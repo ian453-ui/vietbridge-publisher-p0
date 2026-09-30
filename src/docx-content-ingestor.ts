@@ -1,0 +1,251 @@
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, extname, join, resolve } from "node:path";
+import { docxHeading, normalizeWechatHeadings } from "./wechat-heading-structure.ts";
+
+type Article = { id: string; title: string; paragraphs: string[]; media: Array<{ path: string; role: "cover" | "body"; marker: string }> };
+type ActiveAssetOverride = { filename: string; role: "cover" | "body"; driveFileId?: string; inlineObjectId?: string; semanticLabel?: string };
+
+export type DocxIngestResult = {
+  source: string;
+  sourceRevision: string;
+  imported: Array<{ articleId: string; title: string; assetCount: number; target: string }>;
+};
+
+/**
+ * Materialize a Word/Google-Drive export into the Publisher's canonical
+ * per-article contract. Text and inline images are consumed together; images
+ * never become independent ContentItems. Output names are deterministic, so
+ * rescanning the same revision is idempotent and a changed source refreshes it.
+ */
+export function ingestDocxContentBundle(
+  sourceDocx: string,
+  targetRoot: string,
+  source: { driveFileId?: string; driveFolderId?: string; sourceUrl?: string; activeAssetOverrides?: Record<string, ActiveAssetOverride[]> } = {}
+): DocxIngestResult {
+  const sourcePath = resolve(sourceDocx);
+  if (!existsSync(sourcePath) || extname(sourcePath).toLowerCase() !== ".docx") throw new Error("DOCX 内容包不存在");
+  const sourceBytes = readFileSync(sourcePath);
+  const sourceRevision = createHash("sha256").update(sourceBytes).digest("hex");
+  const documentXml = zipText(sourcePath, "word/document.xml");
+  const relationships = parseRelationships(zipText(sourcePath, "word/_rels/document.xml.rels"));
+  const articles = parseArticles(documentXml, relationships);
+  if (!articles.length) throw new Error("DOCX 中没有识别到 VBE 内容编号");
+
+  const imported: DocxIngestResult["imported"] = [];
+  for (const article of articles) {
+    const target = join(resolve(targetRoot), article.id);
+    mkdirSync(target, { recursive: true });
+    const sections = publicSections(article.paragraphs);
+    // Research/related-content references may carry an ID but are not article packages.
+    // Skip those only when they contain neither a public body nor inline media.
+    if (!sections.wechat && article.media.length === 0) continue;
+    if (!sections.wechat) throw new Error(`${article.id} 缺少微信公众号公开母稿`);
+    const publicTitle = sections.wechat.match(/^#\s+(.+)$/mu)?.[1]?.trim() || article.title;
+    article.title = publicTitle;
+    const assetNames: string[] = [];
+    const assetSources: Record<string, Record<string, unknown>> = {};
+    let coverIndex = 0, bodyIndex = 0;
+    const overrides=source.activeAssetOverrides?.[article.id];
+    if(overrides&&overrides.length!==article.media.length)throw new Error(`${article.id} active asset mapping count does not match inline images`);
+    article.media.forEach((media,mediaIndex) => {
+      const suffix = normalizedImageExtension(media.path);
+      const override=overrides?.[mediaIndex];
+      const role=override?.role??media.role;
+      const filename = override?.filename ?? (role === "cover"
+        ? `${coverIndex++ ? `cover_${coverIndex}` : "cover"}_INGESTED${suffix}`
+        : `body_${String(++bodyIndex).padStart(2, "0")}_INGESTED${suffix}`);
+      const bytes = zipBytes(sourcePath, media.path);
+      const destination = join(target, filename);
+      writeFileSync(destination, bytes);
+      assetNames.push(filename);
+      assetSources[filename] = {
+        role: role === "cover" ? "COVER" : "BODY_INFOGRAPHIC",
+        sequence: override ? mediaIndex : role === "cover" ? coverIndex - 1 : bodyIndex,
+        source_kind: override?.driveFileId ? "DRIVE_ACTIVE_ASSET_DOCX_READBACK" : "DOCX_INLINE",
+        source_doc_id: source.driveFileId,
+        source_filename: basename(sourcePath),
+        source_modified_revision: sourceRevision,
+        drive_file_id: override?.driveFileId,
+        inline_object_id: override?.inlineObjectId,
+        semantic_label: override?.semanticLabel,
+        sha256: createHash("sha256").update(bytes).digest("hex")
+      };
+    });
+    const markerToAsset=new Map(article.media.map((media,index)=>[media.marker,assetNames[index]]));
+    const wechat=sections.wechat.replace(/\[\[VB_INLINE_MEDIA:([^\]]+)\]\]/gu,(marker)=>{
+      const filename=markerToAsset.get(marker);
+      if(!filename)throw new Error(`${article.id} unresolved inline image marker in public copy`);
+      const markerIndex=sections.wechat.indexOf(marker),following=sections.wechat.slice(markerIndex+marker.length);
+      const alt=following.match(/(?:^|\n)(图\s*\d+\s*｜[^\n]+)/u)?.[1]?.trim()??filename;
+      return `![${alt}](${filename})`;
+    });
+    const bodyWithoutDuplicateTitle = wechat.trim().replace(/^#\s+(.+)\n+/u, (heading, value: string) => value.trim() === article.title ? "" : heading);
+    writeFileSync(join(target, `${article.id}-wechat-public.md`), `# ${article.title}\n\n${normalizeWechatHeadings(bodyWithoutDuplicateTitle.trim())}\n`);
+    if (isPublicVariant(sections.facebook)) writeFileSync(join(target, `${article.id}-facebook-public.txt`), `${article.title}\n\n${sections.facebook.trim()}\n`);
+    if (isPublicVariant(sections.linkedin)) writeFileSync(join(target, `${article.id}-linkedin-public.txt`), `${article.title}\n\n${sections.linkedin.trim()}\n`);
+    if (isPublicVariant(sections.xiaohongshu)) writeFileSync(join(target, `${article.id}-xiaohongshu-public.txt`), `${sections.xiaohongshu.trim()}\n`);
+
+    const manifestPath = join(target, "manifest.json");
+    let previous: Record<string, unknown> = {};
+    try { previous = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>; } catch { /* first import */ }
+    const previousAssetSources = objectRecord(previous.asset_sources);
+    const previousActiveAssets = Array.isArray(previous.active_assets) ? previous.active_assets.map(String) : [];
+    // A DOCX refresh owns only the assets that a previous DOCX refresh wrote.
+    // Preserve independently verified Drive/history assets instead of silently
+    // replacing the whole canonical media set on every import.
+    const preservedAssets = previousActiveAssets.filter(name => {
+      const metadata = objectRecord(previousAssetSources[name]);
+      return String(metadata.source_kind ?? "").toUpperCase() !== "DOCX_INLINE";
+    });
+    const preservedAssetSources = Object.fromEntries(Object.entries(previousAssetSources).filter(([name, value]) => {
+      const metadata = objectRecord(value);
+      return preservedAssets.includes(name) || String(metadata.source_kind ?? "").toUpperCase() !== "DOCX_INLINE";
+    }));
+    const mergedAssets = [...new Set([...assetNames, ...preservedAssets])];
+    const mergedAssetSources = { ...preservedAssetSources, ...assetSources };
+    const qaPass = assetNames.length > 0;
+    writeFileSync(manifestPath, JSON.stringify({
+      ...previous,
+      article_id: article.id,
+      title: article.title,
+      version: `docx-inline-${sourceRevision.slice(0, 16)}`,
+      content_type: "image_text",
+      source_doc_id: source.driveFileId ?? previous.source_doc_id,
+      source_folder_id: source.driveFolderId ?? previous.source_folder_id,
+      source_url: source.sourceUrl ?? previous.source_url,
+      ingestion_contract: "drive-docx-inline-v1",
+      source_filename: basename(sourcePath),
+      source_revision: sourceRevision,
+      canonical_source: "independent_rewrite_doc",
+      // Extracting bytes proves ingestion only; it does not pass fact or pixel QA.
+      qa_status: qaPass ? "PENDING_FACT_QA" : "FAIL",
+      visual_qa_status: "PENDING",
+      // Content readiness is not publication authorization. A first import is
+      // always unapproved; an explicit prior authorization is merely retained.
+      publication_authorized: previous.publication_authorized === true,
+      active_assets: mergedAssets,
+      asset_sources: mergedAssetSources,
+      blocking_issue: qaPass ? "FACT_AND_VISUAL_QA_PENDING_AFTER_INLINE_ASSET_INGEST" : "document contains no resolvable inline image"
+    }, null, 2) + "\n");
+    imported.push({ articleId: article.id, title: article.title, assetCount: assetNames.length, target });
+  }
+  return { source: sourcePath, sourceRevision, imported };
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function parseArticles(xml: string, relationships: Map<string, string>): Article[] {
+  const articles: Article[] = [];
+  const articlesById = new Map<string, Article>();
+  let current: Article | undefined;
+  for (const paragraph of xml.match(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g) ?? []) {
+    const text = [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map(match => decodeXml(match[1])).join("").trim();
+    const id = text.match(/\b(VBE-\d{8}-\d{3})\b/i)?.[1]?.toUpperCase();
+    if (id && (!current || current.id !== id)) {
+      current = articlesById.get(id);
+      if (!current) {
+        current = { id, title: titleFromHeading(text, id), paragraphs: [], media: [] };
+        articlesById.set(id, current);
+        articles.push(current);
+      }
+    }
+    if (!current) continue;
+    if (text) {
+      current.paragraphs.push(docxHeading(text, paragraph));
+      const declaredTitle = text.match(/^title\s*[:：]\s*(.+)$/iu)?.[1]?.trim();
+      if (declaredTitle) current.title = declaredTitle.replace(/^['"]|['"]$/g, "");
+      if ((!current.title || current.title === current.id) && text.includes("｜")) current.title = titleFromHeading(text, current.id);
+    }
+    for (const match of paragraph.matchAll(/r:embed="([^"]+)"/g)) {
+      const target = relationships.get(match[1]);
+      if (target && !current.media.some(media => media.path === target)) {
+      const context = current.paragraphs.slice(-3).join(" ");
+      const explicitCover = /头图|COVER|插入文章首部/i.test(context) && !/正文|BODY/i.test(context);
+      const marker=`[[VB_INLINE_MEDIA:${target}]]`;
+      if(!current.media.some(media => media.path === target))current.media.push({ path: target, role: explicitCover && !current.media.some(media => media.role === "cover") ? "cover" : "body", marker });
+      current.paragraphs.push(marker);
+      }
+    }
+  }
+  return articles;
+}
+
+function publicSections(paragraphs: string[]) {
+  const text = paragraphs.join("\n");
+  const draftIndex = paragraphs.findIndex(value => /^FULL_DRAFT_V1\s*[｜|]\s*VBE-\d{8}-\d{3}\s*$/iu.test(value.trim()));
+  if (draftIndex >= 0) {
+    const draft: string[] = [];
+    for (const value of paragraphs.slice(draftIndex + 1)) {
+      const line = value.trim();
+      if (/^FULL_DRAFT_V1\s*[｜|]\s*VBE-\d{8}-\d{3}\s*$/iu.test(line) || /^QA\s*:/iu.test(line)) break;
+      draft.push(value);
+    }
+    return { wechat: draft.join("\n").trim(), facebook: "", linkedin: "", xiaohongshu: "" };
+  }
+  const section = (start: RegExp, ends: RegExp[]) => {
+    const match = start.exec(text); if (!match) return "";
+    const rest = text.slice(match.index + match[0].length);
+    const positions = ends.map(pattern => pattern.exec(rest)?.index).filter((value): value is number => value !== undefined);
+    return rest.slice(0, positions.length ? Math.min(...positions) : undefined).trim();
+  };
+  const canonicalStart = paragraphs.findIndex(value => /^【公开母稿[｜|]\s*微信公众号】$/u.test(value.trim()));
+  let wechat = "";
+  if (canonicalStart >= 0) {
+    const derived = /^【(?:平台适配方向|Facebook适配|Facebook版本|LinkedIn适配|LinkedIn版本|小红书适配|小红书版本|正文高密度信息图规格|INTERNAL QA｜不得发布)】$/u;
+    const placeholder = /^【正文高密度信息图】$/u;
+    const publicBody: string[] = [];
+    for (let index = canonicalStart + 1; index < paragraphs.length; index++) {
+      const value = paragraphs[index].trim();
+      if (derived.test(value) || placeholder.test(value)) break;
+      // The canonical Doc may carry an internal asset manifest between the
+      // article and platform variants. It is ingestion metadata, never copy.
+      if (!/^(?:【VISUAL_ASSET_MANIFEST[^】]*】|active_assets\s*:)/iu.test(value)) publicBody.push(value);
+    }
+    const captionIndex = paragraphs.findIndex((value, index) => index > canonicalStart && /^图\s*\d+\s*｜/u.test(value.trim()));
+    const captions: string[] = [];
+    if (captionIndex >= 0) {
+      const caption=paragraphs[captionIndex].trim();
+      if(!publicBody.includes(caption)){
+        captions.push(caption);
+        const sourceLine = paragraphs[captionIndex + 1]?.trim();
+        if (sourceLine && /^VietBridge\s+驻越经营实录｜原创管理工具$/u.test(sourceLine)) captions.push(sourceLine);
+      }
+    }
+    wechat = [...publicBody, ...captions].filter(Boolean).join("\n\n").trim();
+  } else {
+    wechat = section(/【(?:(?:公开正文[｜|]\s*)?微信公众号母稿|公开母稿[｜|]\s*微信公众号)】\s*/u, [/【Facebook/u, /【FACT_QA/u, /【INTERNAL_QA/u]);
+  }
+  return {
+    wechat,
+    facebook: section(/【Facebook(?:版本|适配)?】\s*/u, [/【LinkedIn(?:版本|适配)?】/u, /【小红书(?:版本|适配)?】/u, /【SEO(?:_QA)?】/u, /【FACT_QA/u]),
+    linkedin: section(/【LinkedIn(?:版本|适配)?】\s*/u, [/【小红书(?:版本|适配)?】/u, /【SEO(?:_QA)?】/u, /【FACT_QA/u]),
+    xiaohongshu: section(/【小红书(?:版本|适配)?】\s*/u, [/【SEO(?:_QA)?】/u, /【FACT_QA/u])
+  };
+}
+
+function parseRelationships(xml: string): Map<string, string> {
+  const result = new Map<string, string>();
+  for (const match of xml.matchAll(/<Relationship\b([^>]+)\/?\s*>/g)) {
+    const attrs = match[1];
+    const id = attrs.match(/\bId="([^"]+)"/)?.[1];
+    const target = attrs.match(/\bTarget="([^"]+)"/)?.[1];
+    if (id && target && /(?:^|\/)media\//.test(target)) result.set(id, `word/${target.replace(/^\.\//, "")}`.replace("word/../", ""));
+  }
+  return result;
+}
+
+function titleFromHeading(text: string, id: string): string {
+  const after = text.slice(text.toUpperCase().indexOf(id) + id.length).replace(/^[｜|\s:：-]+/u, "").trim();
+  return after || id;
+}
+function zipText(path: string, entry: string): string { return zipBytes(path, entry).toString("utf8"); }
+function zipBytes(path: string, entry: string): Buffer { return execFileSync("unzip", ["-p", path, entry], { maxBuffer: 64 * 1024 * 1024 }); }
+function decodeXml(value: string): string { return value.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&"); }
+function normalizedImageExtension(path: string): string { const ext = extname(path).toLowerCase(); return [".png", ".jpg", ".jpeg", ".webp"].includes(ext) ? ext : ".png"; }
+function isPublicVariant(value: string): boolean {
+  return Boolean(value.trim()) && !/由母稿压缩|待生成|PENDING|不进入公开payload|保留一个真实经营冲突|场景化开头\s*\+|避免把政策稿压成/iu.test(value);
+}

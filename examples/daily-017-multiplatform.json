@@ -1,0 +1,21 @@
+{
+  "articleId": "Daily-017",
+  "mediaRevision": "v2",
+  "targets": ["xiaohongshu", "facebook", "wechat_channels", "wechat_official_account"],
+  "accountId": "Vietbridge 越南商学院",
+  "mediaType": "video",
+  "title": "300小时加班，你理解反了",
+  "body": "越南300小时加班不是默认额度。先判断200小时的一般上限，再判断是否属于可达到300小时的法定情形，并同步核对员工同意、工时、工资和通知证据。",
+  "tags": ["越南用工", "劳动合规", "加班管理", "驻越经营实录"],
+  "localMedia": ["/Users/a1-6/Library/CloudStorage/GoogleDrive/My Drive/Codex/VietBridge-Enterprise-Training/TT-20260831-ENT-12-Daily017-Overtime-v2/final/Daily-017-vietnam-overtime-controls-video-v2.mp4"],
+  "visibility": "公开可见",
+  "products": [],
+  "approvalRef": "thread-user-2026-08-31-video-ready-republish",
+  "platformOverrides": {
+    "wechat_official_account": {
+      "mediaType": "article",
+      "localMedia": [],
+      "theme": "default"
+    }
+  }
+}

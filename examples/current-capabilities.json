@@ -1,0 +1,13 @@
+{
+  "xiaohongshu": {
+    "loggedInAccountId": "Vietbridge 越南商学院"
+  },
+  "facebook": {
+    "publicUrlReachable": false,
+    "publicUrlHashMatches": false
+  },
+  "wechat_channels": {
+    "chromeConnected": false
+  },
+  "wechat_official_account": {}
+}

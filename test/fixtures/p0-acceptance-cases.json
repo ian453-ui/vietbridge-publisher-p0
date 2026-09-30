@@ -1,0 +1,19 @@
+[
+  {"id":"xhs-timeout-no-duplicate","events":["INTENT","FORM_FILLED","SUBMIT","TIMEOUT"],"expected":"RECONCILE_PENDING","submit_count":1,"auto_retry":false},
+  {"id":"xhs-empty-id-success-redirect","events":["INTENT","FORM_FILLED","SUBMIT","SUCCESS_REDIRECT","EMPTY_ID"],"expected":"PUBLISHED_ID_PENDING","submit_count":1,"auto_retry":false},
+  {"id":"xhs-qr-after-fill","events":["INTENT","FORM_FILLED","QR_CHALLENGE"],"expected":"JOB_WAITING_HUMAN","submit_count":0,"form_snapshot_required":true},
+  {"id":"xhs-prosemirror-partial-tags","events":["INTENT","FORM_FILLING","EDITOR_DESYNC"],"expected":"FAILED_PREFLIGHT","submit_count":0,"recycle_session":true},
+  {"id":"wechat-draft-readback","events":["INTENT","FORM_FILLED","SUBMIT","DRAFT_MEDIA_ID","DRAFT_READBACK_MATCH"],"expected":"DRAFT_API_WRITTEN_NOT_PUBLISHED","submit_count":1},
+  {"id":"wechat-login-expiry-after-fill","events":["INTENT","FORM_FILLED","SESSION_EXPIRED"],"expected":"JOB_WAITING_HUMAN","submit_count":0,"form_snapshot_required":true},
+  {"id":"network-rst-after-submit","events":["INTENT","FORM_FILLED","SUBMIT","TCP_RST"],"expected":"RECONCILE_PENDING","submit_count":1,"auto_retry":false},
+  {"id":"daemon-crash-after-submit","events":["INTENT","FORM_FILLED","SUBMIT","SIGKILL","RESTART"],"expected":"RECONCILE_PENDING","submit_count":1,"auto_retry":false},
+  {"id":"same-profile-concurrency","events":["PROFILE_LOCK_A","PROFILE_LOCK_B"],"expected":"PROFILE_LOCKED","second_job_runs":false},
+  {"id":"cloud-mirror-failure","events":["INTENT","SUBMIT","READBACK_MATCH","SQLITE_COMMIT","CLOUD_FAIL"],"expected":"PUBLISHED","submit_count":1,"mirror_pending":true,"auto_retry":false},
+  {"id":"package-rerender-race","events":["PACKAGE_HASH_VERIFIED","SOURCE_MUTATED_BEFORE_SUBMIT"],"expected":"FAILED_PREFLIGHT","submit_count":0},
+  {"id":"chrome-version-change","events":["CHROME_VERSION_CHANGED","SMOKE_TEST_NOT_RUN"],"expected":"FAILED_PREFLIGHT","submit_count":0},
+  {"id":"profile-growth-safe-boundary","events":["PROFILE_SIZE_CRITICAL","NO_UNRESOLVED_SUBMIT","PROFILE_RECYCLED","READINESS_PASS"],"expected":"PLATFORM_PREFLIGHT","submit_count":0,"profile_deleted_while_active":false},
+  {"id":"form-rehydrate-after-profile-recycle","events":["INTENT","FORM_FILLED","SESSION_DEGRADED","FORM_SNAPSHOT_SQLITE","PROFILE_RECYCLED","LOGIN_HEALTHY","FORM_REHYDRATED"],"expected":"FORM_FILLED","submit_count":0,"form_snapshot_required":true},
+  {"id":"outbox-critical-backpressure","events":["OUTBOX_CRITICAL","UNMIRRORED_EVENTS_PRESERVED","NEW_LIVE_JOB_BLOCKED"],"expected":"FAILED_PREFLIGHT","submit_count":0,"unmirrored_pruned":false},
+  {"id":"devtools-fails-before-submit","events":["INTENT","FORM_FILLED","DEVTOOLS_READINESS_FAIL"],"expected":"FAILED_PREFLIGHT","submit_count":0,"form_snapshot_required":true},
+  {"id":"transport-success-readback-absent","events":["INTENT","FORM_FILLED","SUBMIT","HTTP_200","READBACK_ABSENT"],"expected":"RECONCILE_PENDING","submit_count":1,"auto_retry":false}
+]

@@ -1,0 +1,66 @@
+diff --git a/xiaohongshu/login.go b/xiaohongshu/login.go
+index 67e002d..58f3734 100644
+--- a/xiaohongshu/login.go
++++ b/xiaohongshu/login.go
+@@ -18,22 +18,31 @@ func NewLogin(page *rod.Page) *LoginAction {
+ }
+ 
+ func (a *LoginAction) CheckLoginStatus(ctx context.Context) (bool, error) {
+-	// 加超时保护：只是查登录态的快速检查，不应无限挂（登录扫码的等待在 Login/WaitForLogin 里）
+-	pp := a.page.Context(ctx).Timeout(30 * time.Second)
+-	pp.MustNavigate("https://www.xiaohongshu.com/explore").MustWaitLoad()
+-
+-	time.Sleep(1 * time.Second)
+-
+-	exists, _, err := pp.Has(`.main-container .user .link-wrapper .channel`)
+-	if err != nil {
+-		return false, errors.Wrap(err, "check login status failed")
++	// Do not wait for the window load event: third-party images and scripts can
++	// keep it pending even after the account UI is already interactive.
++	probeCtx, cancel := context.WithTimeout(ctx, 25*time.Second)
++	defer cancel()
++	pp := a.page.Context(probeCtx)
++	if err := pp.Navigate("https://www.xiaohongshu.com/explore"); err != nil {
++		return false, errors.Wrap(err, "check login navigation failed")
+ 	}
+-
+-	if !exists {
+-		return false, errors.Wrap(err, "login status element not found")
++	ticker := time.NewTicker(400 * time.Millisecond)
++	defer ticker.Stop()
++	for {
++		loggedIn, _, err := pp.Has(`.main-container .user .link-wrapper .channel`)
++		if err == nil && loggedIn {
++			return true, nil
++		}
++		loginPrompt, _, promptErr := pp.Has(`.login-container .qrcode-img`)
++		if promptErr == nil && loginPrompt {
++			return false, nil
++		}
++		select {
++		case <-probeCtx.Done():
++			return false, errors.Wrap(probeCtx.Err(), "check login status failed")
++		case <-ticker.C:
++		}
+ 	}
+-
+-	return true, nil
+ }
+ 
+ // CurrentUser 当前登录用户的基础信息。
+diff --git a/xiaohongshu/search.go b/xiaohongshu/search.go
+--- a/xiaohongshu/search.go
++++ b/xiaohongshu/search.go
+@@ -116,6 +116,10 @@ func (s *SearchAction) Search(ctx context.Context, keyword string, filters ...Fi
+ 
+ 	searchURL := makeSearchURL(keyword)
+ 	page.MustNavigate(searchURL)
+-	page.MustWaitStable()
+-	page.MustWait(`() => window.__INITIAL_STATE__ !== undefined`)
++	// The page may keep fetching nonessential resources after search results
++	// are available. Wait for the result state, not global network stability.
++	page.MustWait(`() => {
++		const feeds = window.__INITIAL_STATE__?.search?.feeds;
++		return feeds && (feeds.value !== undefined || feeds._value !== undefined);
++	}`)
+ 	humanize.Delay(ctx, humanize.AfterNavigate)

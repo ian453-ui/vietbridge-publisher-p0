@@ -1,0 +1,25 @@
+{
+  "name": "vietbridge-social-publisher-p0",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "start": "node src/cli.ts",
+    "web": "node src/web-server.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "axios": "^1.20.0",
+    "playwright-core": "^1.63.0",
+    "yaml": "^2.9.0"
+  }
+}
