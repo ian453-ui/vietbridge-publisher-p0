@@ -28,6 +28,12 @@ test("DOCX text and inline sibling images materialize as one idempotent ContentI
     assert.equal(item.assets[0].role, "cover"); assert.equal(item.assets[1].role, "gallery_image");
     assert.equal(item.readiness, "BLOCKED"); assert.ok(item.blockingReasons.includes("VISUAL_QA_PENDING")); assert.equal(item.canonicalDocument.driveFileId, "drive-doc");
     assert.match(readFileSync(item.payloads.facebook!, "utf8"), /FB正文/);
+    const transcript=join(target,"VBE-20260920-050","VBE-20260920-050-source-full-text-internal.md");
+    assert.match(readFileSync(transcript,"utf8"),/LI正文/);
+    assert.match(readFileSync(transcript,"utf8"),/小红书正文/);
+    assert.match(readFileSync(transcript,"utf8"),/内部/);
+    assert.ok(item.sourceEvidence.some(path=>path.endsWith("VBE-20260920-050-source-full-text-internal.md")));
+    assert.doesNotMatch(readFileSync(item.payloads.wechat_official_account!,"utf8"),/内部/);
     const manifest = JSON.parse(readFileSync(join(target, "VBE-20260920-050", "manifest.json"), "utf8"));
     assert.equal(manifest.publication_authorized, false, "ingestion must never grant publication approval");
   } finally { rmSync(root, { recursive: true, force: true }); }
@@ -149,5 +155,39 @@ test("Google Doc FULL_DRAFT blocks merge by content id and inline images materia
     assert.equal(item.readiness,"BLOCKED");assert.ok(item.blockingReasons.includes("VISUAL_QA_PENDING"));
     assert.ok(item.blockingReasons.includes("FACT_QA_PENDING"));
     assert.equal(item.assets[0].qaState,"UNKNOWN","embedded-image ingestion must not imply image QA pass");
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+test("Markdown-style Google Docs platform headings preserve each GPT copy and inline article images",()=>{
+  const root=mkdtempSync(join(tmpdir(),"docx-markdown-platforms-"));
+  try{
+    const unpacked=join(root,"docx"),word=join(unpacked,"word"),media=join(word,"media");mkdirSync(join(word,"_rels"),{recursive:true});mkdirSync(media);
+    const rows=[
+      ["VBE-20260928-085｜越南工业集群新规",""],["content_id: VBE-20260928-085",""],["title: 越南工业集群新规",""],["series: 驻越经营实录",""],
+      ["# 微信公众号母稿",""],["微信公众号导语，先讲选厂不能只看租金。",""],["## 一、核对入住率与基础设施",""],["核验道路、供水和污水处理是否真实可用。","rId1"],
+      ["## Facebook版",""],["Facebook 独立文案。",""],["## LinkedIn版",""],["LinkedIn 独立文案。",""],["## 小红书版",""],["小红书独立文案。",""],["## SEO QA",""],["不得进入公开稿的内部 QA。",""],
+      ["VBE-20260928-087｜TCL案例",""],["content_id: VBE-20260928-087",""],["title: TCL在越南的25年",""],["series: 驻越经营实录",""],
+      ["# TCL在越南的25年",""],["独立案例叙事草稿，不是指定的微信平台版本。",""],["## 微信公众号版本",""],["# TCL在越南的25年",""],["微信正式稿：先核对经营转折，再讲管理启示。","rId2"],
+      ["## Facebook版本",""],["TCL Facebook copy.",""],["## LinkedIn版本",""],["TCL LinkedIn copy.",""],["## 小红书版本",""],["TCL 小红书 copy.",""],["## 事实核查与来源",""],["内部来源核查，不得公开。",""]
+    ];
+    const paragraphs=rows.map(([value,rid])=>`<w:p><w:r>${value?`<w:t>${value}</w:t>`:""}${rid?`<w:drawing><a:blip r:embed="${rid}"/></w:drawing>`:""}</w:r></w:p>`).join("");
+    writeFileSync(join(word,"document.xml"),`<w:document>${paragraphs}</w:document>`);
+    writeFileSync(join(word,"_rels","document.xml.rels"),'<Relationships><Relationship Id="rId1" Target="media/one.png"/><Relationship Id="rId2" Target="media/two.png"/></Relationships>');
+    writeFileSync(join(media,"one.png"),"image-one");writeFileSync(join(media,"two.png"),"image-two");
+    const docx=join(root,"bundle.docx");execFileSync("zip",["-q","-r",docx,"word"],{cwd:unpacked});
+    const target=join(root,"content");ingestDocxContentBundle(docx,target,{driveFileId:"markdown-drive-doc"});
+    const library=new ContentLibrary({roots:[target]}),items=library.index();assert.equal(items.length,2);
+    const industrial=items.find(x=>x.articleId==="VBE-20260928-085")!;
+    const industrialWechat=readFileSync(industrial.payloads.wechat_official_account!,"utf8");
+    assert.match(industrialWechat,/微信公众号导语/);assert.match(industrialWechat,/道路、供水和污水处理/);assert.match(industrialWechat,/!\[body_01_INGESTED\.png\]\(body_01_INGESTED\.png\)/);
+    assert.match(readFileSync(industrial.payloads.facebook!,"utf8"),/Facebook 独立文案/);assert.match(readFileSync(industrial.payloads.linkedin!,"utf8"),/LinkedIn 独立文案/);assert.match(readFileSync(industrial.payloads.xiaohongshu!,"utf8"),/小红书独立文案/);
+    assert.doesNotMatch(industrialWechat,/不得进入公开稿|SEO QA|Facebook 独立文案/);
+    const tcl=items.find(x=>x.articleId==="VBE-20260928-087")!,tclWechat=readFileSync(tcl.payloads.wechat_official_account!,"utf8");
+    assert.match(tclWechat,/微信正式稿/);assert.doesNotMatch(tclWechat,/独立案例叙事草稿|Facebook copy|内部来源核查/);
+    const tclSource=tcl.sourceEvidence.find(path=>path.endsWith("VBE-20260928-087-source-full-text-internal.md"))!;
+    assert.match(readFileSync(tclSource,"utf8"),/独立案例叙事草稿/);
+    assert.match(readFileSync(tclSource,"utf8"),/TCL Facebook copy/);
+    assert.match(readFileSync(tcl.payloads.facebook!,"utf8"),/TCL Facebook copy/);assert.match(readFileSync(tcl.payloads.linkedin!,"utf8"),/TCL LinkedIn copy/);assert.match(readFileSync(tcl.payloads.xiaohongshu!,"utf8"),/TCL 小红书 copy/);
+    assert.equal(tcl.assets.length,1);assert.ok(industrial.assets.length>=1);
   }finally{rmSync(root,{recursive:true,force:true});}
 });

@@ -143,12 +143,14 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
         const item=tasks.library.index().find(candidate=>candidate.articleId===input.articleId&&(!input.packageRoot||candidate.packageRoot===input.packageRoot)&&(!input.version||candidate.version===input.version));
         if(!item)return send(res,404,{error:'CONTENT_PACKAGE_NOT_FOUND'});
         const payloads=Object.fromEntries(Object.entries(item.payloads).map(([platform,path])=>[platform,readFileSync(String(path),'utf8')]));
+        const sourceTranscript=item.sourceEvidence.find(path=>path.endsWith(`${item.articleId}-source-full-text-internal.md`));
+        const sourceTexts=sourceTranscript?{canonical_source_transcript:readFileSync(sourceTranscript,'utf8')}:{};
         const images=item.assets.filter(asset=>['cover','gallery_image','article_inline','video_cover'].includes(asset.role));
         const previewAssets=images.map(asset=>({role:asset.role,sequence:asset.sequence,ordinal:asset.ordinal,filename:asset.filename,staging_path:asset.path,mime_detected:/\.(png|jpe?g|webp)$/i.test(asset.filename)?'image/'+(asset.filename.toLowerCase().endsWith('.png')?'png':asset.filename.toLowerCase().endsWith('.webp')?'webp':'jpeg'):'application/octet-stream'}));
         const preparedPayloads={...payloads};
         let wechatPreviewError:string|undefined;
         if(payloads.wechat_official_account)try{preparedPayloads.wechat_official_account=prepareWechatDraftMarkdown(payloads.wechat_official_account,item.title,previewAssets);}catch(error){wechatPreviewError=String(error);}
-        return send(res,200,{articleId:item.articleId,title:item.title,contentType:item.contentType,payloads:preparedPayloads,previewSource:'CURRENT_LIBRARY_ASSEMBLED',wechatPreviewError,assets:images,videos:item.assets.filter(asset=>asset.role==='video')});
+        return send(res,200,{articleId:item.articleId,title:item.title,contentType:item.contentType,payloads:preparedPayloads,sourceTexts,previewSource:'CURRENT_LIBRARY_ASSEMBLED',wechatPreviewError,assets:images,videos:item.assets.filter(asset=>asset.role==='video')});
       }catch(error){return send(res,400,{error:String(error)});}
     }
     const frozenAsset=url.pathname.match(/^\/api\/jobs\/([^/]+)\/assets\/([^/]+)$/);

@@ -14,6 +14,7 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
   writeFileSync(join(contentRoot, "Daily-018-cover.png"), Buffer.from([137,80,78,71,13,10,26,10,1]));
   writeFileSync(join(contentRoot, "Daily-018-xiaohongshu-public.txt"), "测试标题\n测试正文");
   writeFileSync(join(contentRoot, "Daily-018-facebook-public.txt"), "测试标题\n测试正文");
+  writeFileSync(join(contentRoot, "Daily-018-source-full-text-internal.md"), "<!-- Internal source transcript. Never use as a publish payload. -->\n\n其他 GPT 草稿与编辑备注");
   writeFileSync(join(root, "ledger.yaml"), "published_history: {}\n");
   const db = openDatabase(dbPath);
   const store = new PublisherStore(db);
@@ -50,6 +51,10 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
     const facebookCandidates=await (await fetch(`${base}/api/content/candidates?platforms=facebook`)).json() as any;
     assert.equal(facebookCandidates.candidates.length,1);
     assert.equal(facebookCandidates.candidates[0].articleId,'Daily-018');
+    const contentPreview=await (await fetch(`${base}/api/content/preview`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({articleId:'Daily-018'})})).json() as any;
+    assert.match(contentPreview.sourceTexts.canonical_source_transcript,/其他 GPT 草稿与编辑备注/);
+    assert.doesNotMatch(JSON.stringify(contentPreview.payloads),/其他 GPT 草稿与编辑备注/);
+    assert.equal(contentPreview.assets.length,1);
     const previewAsset=facebookCandidates.candidates[0].assets[0];
     const previewUrl=new URL('/api/content/asset',base);previewUrl.searchParams.set('path',previewAsset.path);previewUrl.searchParams.set('revision',previewAsset.revision);
     const previewResponse=await fetch(previewUrl);assert.equal(previewResponse.status,200);assert.equal(previewResponse.headers.get('x-asset-revision'),previewAsset.revision);

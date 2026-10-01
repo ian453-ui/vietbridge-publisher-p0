@@ -70,6 +70,12 @@ export function ingestDocxContentBundle(
     // Skip those only when they contain neither a public body nor inline media.
     if (!sections.wechat && article.media.length === 0) continue;
     if (!sections.wechat) throw new Error(`${article.id} 缺少微信公众号公开母稿`);
+    // Preserve the complete GPT-authored source (including alternate drafts,
+    // platform variants, and editorial notes) as internal evidence. It is not
+    // a public payload; only the explicitly selected platform copies below
+    // are eligible for Publisher submission.
+    writeFileSync(join(target, `${article.id}-source-full-text-internal.md`),
+      `<!-- Internal source transcript. Never use as a publish payload. -->\n\n${article.paragraphs.join("\n\n")}\n`);
     const publicTitle = sections.wechat.match(/^#\s+(.+)$/mu)?.[1]?.trim() || article.title;
     article.title = publicTitle;
     const assetNames: string[] = [];
@@ -220,6 +226,8 @@ function publicSections(paragraphs: string[]) {
     const positions = ends.map(pattern => pattern.exec(rest)?.index).filter((value): value is number => value !== undefined);
     return rest.slice(0, positions.length ? Math.min(...positions) : undefined).trim();
   };
+  const markdownSection = (start: RegExp, ends: RegExp[]) => section(start, ends);
+  const platformEnd = [/^#{1,3}\s*Facebook(?:版|版本|适配)?\s*$/imu,/^#{1,3}\s*LinkedIn(?:版|版本|适配)?\s*$/imu,/^#{1,3}\s*小红书(?:版|版本|适配)?\s*$/mu,/^#{1,3}\s*(?:事实核查与来源|FACT\s*CHECK|SEO(?:\s*QA)?|VISUAL\s*SPEC)\s*$/imu,/^【(?:Facebook|LinkedIn|小红书|FACT_QA|INTERNAL_QA)[^】]*】$/mu];
   const canonicalStart = paragraphs.findIndex(value => /^【公开母稿[｜|]\s*微信公众号】$/u.test(value.trim()));
   let wechat = "";
   if (canonicalStart >= 0) {
@@ -246,12 +254,28 @@ function publicSections(paragraphs: string[]) {
     wechat = [...publicBody, ...captions].filter(Boolean).join("\n\n").trim();
   } else {
     wechat = section(/【(?:(?:公开正文[｜|]\s*)?微信公众号母稿|公开母稿[｜|]\s*微信公众号)】\s*/u, [/【Facebook/u, /【FACT_QA/u, /【INTERNAL_QA/u]);
+    if (!wechat) {
+      // Recent Google Docs batches use Markdown-style platform headings rather
+      // than the older 【微信公众号母稿】 wrapper. Select the explicit WeChat
+      // section when present; otherwise a top-level "微信公众号母稿" heading
+      // owns the following copy until the next platform/QA section.
+      wechat = markdownSection(/^#{1,3}\s*(?:微信公众号(?:版本|版)|公众号版本)\s*$/mu, platformEnd);
+      if (!wechat) wechat = markdownSection(/^#{1,3}\s*微信公众号母稿\s*$/mu, platformEnd);
+    }
   }
+  const markdownPlatform = (name: string, endNames: string[]) => {
+    const start = new RegExp(`^#{1,3}\\s*${name}(?:版|版本|适配)?\\s*$`, "mu");
+    const ends = endNames.map(value => new RegExp(`^#{1,3}\\s*${value}(?:版|版本|适配)?\\s*$`, "mu"));
+    return section(start, [...ends,/^#{1,3}\s*(?:事实核查与来源|FACT\s*CHECK|SEO(?:\s*QA)?|VISUAL\s*SPEC)\s*$/imu,/^【(?:FACT_QA|INTERNAL_QA)[^】]*】$/mu]);
+  };
+  const facebook = section(/【Facebook(?:版本|适配)?】\s*/u, [/【LinkedIn(?:版本|适配)?】/u, /【小红书(?:版本|适配)?】/u, /【SEO(?:_QA)?】/u, /【FACT_QA/u]) || markdownPlatform("Facebook",["LinkedIn","小红书"]);
+  const linkedin = section(/【LinkedIn(?:版本|适配)?】\s*/u, [/【小红书(?:版本|适配)?】/u, /【SEO(?:_QA)?】/u, /【FACT_QA/u]) || markdownPlatform("LinkedIn",["小红书"]);
+  const xiaohongshu = section(/【小红书(?:版本|适配)?】\s*/u, [/【SEO(?:_QA)?】/u, /【FACT_QA/u]) || markdownPlatform("小红书",[]);
   return {
     wechat,
-    facebook: section(/【Facebook(?:版本|适配)?】\s*/u, [/【LinkedIn(?:版本|适配)?】/u, /【小红书(?:版本|适配)?】/u, /【SEO(?:_QA)?】/u, /【FACT_QA/u]),
-    linkedin: section(/【LinkedIn(?:版本|适配)?】\s*/u, [/【小红书(?:版本|适配)?】/u, /【SEO(?:_QA)?】/u, /【FACT_QA/u]),
-    xiaohongshu: section(/【小红书(?:版本|适配)?】\s*/u, [/【SEO(?:_QA)?】/u, /【FACT_QA/u])
+    facebook,
+    linkedin,
+    xiaohongshu
   };
 }
 
