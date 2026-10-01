@@ -389,6 +389,7 @@ function buildPackage(articleId: string, paths: string[], publishedPlatforms: Su
   // Daily/TT packages predate that contract and their approved public payload
   // remains the canonical local document for backward compatibility.
   if(articleId.startsWith('VBE-')&&!sourceDocId)blockingReasons.push('CANONICAL_DOCUMENT_MISSING');
+  if(metadata.drive_discovery_blocker)blockingReasons.push(String(metadata.drive_discovery_blocker));
   if(metadata.publication_permission===false&&contentType!=='video')blockingReasons.push('APPROVAL_REQUIRED');
   if(Object.keys(payloads).length===0)blockingReasons.push('PUBLIC_PAYLOAD_MISSING');
   if(articleId.startsWith('VBE-')&&qaManifest==='PENDING_FACT_QA')blockingReasons.push('FACT_QA_PENDING');

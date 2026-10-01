@@ -13,6 +13,33 @@ export type DocxIngestResult = {
   imported: Array<{ articleId: string; title: string; assetCount: number; target: string }>;
 };
 
+export type InspectedDocxArticle = {
+  articleId: string; title: string; series: string; status: string; publisherStatus: string;
+  factStatus: string; visualStatus: string; bodyFingerprint: string; assetFingerprint: string;
+  assetCount: number; sourceRevision: string; sourceUrl?: string;
+};
+
+/** Read semantic identity from a Google Docs DOCX export without materializing it. */
+export function inspectDocxContentBundle(sourceDocx: string): InspectedDocxArticle[] {
+  const sourcePath=resolve(sourceDocx);
+  if(!existsSync(sourcePath)||extname(sourcePath).toLowerCase()!=='.docx')throw new Error('DOCX 内容包不存在');
+  const bytes=readFileSync(sourcePath),sourceRevision=createHash('sha256').update(bytes).digest('hex');
+  const articles=parseArticles(zipText(sourcePath,'word/document.xml'),parseRelationships(zipText(sourcePath,'word/_rels/document.xml.rels')));
+  return articles.map(article=>{
+    const lines=article.paragraphs.filter(line=>!line.startsWith('[[VB_INLINE_MEDIA:'));
+    const field=(name:string)=>lines.map(line=>line.match(new RegExp(`^${name}\\s*[:：]\\s*(.*)$`,'iu'))?.[1]).find(Boolean)?.trim()??'';
+    const copy=publicSections(article.paragraphs).wechat;
+    const body=copy.replace(/\[\[VB_INLINE_MEDIA:[^\]]+\]\]/gu,' [IMAGE] ').replace(/\s+/gu,' ').trim();
+    const assets=article.media.map((media,index)=>({index,role:media.role,sha256:createHash('sha256').update(zipBytes(sourcePath,media.path)).digest('hex')}));
+    return {
+      articleId:article.id,title:field('title')||article.title,series:field('series'),status:field('status'),publisherStatus:field('publisher_status'),
+      factStatus:field('fact_check_status')||field('fact_check'),visualStatus:field('visual_status'),
+      bodyFingerprint:createHash('sha256').update(body).digest('hex'),assetFingerprint:createHash('sha256').update(JSON.stringify(assets)).digest('hex'),
+      assetCount:assets.length,sourceRevision
+    };
+  });
+}
+
 /**
  * Materialize a Word/Google-Drive export into the Publisher's canonical
  * per-article contract. Text and inline images are consumed together; images
@@ -22,7 +49,7 @@ export type DocxIngestResult = {
 export function ingestDocxContentBundle(
   sourceDocx: string,
   targetRoot: string,
-  source: { driveFileId?: string; driveFolderId?: string; sourceUrl?: string; activeAssetOverrides?: Record<string, ActiveAssetOverride[]> } = {}
+  source: { driveFileId?: string; driveFolderId?: string; sourceUrl?: string; activeAssetOverrides?: Record<string, ActiveAssetOverride[]>; includeArticleIds?: string[] } = {}
 ): DocxIngestResult {
   const sourcePath = resolve(sourceDocx);
   if (!existsSync(sourcePath) || extname(sourcePath).toLowerCase() !== ".docx") throw new Error("DOCX 内容包不存在");
@@ -30,7 +57,8 @@ export function ingestDocxContentBundle(
   const sourceRevision = createHash("sha256").update(sourceBytes).digest("hex");
   const documentXml = zipText(sourcePath, "word/document.xml");
   const relationships = parseRelationships(zipText(sourcePath, "word/_rels/document.xml.rels"));
-  const articles = parseArticles(documentXml, relationships);
+  const articleIds=source.includeArticleIds?new Set(source.includeArticleIds):undefined;
+  const articles = parseArticles(documentXml, relationships).filter(article=>!articleIds||articleIds.has(article.id));
   if (!articles.length) throw new Error("DOCX 中没有识别到 VBE 内容编号");
 
   const imported: DocxIngestResult["imported"] = [];

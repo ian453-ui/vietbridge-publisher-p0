@@ -16,6 +16,7 @@ import { PublicationLedgerReconciler } from "./publication-ledger.ts";
 import { LocalContentRefresher } from './local-content-refresh.ts';
 import {assetMime,serveAsset} from './asset-response.ts';
 import {videoDetails} from './content-library.ts';
+import {GoogleDriveCanonicalSync} from './google-drive-canonical-sync.ts';
 
 export type WebServerOptions = { dbPath?: string; host?: string; port?: number; contentRoots?: string[]; ledgerPath?: string; stagingRoot?: string; mirrorPath?: string; workerEnabled?: boolean };
 
@@ -51,11 +52,19 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
   const wechatBrowser=new WechatOfficialBrowser();
   const ledgerReconciler=new PublicationLedgerReconciler(db,tasks.library,ledgerPath);
   const localRefresh=new LocalContentRefresher(tasks.library.roots[0]??resolve(socialRoot,'Content-Library'));
+  const canonicalRoot=tasks.library.roots[0]??resolve(socialRoot,'Content-Library');
+  let driveSync:GoogleDriveCanonicalSync|undefined,driveSyncError='GOOGLE_DRIVE_CONNECTOR_STARTING';
+  void GoogleDriveCanonicalSync.connect(db,canonicalRoot).then(sync=>{driveSync=sync;driveSyncError='';sync.start();}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
   if (options.workerEnabled !== false) worker.start();
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/") return html(res, renderDashboard());
     if (req.method === "GET" && url.pathname === "/api/health") return send(res, 200, { ok: true, aiRuntimeRequired: false, capabilities: PLATFORM_CAPABILITIES });
+    if(req.method==='GET'&&url.pathname==='/api/content/drive-sync/status')return send(res,200,driveSync?driveSync.status():{enabled:false,authorized:false,error:driveSyncError,publicationSideEffects:false});
+    if(req.method==='POST'&&url.pathname==='/api/content/drive-sync/run'){
+      if(!driveSync)return send(res,503,{error:driveSyncError||'GOOGLE_DRIVE_SYNC_UNAVAILABLE'});
+      try{return send(res,200,await driveSync.run('full'));}catch(error){return send(res,409,{error:String(error)});}
+    }
     if(req.method==='GET'&&url.pathname==='/api/workspace-context'){
       try{
         const context=await clientWorkspace(String(url.searchParams.get('workspace')||''));
@@ -296,7 +305,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
     }
     return send(res, req.method === "GET" ? 404 : 405, { error: req.method === "GET" ? "NOT_FOUND" : "METHOD_NOT_ALLOWED" });
   });
-  server.on("close", () => { void worker.stop().finally(() => db.close()); });
+  server.on("close", () => { driveSync?.stop(); void worker.stop().finally(() => db.close()); });
   return server;
 }
 

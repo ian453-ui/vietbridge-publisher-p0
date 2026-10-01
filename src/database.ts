@@ -37,6 +37,18 @@ function migrate(db: Db): void {
     CREATE TABLE IF NOT EXISTS app_preferences (
       key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS drive_sync_state (
+      key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS drive_sync_documents (
+      drive_file_id TEXT NOT NULL, content_id TEXT NOT NULL, title TEXT NOT NULL,
+      slug TEXT NOT NULL, body_fingerprint TEXT NOT NULL, asset_fingerprint TEXT NOT NULL,
+      source_revision TEXT NOT NULL, modified_time TEXT NOT NULL, source_url TEXT NOT NULL,
+      status TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, disposition TEXT NOT NULL,
+      detail TEXT, package_root TEXT, updated_at TEXT NOT NULL,
+      PRIMARY KEY(drive_file_id,content_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_drive_sync_content ON drive_sync_documents(content_id, active);
     CREATE TABLE IF NOT EXISTS state_transitions (
       transition_id INTEGER PRIMARY KEY AUTOINCREMENT,
       job_id TEXT NOT NULL REFERENCES jobs(job_id),
