@@ -31,27 +31,35 @@ test('manual DOCX refresh updates article and image while preserving identity an
   const unpacked=join(root,'unpacked'),word=join(unpacked,'word'),content=join(root,'content');
   const id='VBE-20260923-072',docId='1YG1dhjmB5GNrJnQEdMJ24yNZdsp5I-vsYzPlwzQm9H4';
   mkdirSync(join(word,'_rels'),{recursive:true});mkdirSync(join(word,'media'));
-  writeFileSync(join(word,'_rels','document.xml.rels'),'<Relationships><Relationship Id="rId1" Target="media/image1.png"/></Relationships>');
-  const make=(body:string,image:string,path:string)=>{
-    const paragraphs=[`${id}｜标题`,`【头图｜COVER_QA_PASS】`,`【公开母稿｜微信公众号】`,body,'【Facebook版本】','Facebook 正文']
-      .map((text,index)=>`<w:p><w:r><w:t>${text}</w:t>${index===1?'<w:drawing><a:blip r:embed="rId1"/></w:drawing>':''}</w:r></w:p>`).join('');
+  writeFileSync(join(word,'_rels','document.xml.rels'),'<Relationships><Relationship Id="rId1" Target="media/image1.png"/><Relationship Id="rId2" Target="media/image2.png"/></Relationships>');
+  const make=(body:string,images:string[],path:string)=>{
+    const values=[`${id}｜标题`,`【头图｜COVER_QA_PASS】`,`【公开母稿｜微信公众号】`,body,...(images.length>1?['【正文高密度信息图】','图 01｜新版核对图']:[]),'【Facebook版本】','Facebook 正文'];
+    const paragraphs=values.map((text,index)=>`<w:p><w:r><w:t>${text}</w:t>${index===1?'<w:drawing><a:blip r:embed="rId1"/></w:drawing>':''}${index===4&&images.length>1?'<w:drawing><a:blip r:embed="rId2"/></w:drawing>':''}</w:r></w:p>`).join('');
     writeFileSync(join(word,'document.xml'),`<w:document>${paragraphs}</w:document>`);
-    writeFileSync(join(word,'media','image1.png'),image);
+    images.forEach((image,index)=>writeFileSync(join(word,'media',`image${index+1}.png`),image));
     execFileSync('zip',['-q','-r',path,'word'],{cwd:unpacked});
   };
   try{
     const original=join(root,'original.docx'),updated=join(root,'updated.docx');
-    make('旧版正文','old image',original);
+    make('旧版正文',['old image'],original);
     ingestDocxContentBundle(original,content,{driveFileId:docId});
-    make('新版正文','new image',updated);
+    make('新版正文',['new cover','new infographic'],updated);
+    const manifestPath=join(content,id,'manifest.json');
+    const manifest=JSON.parse(readFileSync(manifestPath,'utf8'));
+    writeFileSync(join(content,id,'stale-readback.png'),'stale image');
+    manifest.active_assets.push('stale-readback.png');
+    manifest.asset_sources['stale-readback.png']={source_kind:'DRIVE_ACTIVE_ASSET_DOCX_READBACK',role:'BODY_INFOGRAPHIC'};
+    writeFileSync(manifestPath,JSON.stringify(manifest));
     const result=new LocalContentRefresher(content).refreshDocx(id,readFileSync(updated));
-    assert.deepEqual(result.imported,[{articleId:id,assetCount:1}]);
+    assert.deepEqual(result.imported,[{articleId:id,assetCount:2}]);
     assert.equal(result.publicationTasksChanged,false);
     const items=new ContentLibrary({roots:[content]}).index();
     assert.equal(items.length,1);
     assert.equal(items[0].canonicalDocument.driveFileId,docId);
     assert.match(readFileSync(items[0].payloads.wechat_official_account!,'utf8'),/新版正文/);
-    assert.equal(readFileSync(items[0].assets[0].path,'utf8'),'new image');
+    assert.equal(items[0].assets.length,2);
+    assert.deepEqual(items[0].assets.map(asset=>readFileSync(asset.path,'utf8')),['new cover','new infographic']);
+    assert.ok(!JSON.parse(readFileSync(manifestPath,'utf8')).active_assets.includes('stale-readback.png'));
     assert.throws(()=>new LocalContentRefresher(content).refreshDocx('VBE-20260923-073',readFileSync(updated)),/CANONICAL_DOCUMENT_PACKAGE_NOT_FOUND/);
   }finally{rmSync(root,{recursive:true,force:true});}
 });

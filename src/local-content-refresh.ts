@@ -29,17 +29,18 @@ export class LocalContentRefresher {
     const docxPath = join(temporary, 'source.docx');
     writeFileSync(docxPath, bytes);
     try {
-      const overrides = Object.fromEntries(siblings.map(row => [String(row.data!.article_id), activeOverrides(row.data!)]));
+      // A canonical revision may add, remove, or reorder inline images. Prior
+      // positional overrides describe the previous revision and must not block
+      // the new source from defining its own image sequence and roles.
       // Parse and materialize in isolation before touching the live library.
-      const preview = ingestDocxContentBundle(docxPath, join(temporary, 'preview'), { driveFileId: sourceId, activeAssetOverrides: overrides });
+      const preview = ingestDocxContentBundle(docxPath, join(temporary, 'preview'), { driveFileId: sourceId });
       const incoming = new Set(preview.imported.map(item => item.articleId));
       if (!incoming.has(articleId) || [...incoming].some(id => !allowedIds.has(id))) throw new Error('DOCX_ARTICLE_ID_MISMATCH');
       const targetRoot = dirname(dirname(selected.path));
       const updated = ingestDocxContentBundle(docxPath, targetRoot, {
         driveFileId: sourceId,
         driveFolderId: String(selected.data!.source_folder_id ?? ''),
-        sourceUrl: String(selected.data!.source_url ?? ''),
-        activeAssetOverrides: overrides
+        sourceUrl: String(selected.data!.source_url ?? '')
       });
       for (const item of updated.imported) {
         const path = join(item.target, 'manifest.json');
@@ -73,14 +74,6 @@ export class LocalContentRefresher {
   }
 }
 
-function activeOverrides(manifest: Manifest) {
-  return (manifest.active_assets ?? []).filter(name => /\.(png|jpe?g|webp)$/i.test(name)).map(name => {
-    const source = manifest.asset_sources?.[name] ?? {};
-    return { filename: name, role: /cover/i.test(String(source.role ?? name)) ? 'cover' as const : 'body' as const,
-      driveFileId: String(source.drive_file_id ?? '') || undefined, inlineObjectId: String(source.inline_object_id ?? '') || undefined,
-      semanticLabel: String(source.semantic_label ?? '') || undefined };
-  });
-}
 function readManifest(path: string): Manifest | undefined { try { return JSON.parse(readFileSync(path, 'utf8')) as Manifest; } catch { return undefined; } }
 function writeManifest(path: string, value: Manifest) { const temporary = `${path}.refresh-${process.pid}`; writeFileSync(temporary, JSON.stringify(value, null, 2) + '\n'); renameSync(temporary, path); }
 function findManifests(root: string): string[] {

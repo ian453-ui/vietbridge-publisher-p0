@@ -131,11 +131,10 @@ export function ingestDocxContentBundle(
     // replacing the whole canonical media set on every import.
     const preservedAssets = previousActiveAssets.filter(name => {
       const metadata = objectRecord(previousAssetSources[name]);
-      return String(metadata.source_kind ?? "").toUpperCase() !== "DOCX_INLINE";
+      return !["DOCX_INLINE", "DRIVE_ACTIVE_ASSET_DOCX_READBACK"].includes(String(metadata.source_kind ?? "").toUpperCase());
     });
     const preservedAssetSources = Object.fromEntries(Object.entries(previousAssetSources).filter(([name, value]) => {
-      const metadata = objectRecord(value);
-      return preservedAssets.includes(name) || String(metadata.source_kind ?? "").toUpperCase() !== "DOCX_INLINE";
+      return preservedAssets.includes(name);
     }));
     const mergedAssets = [...new Set([...assetNames, ...preservedAssets])];
     const mergedAssetSources = { ...preservedAssetSources, ...assetSources };
