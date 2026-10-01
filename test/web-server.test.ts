@@ -41,6 +41,8 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
     assert.doesNotMatch(page, /保存任务草稿/);
     assert.doesNotThrow(()=>new Function(page.match(/<script>([\s\S]*?)<\/script>/)![1]));
     assert.match(page,/Facebook 发布账号/);
+    assert.match(page,/完整 GPT 原文（仅内部）/);
+    assert.match(page,/不会进入任何平台发布载荷/);
     const accountFile=join(root,'second.env');writeFileSync(accountFile,'FB_ACCOUNT_NAME=Second\nFB_PAGE_ID=2002\nFB_PAGE_NAME=Second Page\nFB_PAGE_ACCESS_TOKEN=never-return-this\n');chmodSync(accountFile,0o600);
     const imported=await (await fetch(`${base}/api/facebook/accounts/import`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({config_url:`file://${accountFile}`})})).json() as any;
     assert.equal(imported.page_id,'2002');assert.doesNotMatch(JSON.stringify(imported),/never-return-this/);
