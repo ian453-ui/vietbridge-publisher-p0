@@ -19,6 +19,32 @@ export type InspectedDocxArticle = {
   assetCount: number; sourceRevision: string; sourceUrl?: string;
 };
 
+/** Read every authored paragraph and embedded image for internal source review.
+ * This deliberately does not infer a public payload or an image's cover role. */
+export function readDocxSourceReview(sourceDocx:string,contentId:string){
+  const sourcePath=resolve(sourceDocx);
+  if(!existsSync(sourcePath)||extname(sourcePath).toLowerCase()!=='.docx')throw new Error('DOCX 内容包不存在');
+  const article=parseArticles(zipText(sourcePath,'word/document.xml'),parseRelationships(zipText(sourcePath,'word/_rels/document.xml.rels')))
+    .find(item=>item.id===contentId);
+  if(!article)throw new Error('SOURCE_CONTENT_ID_NOT_FOUND');
+  const fields:Record<string,string>={};
+  for(const [index,paragraph] of article.paragraphs.entries()){
+    const fieldLine=paragraph.replace(/\[\[VB_INLINE_MEDIA:[^\]]+\]\]/gu,'').trim();
+    if(!fieldLine)continue;
+    if(index===0&&fieldLine.startsWith(`${contentId}｜`))continue;
+    if(/^#|^【/u.test(fieldLine))break;
+    const match=fieldLine.match(/^([a-z][a-z0-9_]*)\s*[:：]\s*(.*)$/iu);
+    if(match)fields[match[1].toLowerCase()]=match[2].trim();
+    else break;
+  }
+  const sections=publicSections(article.paragraphs);
+  const images=article.media.map((media,index)=>{
+    const bytes=zipBytes(sourcePath,media.path),ext=normalizedImageExtension(media.path);
+    return {index:index+1,filename:basename(media.path),mimeType:ext==='.jpg'||ext==='.jpeg'?'image/jpeg':ext==='.webp'?'image/webp':'image/png',sha256:createHash('sha256').update(bytes).digest('hex'),dataUrl:`data:${ext==='.jpg'||ext==='.jpeg'?'image/jpeg':ext==='.webp'?'image/webp':'image/png'};base64,${bytes.toString('base64')}`};
+  });
+  return {articleId:contentId,title:fields.title||article.title,fields,paragraphs:article.paragraphs,publicSections:{wechat:Boolean(sections.wechat),facebook:Boolean(sections.facebook),linkedin:Boolean(sections.linkedin),xiaohongshu:Boolean(sections.xiaohongshu)},images};
+}
+
 /** Read semantic identity from a Google Docs DOCX export without materializing it. */
 export function inspectDocxContentBundle(sourceDocx: string): InspectedDocxArticle[] {
   const sourcePath=resolve(sourceDocx);

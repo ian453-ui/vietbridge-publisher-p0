@@ -4,8 +4,25 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { ingestDocxContentBundle } from "../src/docx-content-ingestor.ts";
+import { ingestDocxContentBundle,readDocxSourceReview } from "../src/docx-content-ingestor.ts";
 import { ContentLibrary } from "../src/content-library.ts";
+
+test("source review keeps metadata after an inline image inside the field block",()=>{
+  const root=mkdtempSync(join(tmpdir(),"docx-source-fields-"));
+  try{
+    const unpacked=join(root,"docx"),word=join(unpacked,"word");mkdirSync(join(word,"_rels"),{recursive:true});mkdirSync(join(word,"media"));
+    const values=["VBE-20260928-089｜案例","content_id: VBE-20260928-089","status: CONTENT_VISUAL_QA_PASS","publisher_status: BLOCKED_PENDING_QA","【微信公众号母稿】","正文"];
+    const paragraphs=values.map((value,index)=>`<w:p><w:r><w:t>${value}</w:t>${index===1?'<w:drawing><a:blip r:embed="rId1"/></w:drawing>':''}</w:r></w:p>`).join('');
+    writeFileSync(join(word,"document.xml"),`<w:document>${paragraphs}</w:document>`);
+    writeFileSync(join(word,"_rels","document.xml.rels"),'<Relationships><Relationship Id="rId1" Target="media/image1.png"/></Relationships>');
+    writeFileSync(join(word,"media","image1.png"),"image");
+    const docx=join(root,"bundle.docx");execFileSync("zip",["-q","-r",docx,"word"],{cwd:unpacked});
+    const review=readDocxSourceReview(docx,"VBE-20260928-089");
+    assert.equal(review.fields.publisher_status,"BLOCKED_PENDING_QA",JSON.stringify({fields:review.fields,paragraphs:review.paragraphs}));
+    assert.equal(review.images.length,1);
+    assert.equal(review.publicSections.wechat,true);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
 
 test("DOCX text and inline sibling images materialize as one idempotent ContentItem", () => {
   const root = mkdtempSync(join(tmpdir(), "docx-ingest-"));

@@ -411,13 +411,13 @@ function buildPackage(articleId: string, paths: string[], publishedPlatforms: Su
   const variantAssets:Partial<Record<ContentVariantPlatform,string[]>>={};
   for(const platform of Object.keys(payloads) as ContentVariantPlatform[])variantAssets[platform]=[...imageIds];
   const manifestDetail=localizeBlockingDetail(stringValue(metadata.blocking_issue));
-  const blockingDetail=publicPayloadLeaks.length
-    ? `公开载荷含内部制作标记：${publicPayloadLeaks.join('；')}`
-    : blockingReasons.includes('FACT_QA_PENDING')
-      ? '文章事实核查尚未完成；图片导入或视觉检查不能替代主张—来源核验。'
-    : blockingReasons.includes('VISUAL_QA_PENDING')
-      ? '素材文件存在或文件名带 QA_PASS，不代表图中文字、信息密度、来源、手机可读性与正文位置已通过视觉验收。'
-      : manifestDetail;
+  const blockingDetail=[
+    stringValue(metadata.drive_discovery_detail),
+    publicPayloadLeaks.length?`公开载荷含内部制作标记：${publicPayloadLeaks.join('；')}`:'',
+    blockingReasons.includes('FACT_QA_PENDING')?'文章事实核查尚未完成；图片导入或视觉检查不能替代主张—来源核验。':'',
+    blockingReasons.includes('VISUAL_QA_PENDING')?'素材存在不代表信息密度、图中文字、来源、手机可读性与正文位置已通过视觉验收。':'',
+    manifestDetail
+  ].filter(Boolean).join('；');
   return {articleId,version,title,contentType,packageRoot,assets,payloads,canonicalDocument:{contentId:articleId,driveFileId:sourceDocId,driveFolderId:sourceFolderId,sourceAnchor:sourceDoc.sourceAnchor,sourceUrl:stringValue(metadata.source_url)},variantAssets,readiness:blockingReasons.length?'BLOCKED':'READY',blockingReasons,blockingDetail,unresolvedAssets:qaManifest==='FAIL'?[]:mediaSelection.unresolved,duplicateCandidates:0,publishedPlatforms,sourceEvidence:sorted,canonicalSource:String(metadata.canonical_source??'')==='independent_rewrite_doc'};
 }
 

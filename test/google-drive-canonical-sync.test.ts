@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync,mkdtempSync,mkdirSync,readFileSync,rmSync,writeFileSync } from 'node:fs';
+import { existsSync,mkdtempSync,mkdirSync,readFileSync,realpathSync,rmSync,writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDatabase } from '../src/database.ts';
@@ -9,11 +9,11 @@ import { ContentLibrary } from '../src/content-library.ts';
 import { GoogleDriveCanonicalSync } from '../src/google-drive-canonical-sync.ts';
 
 const png=Buffer.from([137,80,78,71,13,10,26,10,1,2,3]);
-function makeDocx(root:string,id:string,title:string,body:string,status='READY'){
+function makeDocx(root:string,id:string,title:string,body:string,status='READY',withPublicSection=true){
   const unpacked=join(root,`src-${Math.random().toString(16).slice(2)}`),word=join(unpacked,'word');mkdirSync(join(word,'_rels'),{recursive:true});mkdirSync(join(word,'media'));
   writeFileSync(join(word,'_rels','document.xml.rels'),'<Relationships><Relationship Id="rId1" Target="media/image1.png"/></Relationships>');
-  const values=[`content_id: ${id}`,`title: ${title}`,'series: 驻越经营实录',`status: ${status}`,'publisher_status: READY','fact_check_status: PASS','visual_status: PASS','【微信公众号母稿】',`# ${title}`,body,'【头图｜COVER】','图 01｜核对内容是否对应'];
-  const paragraphs=values.map((value,index)=>`<w:p><w:r><w:t>${value}</w:t>${index===10?'<w:drawing><a:blip r:embed="rId1"/></w:drawing>':''}</w:r></w:p>`).join('');
+  const values=[`content_id: ${id}`,`title: ${title}`,'series: 驻越经营实录',`status: ${status}`,'publisher_status: READY','fact_check_status: PASS','visual_status: PASS',...(withPublicSection?['【微信公众号母稿】']:[]),`# ${title}`,body,'【头图｜COVER】','图 01｜核对内容是否对应'];
+  const paragraphs=values.map((value,index)=>`<w:p><w:r><w:t>${value}</w:t>${index===values.length-2?'<w:drawing><a:blip r:embed="rId1"/></w:drawing>':''}</w:r></w:p>`).join('');
   writeFileSync(join(word,'document.xml'),`<w:document>${paragraphs}</w:document>`);writeFileSync(join(word,'media','image1.png'),png);
   const path=join(root,`${id}.docx`);execFileSync('zip',['-q','-r',path,'word'],{cwd:unpacked});return readFileSync(path);
 }
@@ -46,13 +46,48 @@ test('a pending canonical revision refreshes visible text while keeping publicat
   const sync=new GoogleDriveCanonicalSync(db,library,fakeDrive([file],bytes),()=>true);
   try{
     await sync.run('full');
-    bytes.set(docId,makeDocx(root,id,'待校稿文章','GPT 新文字已经可读','CONTENT_VISUAL_QA_PASS'));file.modifiedTime='2026-10-01T00:20:00.000Z';
+    bytes.set(docId,makeDocx(root,id,'待校稿文章','GPT 新文字已经可读','CONTENT_QA_PENDING'));file.modifiedTime='2026-10-01T00:20:00.000Z';
     await sync.run('full');
     const item=new ContentLibrary({roots:[library]}).index()[0];
     assert.match(readFileSync(item.payloads.wechat_official_account!,'utf8'),/GPT 新文字已经可读/);
     assert.doesNotMatch(readFileSync(item.payloads.wechat_official_account!,'utf8'),/旧文字需要替换/);
     assert.equal(item.readiness,'BLOCKED');assert.ok(item.blockingReasons.includes('SOURCE_QA_PENDING'));
     assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE drive_file_id=? AND content_id=?').get(docId,id) as {disposition:string}).disposition,'SOURCE_QA_PENDING');
+  }finally{db.close();rmSync(root,{recursive:true,force:true});}
+});
+
+test('producer QA pass is distinct from Publisher fact and visual review',async()=>{
+  const root=mkdtempSync(join(tmpdir(),'publisher-drive-producer-pass-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));mkdirSync(library,{recursive:true});
+  const id='VBE-20261001-205',docId='google-source-document-205',bytes=makeDocx(root,id,'经营许可复核','可预览的公开稿','CONTENT_VISUAL_QA_PASS');
+  const sync=new GoogleDriveCanonicalSync(db,library,fakeDrive([source(docId,`${id}｜驻越经营实录`,bytes)],new Map([[docId,bytes]])),()=>true);
+  try{await sync.run('full');const item=new ContentLibrary({roots:[library]}).index()[0];assert.ok(!item.blockingReasons.includes('SOURCE_QA_PENDING'));assert.ok(item.blockingReasons.includes('FACT_QA_PENDING'));assert.ok(item.blockingReasons.includes('VISUAL_QA_PENDING'));assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE content_id=?').get(id) as {disposition:string}).disposition,'IMPORTED');}
+  finally{db.close();rmSync(root,{recursive:true,force:true});}
+});
+
+test('an unsegmented GPT draft stays readable as Drive source but cannot replace public copy',async()=>{
+  const root=mkdtempSync(join(tmpdir(),'publisher-drive-draft-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));mkdirSync(library,{recursive:true});
+  const id='VBE-20261001-206',docId='google-source-document-206',bytes=makeDocx(root,id,'未分段母稿','GPT 写出的完整正文','READY',false);
+  const sync=new GoogleDriveCanonicalSync(db,library,fakeDrive([source(docId,`${id}｜驻越经营实录`,bytes)],new Map([[docId,bytes]])),()=>true);
+  try{await sync.run('full');assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE content_id=?').get(id) as {disposition:string}).disposition,'SOURCE_PUBLIC_COPY_MISSING');assert.equal(new ContentLibrary({roots:[library]}).index().length,0);const review=await sync.previewSource(id,docId);assert.match(review.paragraphs.join(' '),/GPT 写出的完整正文/);assert.equal(review.fields.status,'READY');assert.equal(review.publicSections.wechat,false);assert.equal(review.images.length,1);}
+  finally{db.close();rmSync(root,{recursive:true,force:true});}
+});
+
+test('a reviewed new single Doc can manually replace an older aggregate source without approving publication',async()=>{
+  const root=mkdtempSync(join(tmpdir(),'publisher-drive-rebind-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));mkdirSync(library,{recursive:true});
+  const id='VBE-20261001-207',oldDoc='aggregate-source-207',newDoc='single-source-document-207';
+  const oldBytes=makeDocx(root,id,'同一案例','旧公开正文'),newBytes=makeDocx(root,id,'同一案例','GPT 新公开正文');
+  const files=[source(oldDoc,`${id}｜聚合稿`,oldBytes)],bytes=new Map([[oldDoc,oldBytes],[newDoc,newBytes]]);
+  const sync=new GoogleDriveCanonicalSync(db,library,fakeDrive(files,bytes),()=>true);
+  try{
+    await sync.run('full');const oldPackage=new ContentLibrary({roots:[library]}).index()[0];assert.equal(oldPackage.packageRoot,realpathSync(join(library,'Drive-Canonical-Auto',id)));
+    files.splice(0,1,source(newDoc,`${id}｜单篇稿`,newBytes,'2026-10-01T00:30:00.000Z'));
+    await sync.run('full');assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE drive_file_id=?').get(newDoc) as {disposition:string}).disposition,'IDENTITY_CONFLICT');
+    assert.throws(()=>sync.approveRebind(id,newDoc,oldPackage.packageRoot,false),/EXPLICIT_REBIND_CONFIRMATION_REQUIRED/);
+    const accepted=sync.approveRebind(id,newDoc,oldPackage.packageRoot,true);assert.equal(accepted.publicationAuthorized,false);
+    await sync.run('auto');const current=new ContentLibrary({roots:[library]}).index()[0];
+    assert.equal(current.canonicalDocument.driveFileId,newDoc);assert.match(readFileSync(current.payloads.wechat_official_account!,'utf8'),/GPT 新公开正文/);
+    assert.equal(current.readiness,'BLOCKED');assert.ok(current.blockingReasons.includes('FACT_QA_PENDING'));
+    const manifest=JSON.parse(readFileSync(join(current.packageRoot,'manifest.json'),'utf8'));assert.equal(manifest.drive_rebind_from,oldDoc);
   }finally{db.close();rmSync(root,{recursive:true,force:true});}
 });
 

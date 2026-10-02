@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
-import { existsSync,mkdtempSync,readFileSync,readdirSync,renameSync,rmSync,writeFileSync } from 'node:fs';
+import { existsSync,mkdtempSync,readFileSync,readdirSync,realpathSync,renameSync,rmSync,writeFileSync } from 'node:fs';
 import { dirname,join,resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import type { Db } from './database.ts';
-import { inspectDocxContentBundle,ingestDocxContentBundle } from './docx-content-ingestor.ts';
+import { inspectDocxContentBundle,ingestDocxContentBundle,readDocxSourceReview } from './docx-content-ingestor.ts';
 
 const DOCX_MIME='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const DOC_MIME='application/vnd.google-apps.document';
@@ -14,6 +14,8 @@ const SERVICE_NAME='com.vietbridge.publisher.google-drive-refresh-token';
 type DriveFile={id:string;name:string;mimeType:string;modifiedTime?:string;version?:string;parents?:string[];webViewLink?:string;trashed?:boolean};
 type DriveClient={listCanonicalDocs():Promise<DriveFile[]>;changes(pageToken:string):Promise<{changes:Array<{fileId:string;removed?:boolean;file?:DriveFile}>;nextPageToken?:string;newStartPageToken?:string}>;startPageToken():Promise<string>;exportDocx(id:string):Promise<Buffer>};
 type SourceRow={drive_file_id:string;content_id:string;title:string;slug:string;body_fingerprint:string;asset_fingerprint:string;source_revision:string;modified_time:string;source_url:string;status:string;active:number;disposition:string;detail:string|null;package_root:string|null};
+const EMPTY_BODY_SHA256=createHash('sha256').update('').digest('hex');
+function contentReviewPending(status:string){const value=status.toUpperCase();return value!=='READY'&&value!=='CONTENT_VISUAL_QA_PASS'&&!/^CONTENT_QA_PASS(?:__|$)/u.test(value);}
 
 /** Drive is canonical input only: this worker never creates or publishes Drive/Platform content. */
 export class GoogleDriveCanonicalSync {
@@ -65,6 +67,28 @@ export class GoogleDriveCanonicalSync {
     const counts=this.db.prepare('SELECT disposition,COUNT(*) as count FROM drive_sync_documents WHERE active=1 GROUP BY disposition').all() as Array<{disposition:string;count:number}>;
     return {enabled:true,authorized:this.authCheck(),running:Boolean(this.running||this.queuedFull),queuedFull:Boolean(this.queuedFull),runningFull:this.runningFull,runningMode:this.runningMode??null,progress:this.progress,lastFullScanAt:get('last_full_scan_at')?.value??null,lastFullCompletedAt:get('last_full_completed_at')?.value??null,lastChangeCheckAt:get('last_change_check_at')?.value??null,lastError:get('last_error')?.value??null,items:this.db.prepare('SELECT COUNT(*) as count FROM drive_sync_documents WHERE active=1').get(),counts,scope:DRIVE_SCOPE,publicationSideEffects:false};
   }
+  sources(){return (this.db.prepare('SELECT drive_file_id,content_id,title,source_url,status,disposition,detail,modified_time,package_root,body_fingerprint FROM drive_sync_documents WHERE active=1 ORDER BY content_id,modified_time DESC').all() as Array<SourceRow>).map(({body_fingerprint,...row})=>({...row,publicCopyPresent:body_fingerprint!==EMPTY_BODY_SHA256}));}
+  approveRebind(contentId:string,driveFileId:string,packageRoot:string,confirmed:boolean){
+    if(!confirmed)throw new Error('EXPLICIT_REBIND_CONFIRMATION_REQUIRED');
+    const selected=this.db.prepare('SELECT * FROM drive_sync_documents WHERE active=1 AND content_id=? AND drive_file_id=?').get(contentId,driveFileId) as SourceRow|undefined;
+    if(!selected)throw new Error('CANONICAL_DRIVE_SOURCE_NOT_FOUND');
+    if(selected.body_fingerprint===EMPTY_BODY_SHA256)throw new Error('EXPLICIT_PUBLIC_COPY_REQUIRED');
+    if(contentReviewPending(selected.status))throw new Error('SOURCE_CONTENT_REVIEW_PENDING');
+    const existing=findArticleManifests(this.contentRoot,contentId).filter(item=>item.data.canonical_source==='independent_rewrite_doc');
+    if(existing.length!==1||!existsSync(packageRoot)||realpathSync(dirname(existing[0].path))!==realpathSync(packageRoot))throw new Error('UNIQUE_EXISTING_PACKAGE_REQUIRED');
+    const oldDocId=String(existing[0].data.source_doc_id??'');
+    if(!oldDocId||oldDocId===driveFileId)throw new Error('NO_SOURCE_REBIND_REQUIRED');
+    const approval={contentId,driveFileId,oldDocId,manifestPath:existing[0].path,sourceRevision:selected.source_revision,approvedAt:new Date().toISOString()};
+    this.setState(`rebind_authorization:${contentId}`,JSON.stringify(approval));
+    return {accepted:true,contentId,driveFileId,previousDriveFileId:oldDocId,approvedAt:approval.approvedAt,publicationAuthorized:false};
+  }
+  async previewSource(contentId:string,driveFileId:string){
+    const row=this.db.prepare('SELECT source_url,modified_time,disposition,detail FROM drive_sync_documents WHERE active=1 AND content_id=? AND drive_file_id=?').get(contentId,driveFileId) as {source_url:string;modified_time:string;disposition:string;detail:string|null}|undefined;
+    if(!row)throw new Error('CANONICAL_DRIVE_SOURCE_NOT_FOUND');
+    const temp=mkdtempSync(join(resolve(process.env.TMPDIR||'/tmp'),'vbp-drive-review-'));
+    try{const path=join(temp,'source.docx');writeFileSync(path,await this.drive.exportDocx(driveFileId));return {...readDocxSourceReview(path,contentId),driveFileId,sourceUrl:row.source_url,modifiedTime:row.modified_time,disposition:row.disposition,detail:row.detail};}
+    finally{rmSync(temp,{recursive:true,force:true});}
+  }
   private async runOnce(mode:'auto'|'full'){
     const now=new Date().toISOString();let cursor=this.state('page_token');const lastFull=Date.parse(this.state('last_full_scan_at')??'');const doFull=mode==='full'||!cursor||!Number.isFinite(lastFull)||Date.now()-lastFull>30*60_000;this.runningFull=doFull;
     if(doFull){this.progress={phase:'listing',done:0,total:0};const start=await this.drive.startPageToken();if(!cursor)this.setState('page_token',start);const files=await this.drive.listCanonicalDocs();const eligible=files.filter(file=>isCandidateName(file.name)||this.isTracked(file.id));this.progress={phase:'reading',done:0,total:eligible.length};const seen=new Set<string>(),failures:string[]=[];for(const file of eligible){this.progress.contentId=file.name;try{await this.processFile(file);seen.add(file.id);}catch(error){this.markPackageBlockedByDriveId(file.id,'DRIVE_SOURCE_SYNC_FAILED',safeError(error));failures.push(`${file.id}: ${safeError(error)}`);}this.progress.done++;}const tracked=this.db.prepare('SELECT DISTINCT drive_file_id FROM drive_sync_documents WHERE active=1').all() as Array<{drive_file_id:string}>;for(const item of tracked)if(!seen.has(item.drive_file_id))this.markSourceInactive(item.drive_file_id,'SOURCE_REMOVED');this.setState('last_full_scan_at',now);cursor=this.state('page_token')??start;await this.reconcileAll();this.setState('last_error',failures.length?`FULL_SCAN_PARTIAL_FAILURE (${failures.length}): ${failures.slice(0,5).join('; ')}`:'');this.setState('last_full_completed_at',new Date().toISOString());if(mode==='full')return {mode:'full',seen:seen.size,failures:failures.length,status:this.status()};}
@@ -110,12 +134,15 @@ export class GoogleDriveCanonicalSync {
     if(rows.some(row=>row.detail==='TITLE_CONTENT_ID_MISMATCH')){const detail=`Drive 文件标题与文档内 content_id 不一致；${contentId} 已隔离。`;for(const row of rows)this.db.prepare("UPDATE drive_sync_documents SET disposition='IDENTITY_CONFLICT',detail=?,updated_at=? WHERE drive_file_id=? AND content_id=?").run(detail,now,row.drive_file_id,contentId);this.setPackageDiscoveryState(contentId,'IDENTITY_CONFLICT',detail);return;}
     if(fingerprints.size>1){const detail=`多个 Drive 文件声明同一 content_id ${contentId}，但标题/正文/图片语义指纹不一致；已隔离，未导入。`;for(const row of rows)this.db.prepare('UPDATE drive_sync_documents SET disposition=\'IDENTITY_CONFLICT\',detail=?,package_root=NULL,updated_at=? WHERE drive_file_id=? AND content_id=?').run(detail,now,row.drive_file_id,contentId);this.setPackageDiscoveryState(contentId,'IDENTITY_CONFLICT',detail);return;}
     const selected=rows[0];for(const row of rows)this.db.prepare('UPDATE drive_sync_documents SET disposition=?,detail=?,updated_at=? WHERE drive_file_id=? AND content_id=?').run(row.drive_file_id===selected.drive_file_id?'CANONICAL_SELECTED':'IDENTICAL_ALIAS',rows.length>1?'内容与图片语义指纹完全一致，保留一个 canonical 项。':null,now,row.drive_file_id,contentId);
-    const sourcePending=!/^READY$/iu.test(selected.status);
-    const sourcePendingDetail=`Drive source status is ${selected.status||'missing'}; not treated as publishable.`;
+    if(selected.body_fingerprint===EMPTY_BODY_SHA256){const detail=`Drive 原文 ${selected.drive_file_id} 有文章字段/正文，但缺少明确的公众号公开稿段；不会把未分段母稿或旧包冒充新版公开稿。`;this.setDisposition(selected.drive_file_id,'SOURCE_PUBLIC_COPY_MISSING',detail,undefined,contentId);this.setPackageDiscoveryState(contentId,'SOURCE_PUBLIC_COPY_MISSING',detail);return;}
+    const sourcePending=contentReviewPending(selected.status);
+    const sourcePendingDetail=`GPT 内容状态是 ${selected.status||'missing'}；原文可预览，但内容制作尚未完成。`;
     const existing=this.manifestsFor(contentId);
     const sameSource=existing.find(item=>String(item.data.source_doc_id??'')===selected.drive_file_id);
     const matchingIdentity=existing.find(item=>item.data.drive_title_slug===selected.slug&&item.data.drive_body_fingerprint===selected.body_fingerprint&&item.data.drive_asset_fingerprint===selected.asset_fingerprint);
-    const reusablePackage=sameSource??matchingIdentity;
+    let reusablePackage=sameSource??matchingIdentity;
+    let approvedRebind:{contentId:string;driveFileId:string;oldDocId:string;manifestPath:string;sourceRevision:string;approvedAt:string}|undefined;
+    if(!reusablePackage&&existing.length===1){try{const value=JSON.parse(this.state(`rebind_authorization:${contentId}`)??'null');if(value?.contentId===contentId&&value?.driveFileId===selected.drive_file_id&&value?.oldDocId===String(existing[0].data.source_doc_id??'')&&value?.manifestPath===existing[0].path&&value?.sourceRevision===selected.source_revision){approvedRebind=value;reusablePackage=existing[0];}}catch{/* Invalid approval cannot rebind a package. */}}
     if(existing.length&&!reusablePackage){const detail='Publisher already contains this content_id under a different or unverified canonical Drive identity; no rebind was made.';this.setDisposition(selected.drive_file_id,'IDENTITY_CONFLICT',detail,undefined,contentId);this.setPackageDiscoveryState(contentId,'IDENTITY_CONFLICT',detail);return;}
     // A selected source is exported again only if materialization is required or its revision changed.
     const prior=this.db.prepare('SELECT package_root,source_revision FROM drive_sync_documents WHERE drive_file_id=? AND content_id=?').get(selected.drive_file_id,contentId) as {package_root:string|null;source_revision:string}|undefined;
@@ -129,10 +156,11 @@ export class GoogleDriveCanonicalSync {
       const imported=ingestDocxContentBundle(docx,targetRoot,{driveFileId:selected.drive_file_id,sourceUrl:selected.source_url,includeArticleIds:[contentId]});
       const item=imported.imported.find(value=>value.articleId===contentId);if(!item)throw new Error('CANONICAL_CONTENT_NOT_MATERIALIZED');
       const manifestPath=join(item.target,'manifest.json');const manifest=JSON.parse(readFileSync(manifestPath,'utf8')) as Record<string,unknown>;
-      manifest.drive_source_revision=selected.source_revision;manifest.drive_body_fingerprint=selected.body_fingerprint;manifest.drive_asset_fingerprint=selected.asset_fingerprint;manifest.drive_title_slug=selected.slug;manifest.drive_discovered_at=now;delete manifest.drive_discovery_blocker;delete manifest.drive_discovery_detail;
+      manifest.drive_source_revision=selected.source_revision;manifest.drive_body_fingerprint=selected.body_fingerprint;manifest.drive_asset_fingerprint=selected.asset_fingerprint;manifest.drive_title_slug=selected.slug;manifest.drive_discovered_at=now;if(approvedRebind){manifest.drive_rebind_from=approvedRebind.oldDocId;manifest.drive_rebind_approved_at=approvedRebind.approvedAt;}delete manifest.drive_discovery_blocker;delete manifest.drive_discovery_detail;
       writeFileSync(manifestPath,JSON.stringify(manifest,null,2)+'\n');
       const paths=this.manifestIndex?.get(contentId);if(paths&&!paths.includes(manifestPath))paths.push(manifestPath);else if(this.manifestIndex&&!paths)this.manifestIndex.set(contentId,[manifestPath]);
       this.setDisposition(selected.drive_file_id,sourcePending?'SOURCE_QA_PENDING':'IMPORTED',sourcePending?sourcePendingDetail:null,item.target,contentId);if(sourcePending)this.setPackageDiscoveryState(contentId,'SOURCE_QA_PENDING',sourcePendingDetail);else this.clearPackageDiscoveryState(contentId);
+      if(approvedRebind)this.db.prepare('DELETE FROM drive_sync_state WHERE key=?').run(`rebind_authorization:${contentId}`);
     }catch(error){const detail=safeError(error);this.setDisposition(selected.drive_file_id,'IMPORT_FAILED',detail,undefined,contentId);this.setPackageDiscoveryState(contentId,'DRIVE_SOURCE_SYNC_FAILED',detail);}finally{rmSync(temp,{recursive:true,force:true});}
   }
   private isTracked(id:string){return Boolean(this.db.prepare('SELECT 1 FROM drive_sync_documents WHERE drive_file_id=? AND active=1').get(id));}

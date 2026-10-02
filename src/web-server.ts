@@ -66,6 +66,20 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       void driveSync.run('full').catch(()=>{});
       return send(res,202,{accepted:true,status:driveSync.status()});
     }
+    if(req.method==='GET'&&url.pathname==='/api/content/drive-sources'){
+      if(!driveSync)return send(res,503,{error:driveSyncError||'GOOGLE_DRIVE_SYNC_UNAVAILABLE'});
+      return send(res,200,{sources:driveSync.sources()});
+    }
+    if(req.method==='POST'&&url.pathname==='/api/content/drive-source-preview'){
+      if(!driveSync)return send(res,503,{error:driveSyncError||'GOOGLE_DRIVE_SYNC_UNAVAILABLE'});
+      try{const input=await readJson(req) as {contentId?:string;driveFileId?:string};return send(res,200,await driveSync.previewSource(String(input.contentId||''),String(input.driveFileId||'')));}
+      catch(error){return send(res,409,{error:String(error)});}
+    }
+    if(req.method==='POST'&&url.pathname==='/api/content/drive-source-rebind'){
+      if(!driveSync)return send(res,503,{error:driveSyncError||'GOOGLE_DRIVE_SYNC_UNAVAILABLE'});
+      try{const input=await readJson(req) as {contentId?:string;driveFileId?:string;packageRoot?:string;confirmed?:boolean};const result=driveSync.approveRebind(String(input.contentId||''),String(input.driveFileId||''),String(input.packageRoot||''),input.confirmed===true);void driveSync.run('auto').catch(()=>{});return send(res,202,result);}
+      catch(error){return send(res,409,{error:String(error)});}
+    }
     if(req.method==='GET'&&url.pathname==='/api/workspace-context'){
       try{
         const context=await clientWorkspace(String(url.searchParams.get('workspace')||''));
