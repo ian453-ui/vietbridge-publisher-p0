@@ -54,7 +54,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
   const localRefresh=new LocalContentRefresher(tasks.library.roots[0]??resolve(socialRoot,'Content-Library'));
   const canonicalRoot=tasks.library.roots[0]??resolve(socialRoot,'Content-Library');
   let driveSync:GoogleDriveCanonicalSync|undefined,driveSyncError='GOOGLE_DRIVE_CONNECTOR_STARTING';
-  void GoogleDriveCanonicalSync.connect(db,canonicalRoot).then(sync=>{driveSync=sync;driveSyncError='';sync.start();}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
+  void GoogleDriveCanonicalSync.connect(db,canonicalRoot).then(sync=>{driveSync=sync;driveSyncError='';}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
   if (options.workerEnabled !== false) worker.start();
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -77,7 +77,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
     }
     if(req.method==='POST'&&url.pathname==='/api/content/drive-source-rebind'){
       if(!driveSync)return send(res,503,{error:driveSyncError||'GOOGLE_DRIVE_SYNC_UNAVAILABLE'});
-      try{const input=await readJson(req) as {contentId?:string;driveFileId?:string;packageRoot?:string;confirmed?:boolean};const result=driveSync.approveRebind(String(input.contentId||''),String(input.driveFileId||''),String(input.packageRoot||''),input.confirmed===true);void driveSync.run('auto').catch(()=>{});return send(res,202,result);}
+      try{const input=await readJson(req) as {contentId?:string;driveFileId?:string;packageRoot?:string;confirmed?:boolean};const result=driveSync.approveRebind(String(input.contentId||''),String(input.driveFileId||''),String(input.packageRoot||''),input.confirmed===true);void driveSync.run('full').catch(()=>{});return send(res,202,result);}
       catch(error){return send(res,409,{error:String(error)});}
     }
     if(req.method==='GET'&&url.pathname==='/api/workspace-context'){
@@ -128,7 +128,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       const platforms=requested.filter(value=>value in PLATFORM_CAPABILITIES) as (keyof typeof PLATFORM_CAPABILITIES)[];
       const candidates=tasks.candidates(platforms.length?platforms:undefined,url.searchParams.get('includePublished')==='1',url.searchParams.get('includeIncomplete')==='1');
       const workspace=String(url.searchParams.get('workspace')||'');
-      if(!workspace){
+      if(!workspace||workspace==='ws-vietbridge'){
         if(candidates.status==='CANDIDATES')candidates.candidates=candidates.candidates.filter(item=>!item.packageRoot.includes('/Content-Library/clients/'));
         return send(res,200,candidates);
       }

@@ -50,6 +50,9 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
     const health = await (await fetch(`${base}/api/health`)).json() as any;
     assert.equal(health.aiRuntimeRequired, false);
     assert.equal(health.capabilities.wechat_channels.validation, "historically_verified_browser_flow");
+    const defaultWorkspaceCandidates = await fetch(`${base}/api/content/candidates?workspace=ws-vietbridge&includeIncomplete=1`);
+    assert.equal(defaultWorkspaceCandidates.status, 200);
+    assert.equal((await defaultWorkspaceCandidates.json() as any).status, "CANDIDATES");
     const jobs = await (await fetch(`${base}/api/jobs`)).json() as any;
     assert.equal(jobs.jobs[0].article_id, "Daily-017");
     const detail = await (await fetch(`${base}/api/jobs/${jobId}`)).json() as any;
