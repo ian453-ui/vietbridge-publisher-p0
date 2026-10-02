@@ -73,8 +73,7 @@ export class GoogleDriveCanonicalSync {
     const selected=this.db.prepare('SELECT * FROM drive_sync_documents WHERE active=1 AND content_id=? AND drive_file_id=?').get(contentId,driveFileId) as SourceRow|undefined;
     if(!selected)throw new Error('CANONICAL_DRIVE_SOURCE_NOT_FOUND');
     if(selected.body_fingerprint===EMPTY_BODY_SHA256)throw new Error('EXPLICIT_PUBLIC_COPY_REQUIRED');
-    if(contentReviewPending(selected.status))throw new Error('SOURCE_CONTENT_REVIEW_PENDING');
-    const existing=findArticleManifests(this.contentRoot,contentId).filter(item=>item.data.canonical_source==='independent_rewrite_doc');
+    const existing=findArticleManifests(this.contentRoot,contentId);
     if(existing.length!==1||!existsSync(packageRoot)||realpathSync(dirname(existing[0].path))!==realpathSync(packageRoot))throw new Error('UNIQUE_EXISTING_PACKAGE_REQUIRED');
     const oldDocId=String(existing[0].data.source_doc_id??'');
     if(!oldDocId||oldDocId===driveFileId)throw new Error('NO_SOURCE_REBIND_REQUIRED');
@@ -143,6 +142,8 @@ export class GoogleDriveCanonicalSync {
     let reusablePackage=sameSource??matchingIdentity;
     let approvedRebind:{contentId:string;driveFileId:string;oldDocId:string;manifestPath:string;sourceRevision:string;approvedAt:string}|undefined;
     if(!reusablePackage&&existing.length===1){try{const value=JSON.parse(this.state(`rebind_authorization:${contentId}`)??'null');if(value?.contentId===contentId&&value?.driveFileId===selected.drive_file_id&&value?.oldDocId===String(existing[0].data.source_doc_id??'')&&value?.manifestPath===existing[0].path&&value?.sourceRevision===selected.source_revision){approvedRebind=value;reusablePackage=existing[0];}}catch{/* Invalid approval cannot rebind a package. */}}
+    const autoRebindFrom=!reusablePackage&&rows.length===1&&existing.length===1?String(existing[0].data.source_doc_id??''):'';
+    if(autoRebindFrom&&autoRebindFrom!==selected.drive_file_id)reusablePackage=existing[0];
     if(existing.length&&!reusablePackage){const detail='Publisher already contains this content_id under a different or unverified canonical Drive identity; no rebind was made.';this.setDisposition(selected.drive_file_id,'IDENTITY_CONFLICT',detail,undefined,contentId);this.setPackageDiscoveryState(contentId,'IDENTITY_CONFLICT',detail);return;}
     // A selected source is exported again only if materialization is required or its revision changed.
     const prior=this.db.prepare('SELECT package_root,source_revision FROM drive_sync_documents WHERE drive_file_id=? AND content_id=?').get(selected.drive_file_id,contentId) as {package_root:string|null;source_revision:string}|undefined;
@@ -156,7 +157,7 @@ export class GoogleDriveCanonicalSync {
       const imported=ingestDocxContentBundle(docx,targetRoot,{driveFileId:selected.drive_file_id,sourceUrl:selected.source_url,includeArticleIds:[contentId]});
       const item=imported.imported.find(value=>value.articleId===contentId);if(!item)throw new Error('CANONICAL_CONTENT_NOT_MATERIALIZED');
       const manifestPath=join(item.target,'manifest.json');const manifest=JSON.parse(readFileSync(manifestPath,'utf8')) as Record<string,unknown>;
-      manifest.drive_source_revision=selected.source_revision;manifest.drive_body_fingerprint=selected.body_fingerprint;manifest.drive_asset_fingerprint=selected.asset_fingerprint;manifest.drive_title_slug=selected.slug;manifest.drive_discovered_at=now;if(approvedRebind){manifest.drive_rebind_from=approvedRebind.oldDocId;manifest.drive_rebind_approved_at=approvedRebind.approvedAt;}delete manifest.drive_discovery_blocker;delete manifest.drive_discovery_detail;
+      manifest.drive_source_revision=selected.source_revision;manifest.drive_body_fingerprint=selected.body_fingerprint;manifest.drive_asset_fingerprint=selected.asset_fingerprint;manifest.drive_title_slug=selected.slug;manifest.drive_discovered_at=now;if(approvedRebind){manifest.drive_rebind_from=approvedRebind.oldDocId;manifest.drive_rebind_approved_at=approvedRebind.approvedAt;}else if(autoRebindFrom){manifest.drive_rebind_from=autoRebindFrom;manifest.drive_rebind_mode='auto_unique_source';manifest.drive_rebind_at=now;}delete manifest.drive_discovery_blocker;delete manifest.drive_discovery_detail;
       writeFileSync(manifestPath,JSON.stringify(manifest,null,2)+'\n');
       const paths=this.manifestIndex?.get(contentId);if(paths&&!paths.includes(manifestPath))paths.push(manifestPath);else if(this.manifestIndex&&!paths)this.manifestIndex.set(contentId,[manifestPath]);
       this.setDisposition(selected.drive_file_id,sourcePending?'SOURCE_QA_PENDING':'IMPORTED',sourcePending?sourcePendingDetail:null,item.target,contentId);if(sourcePending)this.setPackageDiscoveryState(contentId,'SOURCE_QA_PENDING',sourcePendingDetail);else this.clearPackageDiscoveryState(contentId);

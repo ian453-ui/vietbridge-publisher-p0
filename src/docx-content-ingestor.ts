@@ -42,7 +42,7 @@ export function readDocxSourceReview(sourceDocx:string,contentId:string){
     const bytes=zipBytes(sourcePath,media.path),ext=normalizedImageExtension(media.path);
     return {index:index+1,filename:basename(media.path),mimeType:ext==='.jpg'||ext==='.jpeg'?'image/jpeg':ext==='.webp'?'image/webp':'image/png',sha256:createHash('sha256').update(bytes).digest('hex'),dataUrl:`data:${ext==='.jpg'||ext==='.jpeg'?'image/jpeg':ext==='.webp'?'image/webp':'image/png'};base64,${bytes.toString('base64')}`};
   });
-  return {articleId:contentId,title:fields.title||article.title,fields,paragraphs:article.paragraphs,publicSections:{wechat:Boolean(sections.wechat),facebook:Boolean(sections.facebook),linkedin:Boolean(sections.linkedin),xiaohongshu:Boolean(sections.xiaohongshu)},images};
+  return {articleId:contentId,title:fields.title||article.title,fields,paragraphs:article.paragraphs,publicCopies:sections,publicSections:{wechat:Boolean(sections.wechat),facebook:Boolean(sections.facebook),linkedin:Boolean(sections.linkedin),xiaohongshu:Boolean(sections.xiaohongshu)},images};
 }
 
 /** Read semantic identity from a Google Docs DOCX export without materializing it. */

@@ -72,7 +72,7 @@ test('an unsegmented GPT draft stays readable as Drive source but cannot replace
   finally{db.close();rmSync(root,{recursive:true,force:true});}
 });
 
-test('a reviewed new single Doc can manually replace an older aggregate source without approving publication',async()=>{
+test('a unique new single Doc automatically refreshes an older package without approving publication',async()=>{
   const root=mkdtempSync(join(tmpdir(),'publisher-drive-rebind-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));mkdirSync(library,{recursive:true});
   const id='VBE-20261001-207',oldDoc='aggregate-source-207',newDoc='single-source-document-207';
   const oldBytes=makeDocx(root,id,'同一案例','旧公开正文'),newBytes=makeDocx(root,id,'同一案例','GPT 新公开正文');
@@ -80,14 +80,13 @@ test('a reviewed new single Doc can manually replace an older aggregate source w
   const sync=new GoogleDriveCanonicalSync(db,library,fakeDrive(files,bytes),()=>true);
   try{
     await sync.run('full');const oldPackage=new ContentLibrary({roots:[library]}).index()[0];assert.equal(oldPackage.packageRoot,realpathSync(join(library,'Drive-Canonical-Auto',id)));
+    const oldManifestPath=join(oldPackage.packageRoot,'manifest.json'),oldManifest=JSON.parse(readFileSync(oldManifestPath,'utf8'));oldManifest.canonical_source='public_batch_doc';writeFileSync(oldManifestPath,JSON.stringify(oldManifest,null,2)+'\n');
     files.splice(0,1,source(newDoc,`${id}｜单篇稿`,newBytes,'2026-10-01T00:30:00.000Z'));
-    await sync.run('full');assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE drive_file_id=?').get(newDoc) as {disposition:string}).disposition,'IDENTITY_CONFLICT');
-    assert.throws(()=>sync.approveRebind(id,newDoc,oldPackage.packageRoot,false),/EXPLICIT_REBIND_CONFIRMATION_REQUIRED/);
-    const accepted=sync.approveRebind(id,newDoc,oldPackage.packageRoot,true);assert.equal(accepted.publicationAuthorized,false);
-    await sync.run('auto');const current=new ContentLibrary({roots:[library]}).index()[0];
+    await sync.run('full');assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE drive_file_id=?').get(newDoc) as {disposition:string}).disposition,'IMPORTED');
+    const current=new ContentLibrary({roots:[library]}).index()[0];
     assert.equal(current.canonicalDocument.driveFileId,newDoc);assert.match(readFileSync(current.payloads.wechat_official_account!,'utf8'),/GPT 新公开正文/);
     assert.equal(current.readiness,'BLOCKED');assert.ok(current.blockingReasons.includes('FACT_QA_PENDING'));
-    const manifest=JSON.parse(readFileSync(join(current.packageRoot,'manifest.json'),'utf8'));assert.equal(manifest.drive_rebind_from,oldDoc);
+    const manifest=JSON.parse(readFileSync(join(current.packageRoot,'manifest.json'),'utf8'));assert.equal(manifest.drive_rebind_from,oldDoc);assert.equal(manifest.drive_rebind_mode,'auto_unique_source');
   }finally{db.close();rmSync(root,{recursive:true,force:true});}
 });
 
