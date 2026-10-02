@@ -152,6 +152,16 @@ test("VBE packages are recognized and manifest active_assets suppress obsolete r
   } finally { rmSync(root, {recursive:true, force:true}); }
 });
 
+test("explicitly empty active assets never preview stale sibling images as current",()=>{
+  const root=mkdtempSync(join(tmpdir(),"content-empty-assets-"));
+  try{const content=join(root,"VBE-20260928-091");mkdirSync(content);
+    writeFileSync(join(content,"manifest.json"),JSON.stringify({article_id:"VBE-20260928-091",source_doc_id:"current-doc",canonical_source:"independent_rewrite_doc",qa_status:"PENDING_FACT_QA",active_assets:[]}));
+    writeFileSync(join(content,"body_01_INGESTED.png"),Buffer.from("stale image"));
+    writeFileSync(join(content,"VBE-20260928-091-wechat-public.md"),"# 当前公开稿\n最新正文");
+    const item=new ContentLibrary({roots:[content]}).index()[0];assert.equal(item.assets.length,0);assert.ok(item.blockingReasons.includes("COVER_MISSING"));assert.equal(item.wechatDraftEligible,false);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
 test("public payload internal production markers fail closed",()=>{
   const root=mkdtempSync(join(tmpdir(),"content-public-leak-"));
   try{

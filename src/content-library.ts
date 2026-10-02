@@ -494,6 +494,9 @@ function fileBelongsToContent(path:string,articleId:string):boolean {
 function selectPublishableMedia(paths: string[], metadata: Record<string, unknown> = {}, qaManifest = ""): {selected:string[];unresolved:string[]} {
   const media = paths.filter(path => MEDIA.has(extname(path).toLowerCase()));
   const declared = Array.isArray(metadata.active_assets) ? metadata.active_assets.map(String) : [];
+  // An explicit empty canonical asset list means this revision has no bound
+  // images. Never resurrect sibling files left by an older Drive revision.
+  if(Array.isArray(metadata.active_assets)&&declared.length===0)return {selected:[],unresolved:[]};
   if (declared.length) {
     const byName = new Map(media.map(path => [basename(path), path]));
     const selected = declared.map(name => byName.get(name)).filter((path): path is string => Boolean(path));

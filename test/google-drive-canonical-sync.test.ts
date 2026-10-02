@@ -9,11 +9,11 @@ import { ContentLibrary } from '../src/content-library.ts';
 import { GoogleDriveCanonicalSync } from '../src/google-drive-canonical-sync.ts';
 
 const png=Buffer.from([137,80,78,71,13,10,26,10,1,2,3]);
-function makeDocx(root:string,id:string,title:string,body:string,status='READY',withPublicSection=true){
+function makeDocx(root:string,id:string,title:string,body:string,status='READY',withPublicSection=true,withImage=true){
   const unpacked=join(root,`src-${Math.random().toString(16).slice(2)}`),word=join(unpacked,'word');mkdirSync(join(word,'_rels'),{recursive:true});mkdirSync(join(word,'media'));
   writeFileSync(join(word,'_rels','document.xml.rels'),'<Relationships><Relationship Id="rId1" Target="media/image1.png"/></Relationships>');
   const values=[`content_id: ${id}`,`title: ${title}`,'series: 驻越经营实录',`status: ${status}`,'publisher_status: READY','fact_check_status: PASS','visual_status: PASS',...(withPublicSection?['【微信公众号母稿】']:[]),`# ${title}`,body,'【头图｜COVER】','图 01｜核对内容是否对应'];
-  const paragraphs=values.map((value,index)=>`<w:p><w:r><w:t>${value}</w:t>${index===values.length-2?'<w:drawing><a:blip r:embed="rId1"/></w:drawing>':''}</w:r></w:p>`).join('');
+  const paragraphs=values.map((value,index)=>`<w:p><w:r><w:t>${value}</w:t>${withImage&&index===values.length-2?'<w:drawing><a:blip r:embed="rId1"/></w:drawing>':''}</w:r></w:p>`).join('');
   writeFileSync(join(word,'document.xml'),`<w:document>${paragraphs}</w:document>`);writeFileSync(join(word,'media','image1.png'),png);
   const path=join(root,`${id}.docx`);execFileSync('zip',['-q','-r',path,'word'],{cwd:unpacked});return readFileSync(path);
 }
@@ -51,8 +51,21 @@ test('a pending canonical revision refreshes visible text while keeping publicat
     const item=new ContentLibrary({roots:[library]}).index()[0];
     assert.match(readFileSync(item.payloads.wechat_official_account!,'utf8'),/GPT 新文字已经可读/);
     assert.doesNotMatch(readFileSync(item.payloads.wechat_official_account!,'utf8'),/旧文字需要替换/);
-    assert.equal(item.readiness,'BLOCKED');assert.ok(item.blockingReasons.includes('SOURCE_QA_PENDING'));
+    assert.equal(item.readiness,'BLOCKED');assert.ok(!item.blockingReasons.includes('SOURCE_QA_PENDING'));
     assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE drive_file_id=? AND content_id=?').get(docId,id) as {disposition:string}).disposition,'SOURCE_QA_PENDING');
+  }finally{db.close();rmSync(root,{recursive:true,force:true});}
+});
+
+test('a REVIEW source without inline images stays previewable and asks only for actual cover media',async()=>{
+  const root=mkdtempSync(join(tmpdir(),'publisher-drive-text-only-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));mkdirSync(library,{recursive:true});
+  const id='VBE-20261001-208',docId='google-source-document-208',bytes=makeDocx(root,id,'待配图文章','最新公众号公开正文','REVIEW',true,false);
+  const sync=new GoogleDriveCanonicalSync(db,library,fakeDrive([source(docId,`${id}｜驻越经营实录`,bytes)],new Map([[docId,bytes]])),()=>true);
+  try{await sync.run('full');const item=new ContentLibrary({roots:[library]}).index()[0],manifestPath=join(item.packageRoot,'manifest.json');
+    assert.match(readFileSync(item.payloads.wechat_official_account!,'utf8'),/最新公众号公开正文/);
+    assert.ok(item.blockingReasons.includes('COVER_MISSING'));assert.ok(!item.blockingReasons.includes('PACKAGE_QA_FAILED'));assert.ok(!item.blockingReasons.includes('SOURCE_QA_PENDING'));
+    const manifest=JSON.parse(readFileSync(manifestPath,'utf8'));assert.equal(manifest.qa_status,'PENDING_FACT_QA');assert.ok(!String(manifest.blocking_issue).includes('document contains no resolvable inline image'));
+    manifest.qa_status='FAIL';manifest.blocking_issue='document contains no resolvable inline image';writeFileSync(manifestPath,JSON.stringify(manifest,null,2)+'\n');
+    await sync.run('auto');const repaired=JSON.parse(readFileSync(manifestPath,'utf8'));assert.equal(repaired.qa_status,'PENDING_FACT_QA');assert.equal(repaired.blocking_issue,undefined);
   }finally{db.close();rmSync(root,{recursive:true,force:true});}
 });
 

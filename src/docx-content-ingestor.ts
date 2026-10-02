@@ -164,7 +164,6 @@ export function ingestDocxContentBundle(
     }));
     const mergedAssets = [...new Set([...assetNames, ...preservedAssets])];
     const mergedAssetSources = { ...preservedAssetSources, ...assetSources };
-    const qaPass = assetNames.length > 0;
     writeFileSync(manifestPath, JSON.stringify({
       ...previous,
       article_id: article.id,
@@ -179,14 +178,14 @@ export function ingestDocxContentBundle(
       source_revision: sourceRevision,
       canonical_source: "independent_rewrite_doc",
       // Extracting bytes proves ingestion only; it does not pass fact or pixel QA.
-      qa_status: qaPass ? "PENDING_FACT_QA" : "FAIL",
+      qa_status: "PENDING_FACT_QA",
       visual_qa_status: "PENDING",
       // Content readiness is not publication authorization. A first import is
       // always unapproved; an explicit prior authorization is merely retained.
       publication_authorized: previous.publication_authorized === true,
       active_assets: mergedAssets,
       asset_sources: mergedAssetSources,
-      blocking_issue: qaPass ? "FACT_AND_VISUAL_QA_PENDING_AFTER_INLINE_ASSET_INGEST" : "document contains no resolvable inline image"
+      blocking_issue: assetNames.length ? "FACT_AND_VISUAL_QA_PENDING_AFTER_INLINE_ASSET_INGEST" : ""
     }, null, 2) + "\n");
     imported.push({ articleId: article.id, title: article.title, assetCount: assetNames.length, target });
   }
