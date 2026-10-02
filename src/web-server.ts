@@ -63,7 +63,8 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
     if(req.method==='GET'&&url.pathname==='/api/content/drive-sync/status')return send(res,200,driveSync?driveSync.status():{enabled:false,authorized:false,error:driveSyncError,publicationSideEffects:false});
     if(req.method==='POST'&&url.pathname==='/api/content/drive-sync/run'){
       if(!driveSync)return send(res,503,{error:driveSyncError||'GOOGLE_DRIVE_SYNC_UNAVAILABLE'});
-      try{return send(res,200,await driveSync.run('full'));}catch(error){return send(res,409,{error:String(error)});}
+      void driveSync.run('full').catch(()=>{});
+      return send(res,202,{accepted:true,status:driveSync.status()});
     }
     if(req.method==='GET'&&url.pathname==='/api/workspace-context'){
       try{

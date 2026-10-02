@@ -9,10 +9,10 @@ import { ContentLibrary } from '../src/content-library.ts';
 import { GoogleDriveCanonicalSync } from '../src/google-drive-canonical-sync.ts';
 
 const png=Buffer.from([137,80,78,71,13,10,26,10,1,2,3]);
-function makeDocx(root:string,id:string,title:string,body:string){
+function makeDocx(root:string,id:string,title:string,body:string,status='READY'){
   const unpacked=join(root,`src-${Math.random().toString(16).slice(2)}`),word=join(unpacked,'word');mkdirSync(join(word,'_rels'),{recursive:true});mkdirSync(join(word,'media'));
   writeFileSync(join(word,'_rels','document.xml.rels'),'<Relationships><Relationship Id="rId1" Target="media/image1.png"/></Relationships>');
-  const values=[`content_id: ${id}`,`title: ${title}`,'series: 驻越经营实录','status: READY','publisher_status: READY','fact_check_status: PASS','visual_status: PASS','【微信公众号母稿】',`# ${title}`,body,'【头图｜COVER】','图 01｜核对内容是否对应'];
+  const values=[`content_id: ${id}`,`title: ${title}`,'series: 驻越经营实录',`status: ${status}`,'publisher_status: READY','fact_check_status: PASS','visual_status: PASS','【微信公众号母稿】',`# ${title}`,body,'【头图｜COVER】','图 01｜核对内容是否对应'];
   const paragraphs=values.map((value,index)=>`<w:p><w:r><w:t>${value}</w:t>${index===10?'<w:drawing><a:blip r:embed="rId1"/></w:drawing>':''}</w:r></w:p>`).join('');
   writeFileSync(join(word,'document.xml'),`<w:document>${paragraphs}</w:document>`);writeFileSync(join(word,'media','image1.png'),png);
   const path=join(root,`${id}.docx`);execFileSync('zip',['-q','-r',path,'word'],{cwd:unpacked});return readFileSync(path);
@@ -36,6 +36,71 @@ test('full scan materializes current text plus inline image, then same Drive ide
     const packageRoot=first[0].packageRoot,updatedBytes=makeDocx(root,id,'工厂成本先核算','正文新版：将同一单位成本口径写入采购与预算复核。');bytes.set(docId,updatedBytes);driveFile.modifiedTime='2026-10-01T00:10:00.000Z';
     await sync.run('full');const current=new ContentLibrary({roots:[library]}).index();assert.equal(current.length,1);assert.equal(current[0].packageRoot,packageRoot);assert.equal(current[0].duplicateCandidates,0);assert.match(readFileSync(current[0].payloads.wechat_official_account!,'utf8'),/正文新版/);
   }finally{db.close();rmSync(root,{recursive:true,force:true});}
+});
+
+test('a pending canonical revision refreshes visible text while keeping publication blocked',async()=>{
+  const root=mkdtempSync(join(tmpdir(),'publisher-drive-pending-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));
+  const id='VBE-20261001-204',docId='google-source-document-204';mkdirSync(library,{recursive:true});
+  const oldBytes=makeDocx(root,id,'待校稿文章','旧文字需要替换');
+  const file=source(docId,`${id}｜驻越经营实录`,oldBytes),bytes=new Map([[docId,oldBytes]]);
+  const sync=new GoogleDriveCanonicalSync(db,library,fakeDrive([file],bytes),()=>true);
+  try{
+    await sync.run('full');
+    bytes.set(docId,makeDocx(root,id,'待校稿文章','GPT 新文字已经可读','CONTENT_VISUAL_QA_PASS'));file.modifiedTime='2026-10-01T00:20:00.000Z';
+    await sync.run('full');
+    const item=new ContentLibrary({roots:[library]}).index()[0];
+    assert.match(readFileSync(item.payloads.wechat_official_account!,'utf8'),/GPT 新文字已经可读/);
+    assert.doesNotMatch(readFileSync(item.payloads.wechat_official_account!,'utf8'),/旧文字需要替换/);
+    assert.equal(item.readiness,'BLOCKED');assert.ok(item.blockingReasons.includes('SOURCE_QA_PENDING'));
+    assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE drive_file_id=? AND content_id=?').get(docId,id) as {disposition:string}).disposition,'SOURCE_QA_PENDING');
+  }finally{db.close();rmSync(root,{recursive:true,force:true});}
+});
+
+test('full scan skips large aggregate Docs unless they are already tracked',async()=>{
+  const root=mkdtempSync(join(tmpdir(),'publisher-drive-aggregate-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));
+  const id='VBE-20261001-203',docId='google-source-document-203';mkdirSync(library,{recursive:true});
+  const bytes=makeDocx(root,id,'单篇规范文章','正文：只导入有单篇内容编号的规范文章。');
+  const files=[source(docId,`${id}｜驻越经营实录`,bytes),source('large-review-bundle','2026-09-28 驻越经营实录 091-101 大众商业案例 待QA',bytes),source('large-archive-bundle','2026-09-16｜驻越经营实录｜新增20篇生产包（22-41）',bytes)];
+  const sync=new GoogleDriveCanonicalSync(db,library,fakeDrive(files,new Map([[docId,bytes]])),()=>true);
+  try{
+    await sync.run('full');
+    assert.equal(sync.status().lastError,'');
+    assert.equal(db.prepare('SELECT COUNT(*) as count FROM drive_sync_documents WHERE active=1').get()?.count,1);
+    assert.equal(new ContentLibrary({roots:[library]}).index()[0].articleId,id);
+  }finally{db.close();rmSync(root,{recursive:true,force:true});}
+});
+
+test('a manual full scan queues behind an active automatic changes scan',async()=>{
+  const root=mkdtempSync(join(tmpdir(),'publisher-drive-manual-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));mkdirSync(library,{recursive:true});
+  let fullScans=0;const drive={async listCanonicalDocs(){fullScans++;return [];},async startPageToken(){return 'token-0';},async changes(){await new Promise(resolve=>setTimeout(resolve,40));return {changes:[],newStartPageToken:'token-1'};},async exportDocx(){throw new Error('UNEXPECTED_EXPORT');}};
+  const sync=new GoogleDriveCanonicalSync(db,library,drive,()=>true);
+  try{
+    await sync.run('full');assert.equal(fullScans,1);
+    const automatic=sync.run('auto');await new Promise(resolve=>setTimeout(resolve,5));const manual=sync.run('full');
+    await Promise.all([automatic,manual]);assert.equal(fullScans,2);assert.equal(sync.status().lastError,'');
+  }finally{db.close();rmSync(root,{recursive:true,force:true});}
+});
+
+test('a manual request joins an automatic full scan instead of exporting twice',async()=>{
+  const root=mkdtempSync(join(tmpdir(),'publisher-drive-join-full-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));mkdirSync(library,{recursive:true});
+  let fullScans=0;const drive={async listCanonicalDocs(){fullScans++;await new Promise(resolve=>setTimeout(resolve,40));return [];},async startPageToken(){return 'token-0';},async changes(){return {changes:[],newStartPageToken:'token-1'};},async exportDocx(){throw new Error('UNEXPECTED_EXPORT');}};
+  const sync=new GoogleDriveCanonicalSync(db,library,drive,()=>true);
+  try{
+    const automatic=sync.run('auto'),manual=sync.run('full');
+    assert.equal(sync.status().runningFull,true);
+    assert.equal(sync.status().queuedFull,false);
+    await Promise.all([automatic,manual]);
+    assert.equal(fullScans,1);
+    assert.ok(sync.status().lastFullCompletedAt);
+  }finally{db.close();rmSync(root,{recursive:true,force:true});}
+});
+
+test('an automatic change check stops at the new start token',async()=>{
+  const root=mkdtempSync(join(tmpdir(),'publisher-drive-cursor-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));mkdirSync(library,{recursive:true});
+  let calls=0;const drive={async listCanonicalDocs(){return [];},async startPageToken(){return 'token-0';},async changes(){calls++;return {changes:[],newStartPageToken:'token-1'};},async exportDocx(){throw new Error('UNEXPECTED_EXPORT');}};
+  const sync=new GoogleDriveCanonicalSync(db,library,drive,()=>true);
+  try{await sync.run('full');await sync.run('auto');assert.equal(calls,1);}
+  finally{db.close();rmSync(root,{recursive:true,force:true});}
 });
 
 test('same content id with distinct Drive documents and semantic fingerprints is quarantined, not bound by scan order',async()=>{
