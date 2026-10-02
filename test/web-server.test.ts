@@ -7,6 +7,26 @@ import { createPublisherServer } from "../src/web-server.ts";
 import { openDatabase } from "../src/database.ts";
 import { PublisherStore } from "../src/publisher-store.ts";
 
+test("pending fact and visual QA allow only a confirmed WeChat draft task",async()=>{
+  const root=mkdtempSync(join(tmpdir(),"wechat-draft-gate-")),content=join(root,"content");mkdirSync(content);
+  const id="VBE-20260928-083";
+  writeFileSync(join(content,"manifest.json"),JSON.stringify({article_id:id,title:"公众号测试标题",source_doc_id:"canonical-doc",qa_status:"PENDING_FACT_QA",visual_qa_status:"PENDING",active_assets:[`${id}-cover.png`]}));
+  writeFileSync(join(content,`${id}-cover.png`),Buffer.from([137,80,78,71,13,10,26,10,1]));
+  writeFileSync(join(content,`${id}-wechat-public.md`),"# 公众号测试标题\n\n仅供草稿箱审阅的正文。");
+  const server=createPublisherServer({dbPath:join(root,"publisher.sqlite"),contentRoots:[content],stagingRoot:join(root,"staging"),mirrorPath:join(root,"events.jsonl"),workerEnabled:false});
+  await new Promise<void>(resolve=>server.listen(0,"127.0.0.1",resolve));
+  const address=server.address();assert.ok(address&&typeof address==='object');const base=`http://127.0.0.1:${address.port}`;
+  try{
+    const candidates=await(await fetch(`${base}/api/content/candidates?platforms=wechat_official_account&includeIncomplete=1`)).json() as any;
+    const item=candidates.candidates.find((x:any)=>x.articleId===id);assert.equal(item.readiness,"BLOCKED");assert.equal(item.wechatDraftEligible,true);
+    const post=(platforms:string[])=>fetch(`${base}/api/tasks/execute`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({mode:"article_id",value:id,platforms})});
+    assert.equal((await post(["facebook"])).status,409);
+    assert.equal((await post(["wechat_official_account","facebook"])).status,409);
+    const response=await post(["wechat_official_account"]);assert.equal(response.status,201);
+    const batch=await response.json() as any;assert.equal(batch.control_state,"AWAITING_APPROVAL");assert.deepEqual(batch.jobs.map((j:any)=>j.platform),["wechat_official_account"]);
+  }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));rmSync(root,{recursive:true,force:true});}
+});
+
 test("local dashboard exposes read-only SQLite jobs and no-AI health contract", async () => {
   const root = mkdtempSync(join(tmpdir(), "publisher-web-"));
   const dbPath = join(root, "publisher.sqlite");

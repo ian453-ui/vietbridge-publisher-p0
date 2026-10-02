@@ -59,6 +59,7 @@ export type ContentPackage = {
   canonicalDocument: { contentId: string; driveFileId?: string; driveFolderId?: string; sourceAnchor?: string; sourceUrl?: string };
   variantAssets: Partial<Record<ContentVariantPlatform, string[]>>;
   readiness: "READY" | "BLOCKED";
+  wechatDraftEligible?: boolean;
   blockingReasons: string[];
   blockingDetail?: string;
   unresolvedAssets: string[];
@@ -186,7 +187,7 @@ export class ContentLibrary {
     // not become a second ContentItem for the same article.
     const indexed=allIndexed.filter(item=>item.canonicalSource||!explicitCanonicalIds.has(item.articleId));
     const counts=new Map<string,number>();for(const item of indexed)counts.set(item.articleId,(counts.get(item.articleId)||0)+1);
-    for(const item of indexed){item.duplicateCandidates=(counts.get(item.articleId)||1)-1;if(item.articleId.startsWith('VBE-')&&item.duplicateCandidates>0){item.readiness='BLOCKED';item.blockingReasons.push('CANONICAL_ARTICLE_DUPLICATE');}}
+    for(const item of indexed){item.duplicateCandidates=(counts.get(item.articleId)||1)-1;if(item.articleId.startsWith('VBE-')&&item.duplicateCandidates>0){item.readiness='BLOCKED';item.blockingReasons.push('CANONICAL_ARTICLE_DUPLICATE');}item.wechatDraftEligible=canStageWechatDraft(item);}
     return indexed
       .sort((a, b) => b.articleId.localeCompare(a.articleId, undefined, { numeric: true }));
   }
@@ -287,6 +288,14 @@ export class ContentLibrary {
     }
     return result;
   }
+}
+
+/** Draft-box staging is reversible and distinct from public publication QA. */
+export function canStageWechatDraft(item:ContentPackage):boolean{
+  const soft=new Set(['FACT_QA_PENDING','VISUAL_QA_PENDING','SOURCE_QA_PENDING','APPROVAL_REQUIRED','CONTENT_QA_PENDING']);
+  return Boolean(item.payloads.wechat_official_account)
+    &&item.assets.some(asset=>asset.role==='cover'||asset.role==='gallery_image')
+    &&item.blockingReasons.every(reason=>soft.has(reason));
 }
 
 function buildPackage(articleId: string, paths: string[], publishedPlatforms: SupportedPlatform[]): ContentPackage {

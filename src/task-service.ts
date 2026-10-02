@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import type { Db } from "./database.ts";
 import { transaction } from "./database.ts";
-import { ContentLibrary, type ResolveRequest, type ResolveResult } from "./content-library.ts";
+import { ContentLibrary, canStageWechatDraft, type ResolveRequest, type ResolveResult } from "./content-library.ts";
 import { ContentSnapshotStore } from "./content-snapshot.ts";
 import { PublisherStore } from "./publisher-store.ts";
 import { automaticTitle } from "./publication-control.ts";
@@ -80,7 +80,7 @@ export class TaskService {
       : this.preview(request);
     const result = this.withSqliteStatus(rawResult, platforms);
     if (result.status !== "MATCHED") return { resolution: result };
-    if(result.package.readiness!=='READY')return {resolution:result,error:'内容包未通过消费校验：'+result.package.blockingReasons.join('、')+'；未创建发布任务'};
+    if(result.package.readiness!=='READY'&&!(platforms.length===1&&platforms[0]==='wechat_official_account'&&canStageWechatDraft(result.package)))return {resolution:result,error:'内容包未通过消费校验：'+result.package.blockingReasons.join('、')+'；未创建发布任务'};
     const selected = platforms.filter(platform => input.republish || (!result.package.draftPlatforms?.includes(platform) && !result.package.publishedPlatforms.includes(platform)));
     if (!selected.length) return { resolution: result, error: "所选平台已有发布记录或公众号草稿；请在原任务处理，未创建重复任务" };
     if (!input.republish && selected.includes('wechat_official_account')) {
