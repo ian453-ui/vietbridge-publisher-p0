@@ -36,6 +36,14 @@ export function renderWechatPreviewArticle(markdown, assets, imageUrl) {
     } else grouped.push(current);
   }
   const html = [];
+  const unplacedBodyImages = (assets ?? []).filter((asset) =>
+    /^body[_-]/iu.test(String(asset.filename ?? ''))
+    && !body.includes(String(asset.filename ?? '')));
+  if (unplacedBodyImages.length) {
+    html.push('<p class="preview-note error">原文图片已读到，但以下正文信息图没有出现在公众号正文中：'
+      + unplacedBodyImages.map((asset) => escapeHtml(asset.filename)).join('、')
+      + '。当前头图展示不能代替正文排版；请先修正公众号公开稿的图片位置。</p>');
+  }
   for (const block of grouped) {
     const line = block.trim();
     const image = line.match(/^!\[([^\]]*)\]\(<?([^)>]+)>?\)$/u);

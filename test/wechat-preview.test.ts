@@ -30,3 +30,12 @@ test('inline body image references resolve to canonical frozen image bytes',()=>
   const html=renderWechatPreviewArticle('![时间线](assets/body-01.png)',assets,()=>'/api/assets/body-01.png');
   assert.match(html,/<img src="\/api\/assets\/body-01\.png" alt="时间线">/);
 });
+
+test('a body infographic promoted to cover is not mistaken for a rendered article image',()=>{
+  const assets=[{filename:'body_01_INGESTED.png',role:'cover',path:'/library/body_01_INGESTED.png'}];
+  const missing=renderWechatPreviewArticle('# 标题\n\n正文没有图片。',assets,()=>'/asset');
+  assert.match(missing,/正文信息图没有出现在公众号正文中/);
+  const placed=renderWechatPreviewArticle('# 标题\n\n![主图](body_01_INGESTED.png)',assets,()=>'/asset');
+  assert.doesNotMatch(placed,/正文信息图没有出现在公众号正文中/);
+  assert.match(placed,/<img src="\/asset" alt="主图">/);
+});
