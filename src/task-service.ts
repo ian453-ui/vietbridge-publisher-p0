@@ -64,7 +64,8 @@ export class TaskService {
   }
 
   execute(input: ExecuteTaskInput): Record<string, unknown> {
-    const platforms = normalizePlatforms(input.platforms?.length ? input.platforms : [...SUPPORTED_PLATFORMS]);
+    if(!Array.isArray(input.platforms)||input.platforms.length===0)throw new Error("请明确选择至少一个发布平台；未创建任务");
+    const platforms = normalizePlatforms(input.platforms);
     const facebookAccount=platforms.includes('facebook')?(input.facebookAccountId?this.facebookAccounts.select(input.facebookAccountId):this.facebookAccounts.selected()):undefined;
     const accountFor=(platform:SupportedPlatform)=>platform==='facebook'&&facebookAccount?this.facebookAccounts.jobIdentity(facebookAccount):ACCOUNTS[platform];
     if (!platforms.length) throw new Error("至少选择一个平台");
