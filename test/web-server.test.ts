@@ -75,6 +75,7 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
     assert.match(page, /筛选候选内容（不改变发布平台）/);
     assert.match(page, /正在一次性建立/);
     assert.match(page, /正在停止…/);
+    assert.match(page, /if\(t\.control_state==='RUNNING'\)return .*暂停<\/button>'\+stop;/);
     assert.match(page, /setInterval\(load,15000\)/);
     assert.doesNotMatch(page, /保存任务草稿/);
     assert.doesNotThrow(()=>new Function(page.match(/<script>([\s\S]*?)<\/script>/)![1]));
