@@ -15,6 +15,7 @@ dialog{width:min(940px,94vw);max-height:92vh;border:0;border-radius:14px;padding
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const workspaceParam=new URLSearchParams(location.search).get('workspace')||'ws-vietbridge';let workspaceReady=!workspaceParam,workspaceAccountId='';let chosen=null;let choices=[],picked=new Set(),creating=false,candidateQuery='',batchCache=[],facebookAccounts=[];
 const articlePreviewHtml=${renderWechatPreviewArticle.toString()};
+$('#refresh-status').textContent='自动读取 Drive 最近更新；也可点击“立即扫描 Drive 原文”或上传本地修订版。读取不会自动发布。';
 $('#message').insertAdjacentHTML('beforebegin','<p class="hint">独立头图可选：小红书可直接使用已绑定主图。公众号草稿需要一张临时封面；入草稿箱后，你可以手工换成裁切后的高密度信息图。这里不会替你对外群发。</p>');
 function refreshTarget(){const selected=[...picked].map(i=>choices[i]?.articleId).filter(Boolean);if(selected.length===1)return selected[0];const typed=$('#source').value.trim();return /^VBE-\\d{8}-\\d{3}$/.test(typed)?typed:null}
 $('#refresh-document').onclick=()=>{if(!refreshTarget()){$('#refresh-status').textContent='先勾选一篇文章，或在上方输入精确内容编号。';return}$('#refresh-docx-file').click()};
@@ -30,7 +31,7 @@ const driveStatus=async()=>{
     else if(lastSeenDriveRevision&&revision!==lastSeenDriveRevision&&!manualDriveScan&&picked.size===0&&!creating){lastManualResult='';await preview()}
     lastSeenDriveRevision=revision;$('#drive-sync-now').disabled=manualDriveScan;
     const progress=s.progress?.total?' · 已核对 '+s.progress.done+'/'+s.progress.total:'';
-    $('#drive-sync-status').textContent=manualDriveScan?'手工扫描已启动'+(s.queuedFull?'，等待当前扫描结束':'，正在核对正文和图片'+progress)+'；内容库仍可浏览':lastManualResult||(!s.authorized?'Drive 手工更新未连接：'+(s.error||'需要完成只读授权'):s.running?'Drive 手工扫描中'+progress+' · 内容库仍可浏览':s.lastError?'Drive 上次扫描异常：'+s.lastError:'Drive 手工更新模式 · 上次完成全量 '+(s.lastFullCompletedAt||s.lastFullScanAt||'尚未扫描')+' · 冲突 '+(s.counts?.find(x=>x.disposition==='IDENTITY_CONFLICT')?.count||0));
+    $('#drive-sync-status').textContent=manualDriveScan?'手工扫描已启动'+(s.queuedFull?'，等待当前扫描结束':'，正在核对正文和图片'+progress)+'；内容库仍可浏览':lastManualResult||(!s.authorized?'Drive 读取未连接：'+(s.error||'需要完成只读授权'):s.running?(s.automatic?'Drive 自动检查中':'Drive 扫描中')+progress+' · 内容库仍可浏览':s.lastError?'Drive 上次扫描异常：'+s.lastError:(s.automatic?'Drive 自动读取已开启':'Drive 手工更新模式')+' · 上次完成全量 '+(s.lastFullCompletedAt||s.lastFullScanAt||'尚未扫描')+' · 冲突 '+(s.counts?.find(x=>x.disposition==='IDENTITY_CONFLICT')?.count||0));
   }catch(error){$('#drive-sync-status').textContent='Drive 状态读取失败：'+error.message;$('#drive-sync-now').disabled=false}
 };driveStatus();setInterval(()=>{void driveStatus()},5000);
 $('#drive-sync-now').onclick=async()=>{const button=$('#drive-sync-now');button.disabled=true;manualDriveScan=true;manualStartFull=lastDriveStatus?.lastFullCompletedAt??null;lastManualResult='';$('#drive-sync-status').textContent='正在启动手工扫描；内容库仍可浏览…';try{const r=await fetch('/api/content/drive-sync/run',{method:'POST'}),data=await r.json();if(!r.ok)throw Error(data.error||'Drive 扫描启动失败');await driveStatus()}catch(error){manualDriveScan=false;button.disabled=false;lastManualResult='手工扫描启动失败：'+error.message;$('#drive-sync-status').textContent=lastManualResult}};

@@ -15,6 +15,7 @@ export type DocxIngestResult = {
 
 export type InspectedDocxArticle = {
   articleId: string; title: string; series: string; status: string; publisherStatus: string;
+  publicFinal: boolean;
   factStatus: string; visualStatus: string; bodyFingerprint: string; assetFingerprint: string;
   assetCount: number; sourceRevision: string; sourceUrl?: string;
 };
@@ -58,7 +59,7 @@ export function inspectDocxContentBundle(sourceDocx: string): InspectedDocxArtic
     const body=copy.replace(/\[\[VB_INLINE_MEDIA:[^\]]+\]\]/gu,' [IMAGE] ').replace(/\s+/gu,' ').trim();
     const assets=article.media.map((media,index)=>({index,role:media.role,sha256:createHash('sha256').update(zipBytes(sourcePath,media.path)).digest('hex')}));
     return {
-      articleId:article.id,title:field('title')||article.title,series:field('series'),status:field('status'),publisherStatus:field('publisher_status'),
+      articleId:article.id,title:field('title')||article.title,series:field('series'),status:field('status'),publisherStatus:field('publisher_status'),publicFinal:article.paragraphs.some(value=>/^【PUBLIC_FINAL BEGIN(?:[｜|][^】]*)?】$/iu.test(value.trim())),
       factStatus:field('fact_check_status')||field('fact_check'),visualStatus:field('visual_status'),
       bodyFingerprint:createHash('sha256').update(body).digest('hex'),assetFingerprint:createHash('sha256').update(JSON.stringify(assets)).digest('hex'),
       assetCount:assets.length,sourceRevision
@@ -157,7 +158,9 @@ export function ingestDocxContentBundle(
     // A DOCX refresh owns only the assets that a previous DOCX refresh wrote.
     // Preserve independently verified Drive/history assets instead of silently
     // replacing the whole canonical media set on every import.
+    const explicitFinalMedia=article.media.length>0&&article.paragraphs.some(value=>/^【PUBLIC_FINAL BEGIN(?:[｜|][^】]*)?】$/iu.test(value.trim()));
     const preservedAssets = previousActiveAssets.filter(name => {
+      if(explicitFinalMedia)return false;
       const metadata = objectRecord(previousAssetSources[name]);
       return !["DOCX_INLINE", "DRIVE_ACTIVE_ASSET_DOCX_READBACK"].includes(String(metadata.source_kind ?? "").toUpperCase());
     });
@@ -175,7 +178,7 @@ export function ingestDocxContentBundle(
       source_doc_id: source.driveFileId ?? previous.source_doc_id,
       source_folder_id: source.driveFolderId ?? previous.source_folder_id,
       source_url: source.sourceUrl ?? previous.source_url,
-      ingestion_contract: "drive-docx-inline-v2",
+      ingestion_contract: "drive-docx-inline-v5",
       source_filename: basename(sourcePath),
       source_revision: sourceRevision,
       canonical_source: "independent_rewrite_doc",
@@ -235,6 +238,22 @@ function parseArticles(xml: string, relationships: Map<string, string>): Article
 }
 
 function publicSections(paragraphs: string[]) {
+  const text = paragraphs.join("\n");
+  const finalStart=paragraphs.findIndex(value=>/^【PUBLIC_FINAL BEGIN(?:[｜|][^】]*)?】$/iu.test(value.trim()));
+  if(finalStart>=0){
+    const finalEnd=paragraphs.findIndex((value,index)=>index>finalStart&&/^【PUBLIC_FINAL END】$/iu.test(value.trim()));
+    if(finalEnd>finalStart){
+      const bodyLines=paragraphs.slice(finalStart+1,finalEnd);
+      while(bodyLines.length&&/^(?:\s*|(?:[a-z][a-z0-9_]*\s*[:：].*)|微信公众号(?:完整)?母稿)$/iu.test(bodyLines[0].trim()))bodyLines.shift();
+      const explicit=bodyLines.join("\n").trim();
+      const other=publicSectionsWithoutFinal(paragraphs);
+      return {...other,wechat:explicit};
+    }
+  }
+  return publicSectionsWithoutFinal(paragraphs);
+}
+
+function publicSectionsWithoutFinal(paragraphs: string[]) {
   const text = paragraphs.join("\n");
   const draftIndex = paragraphs.findIndex(value => /^FULL_DRAFT_V1\s*[｜|]\s*VBE-\d{8}-\d{3}\s*$/iu.test(value.trim()));
   if (draftIndex >= 0) {

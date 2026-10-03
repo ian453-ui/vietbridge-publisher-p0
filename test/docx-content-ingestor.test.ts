@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { ingestDocxContentBundle,readDocxSourceReview } from "../src/docx-content-ingestor.ts";
@@ -21,6 +21,25 @@ test("source review keeps metadata after an inline image inside the field block"
     assert.equal(review.fields.publisher_status,"BLOCKED_PENDING_QA",JSON.stringify({fields:review.fields,paragraphs:review.paragraphs}));
     assert.equal(review.images.length,1);
     assert.equal(review.publicSections.wechat,true);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+test("PUBLIC_FINAL longform wins over deprecated WeChat summary and keeps inline images",()=>{
+  const root=mkdtempSync(join(tmpdir(),"docx-public-final-"));
+  try{
+    const word=join(root,"bundle","word"),media=join(word,"media");mkdirSync(join(word,"_rels"),{recursive:true});mkdirSync(media);
+    const values=["VBE-20260928-101｜案例","title: 越俄商业合作","wechat_role: PUBLIC_FINAL_LONGFORM","# 越俄商业合作","【PUBLIC_FINAL BEGIN｜微信公众号完整母稿】","qa: CONTENT_QA_PASS","微信公众号母稿","# 越俄商业合作","完整长文第一段。","", "完整长文第二段。","【PUBLIC_FINAL END】","【微信公众号公开版 BEGIN】","过时摘要，不应发布。","【微信公众号公开版 END】"];
+    const xml=values.map((value,index)=>`<w:p><w:r>${value?`<w:t>${value}</w:t>`:""}${index===9?'<w:drawing><a:blip r:embed="rId1"/></w:drawing>':""}</w:r></w:p>`).join("");
+    writeFileSync(join(word,"document.xml"),`<w:document>${xml}</w:document>`);
+    writeFileSync(join(word,"_rels","document.xml.rels"),'<Relationships><Relationship Id="rId1" Target="media/image1.png"/></Relationships>');writeFileSync(join(media,"image1.png"),"image");
+    const docx=join(root,"source.docx");execFileSync("zip",["-q","-r",docx,"word"],{cwd:join(root,"bundle")});
+    const review=readDocxSourceReview(docx,"VBE-20260928-101");assert.match(review.publicCopies.wechat,/完整长文第二段/);assert.doesNotMatch(review.publicCopies.wechat,/过时摘要/);
+    const target=join(root,"content"),articleRoot=join(target,"VBE-20260928-101");mkdirSync(articleRoot,{recursive:true});
+    writeFileSync(join(articleRoot,"legacy.png"),"historical image");writeFileSync(join(articleRoot,"manifest.json"),JSON.stringify({active_assets:["legacy.png"],asset_sources:{"legacy.png":{source_kind:"LOCAL_GENERATED_AND_TYPESET",role:"COVER"}}}));
+    const result=ingestDocxContentBundle(docx,target);const wechat=readFileSync(join(result.imported[0].target,"VBE-20260928-101-wechat-public.md"),"utf8");
+    assert.match(wechat,/完整长文第二段/);assert.match(wechat,/!\[[^\]]*\]\(body_01_INGESTED\.png\)/u);assert.doesNotMatch(wechat,/过时摘要|PUBLIC_FINAL|CONTENT_QA_PASS|微信公众号母稿/);
+    assert.equal((wechat.match(/^# /gmu)||[]).length,1);
+    const manifest=JSON.parse(readFileSync(join(articleRoot,"manifest.json"),"utf8"));assert.deepEqual(manifest.active_assets,["body_01_INGESTED.png"]);assert.ok(existsSync(join(articleRoot,"legacy.png")));
   }finally{rmSync(root,{recursive:true,force:true});}
 });
 

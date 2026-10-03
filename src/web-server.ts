@@ -55,7 +55,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
   const localRefresh=new LocalContentRefresher(tasks.library.roots[0]??resolve(socialRoot,'Content-Library'));
   const canonicalRoot=tasks.library.roots[0]??resolve(socialRoot,'Content-Library');
   let driveSync:GoogleDriveCanonicalSync|undefined,driveSyncError='GOOGLE_DRIVE_CONNECTOR_STARTING';
-  void GoogleDriveCanonicalSync.connect(db,canonicalRoot).then(sync=>{driveSync=sync;driveSyncError='';}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
+  void GoogleDriveCanonicalSync.connect(db,canonicalRoot).then(sync=>{driveSync=sync;driveSyncError='';if(options.workerEnabled!==false)sync.start();}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
   if (options.workerEnabled !== false) worker.start();
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");

@@ -15,7 +15,7 @@ type DriveFile={id:string;name:string;mimeType:string;modifiedTime?:string;versi
 type DriveClient={listCanonicalDocs():Promise<DriveFile[]>;changes(pageToken:string):Promise<{changes:Array<{fileId:string;removed?:boolean;file?:DriveFile}>;nextPageToken?:string;newStartPageToken?:string}>;startPageToken():Promise<string>;exportDocx(id:string):Promise<Buffer>};
 type SourceRow={drive_file_id:string;content_id:string;title:string;slug:string;body_fingerprint:string;asset_fingerprint:string;source_revision:string;modified_time:string;source_url:string;status:string;active:number;disposition:string;detail:string|null;package_root:string|null};
 const EMPTY_BODY_SHA256=createHash('sha256').update('').digest('hex');
-function contentReviewPending(status:string){const value=status.toUpperCase();return value!=='READY'&&value!=='CONTENT_VISUAL_QA_PASS'&&!/^CONTENT_QA_PASS(?:__|$)/u.test(value);}
+function contentReviewPending(status:string){const value=status.toUpperCase();return !['READY','CONTENT_VISUAL_QA_PASS','PUBLISHER_PENDING'].includes(value)&&!/^CONTENT_QA_PASS(?:__|$)/u.test(value);}
 
 /** Drive is canonical input only: this worker never creates or publishes Drive/Platform content. */
 export class GoogleDriveCanonicalSync {
@@ -48,7 +48,7 @@ export class GoogleDriveCanonicalSync {
     return {
       async listCanonicalDocs(){
         const result:DriveFile[]=[];let pageToken:string|undefined;
-        do{const page=await api('files',{q:`trashed = false and mimeType = '${DOC_MIME}' and fullText contains '\"驻越经营实录\"'`,fields:'nextPageToken,files(id,name,mimeType,modifiedTime,version,parents,webViewLink,trashed)',pageSize:'1000',spaces:'drive',supportsAllDrives:'true',includeItemsFromAllDrives:'true',...(pageToken?{pageToken}:{})});result.push(...(page.files??[]));pageToken=page.nextPageToken;}while(pageToken);
+        do{const page=await api('files',{q:`trashed = false and mimeType = '${DOC_MIME}' and (fullText contains '\"驻越经营实录\"' or name contains 'VBE-' or name contains '驻越经营实录')`,fields:'nextPageToken,files(id,name,mimeType,modifiedTime,version,parents,webViewLink,trashed)',pageSize:'1000',spaces:'drive',supportsAllDrives:'true',includeItemsFromAllDrives:'true',...(pageToken?{pageToken}:{})});result.push(...(page.files??[]));pageToken=page.nextPageToken;}while(pageToken);
         return result;
       },
       async startPageToken(){const result=await api('changes/startPageToken',{supportsAllDrives:'true'});if(!result.startPageToken)throw new Error('GOOGLE_DRIVE_START_TOKEN_MISSING');return String(result.startPageToken);},
@@ -89,7 +89,7 @@ export class GoogleDriveCanonicalSync {
     finally{rmSync(temp,{recursive:true,force:true});}
   }
   private async runOnce(mode:'auto'|'full'){
-    const now=new Date().toISOString();let cursor=this.state('page_token');const lastFull=Date.parse(this.state('last_full_scan_at')??'');const doFull=mode==='full'||!cursor||!Number.isFinite(lastFull)||Date.now()-lastFull>30*60_000;this.runningFull=doFull;
+    const now=new Date().toISOString();let cursor=this.state('page_token');const lastFull=Date.parse(this.state('last_full_scan_at')??'');const doFull=mode==='full'||!cursor||!Number.isFinite(lastFull)||Date.now()-lastFull>24*60*60_000;this.runningFull=doFull;
     if(doFull){this.progress={phase:'listing',done:0,total:0};const start=await this.drive.startPageToken();if(!cursor)this.setState('page_token',start);const files=await this.drive.listCanonicalDocs();const eligible=files.filter(file=>isCandidateName(file.name)||this.isTracked(file.id));this.progress={phase:'reading',done:0,total:eligible.length};const seen=new Set<string>(),failures:string[]=[];for(const file of eligible){this.progress.contentId=file.name;try{await this.processFile(file);seen.add(file.id);}catch(error){this.markPackageBlockedByDriveId(file.id,'DRIVE_SOURCE_SYNC_FAILED',safeError(error));failures.push(`${file.id}: ${safeError(error)}`);}this.progress.done++;}const tracked=this.db.prepare('SELECT DISTINCT drive_file_id FROM drive_sync_documents WHERE active=1').all() as Array<{drive_file_id:string}>;for(const item of tracked)if(!seen.has(item.drive_file_id))this.markSourceInactive(item.drive_file_id,'SOURCE_REMOVED');this.setState('last_full_scan_at',now);cursor=this.state('page_token')??start;await this.reconcileAll();this.setState('last_error',failures.length?`FULL_SCAN_PARTIAL_FAILURE (${failures.length}): ${failures.slice(0,5).join('; ')}`:'');this.setState('last_full_completed_at',new Date().toISOString());if(mode==='full')return {mode:'full',seen:seen.size,failures:failures.length,status:this.status()};}
     if(!cursor)throw new Error('GOOGLE_DRIVE_PAGE_TOKEN_MISSING');
     let token=cursor,pages=0,processed=0;this.progress={phase:'changes',done:0,total:0};
@@ -110,7 +110,7 @@ export class GoogleDriveCanonicalSync {
       const path=join(temp,'canonical.docx'),bytes=await this.drive.exportDocx(file.id);writeFileSync(path,bytes);let inspected;
       try{inspected=inspectDocxContentBundle(path);}catch(error){const id=String(file.name.match(/VBE-\d{8}-\d{3}/u)?.[0]??'').toUpperCase();if(id){const sha=createHash('sha256').update(bytes).digest('hex'),now=new Date().toISOString();this.db.prepare(`INSERT INTO drive_sync_documents(drive_file_id,content_id,title,slug,body_fingerprint,asset_fingerprint,source_revision,modified_time,source_url,status,active,disposition,detail,updated_at)
         VALUES(?,?,?,?,?,?,?,?,?,'MALFORMED',1,'IMPORT_FAILED',?,?) ON CONFLICT(drive_file_id,content_id) DO UPDATE SET source_revision=excluded.source_revision,modified_time=excluded.modified_time,status='MALFORMED',active=1,disposition='IMPORT_FAILED',detail=excluded.detail,updated_at=excluded.updated_at`).run(file.id,id,file.name,slugify(file.name),sha,sha,sha,String(file.modifiedTime??''),String(file.webViewLink??''),safeError(error),now);this.setPackageDiscoveryState(id,'DRIVE_SOURCE_SYNC_FAILED',safeError(error));return;}throw error;}
-      const docs=inspected.filter(doc=>doc.series==='驻越经营实录');
+      const docs=inspected.filter(doc=>doc.series==='驻越经营实录'||(doc.publicFinal&&file.name.includes(doc.articleId)));
       if(!docs.length){this.markSourceInactive(file.id,'SOURCE_REMOVED');return;}
       const priorIds=(this.db.prepare('SELECT DISTINCT content_id FROM drive_sync_documents WHERE active=1 AND drive_file_id=?').all(file.id) as Array<{content_id:string}>).map(row=>row.content_id);
       this.db.prepare('UPDATE drive_sync_documents SET active=0,disposition=\'SUPERSEDED_REVISION\',updated_at=? WHERE drive_file_id=?').run(new Date().toISOString(),file.id);
@@ -153,7 +153,7 @@ export class GoogleDriveCanonicalSync {
     const targetRoot=reusablePackage?dirname(dirname(reusablePackage.path)):join(this.contentRoot,'Drive-Canonical-Auto');
     const localManifest=reusablePackage?readFileSync(reusablePackage.path,'utf8'):'';
     const manifestRevision=localManifest?((JSON.parse(localManifest) as Record<string,unknown>).drive_source_revision??''):'';
-    const parserCurrent=localManifest?((JSON.parse(localManifest) as Record<string,unknown>).ingestion_contract==='drive-docx-inline-v2'):false;
+    const parserCurrent=localManifest?((JSON.parse(localManifest) as Record<string,unknown>).ingestion_contract==='drive-docx-inline-v5'):false;
     if(prior?.package_root&&existsSync(reusablePackage?.path??'')&&manifestRevision===selected.source_revision&&parserCurrent){this.repairLegacyImageStatus(reusablePackage!.path);this.setDisposition(selected.drive_file_id,sourcePending?'SOURCE_QA_PENDING':'IMPORTED',sourcePending?sourcePendingDetail:null,prior.package_root,contentId);this.clearPackageDiscoveryState(contentId);return;}
     const temp=mkdtempSync(join(resolve(process.env.TMPDIR||'/tmp'),'vbp-drive-import-'));
     try{
