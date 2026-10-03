@@ -401,11 +401,9 @@ function buildPackage(articleId: string, paths: string[], publishedPlatforms: Su
   if(metadata.drive_discovery_blocker)blockingReasons.push(String(metadata.drive_discovery_blocker));
   if(metadata.publication_permission===false&&contentType!=='video')blockingReasons.push('APPROVAL_REQUIRED');
   if(Object.keys(payloads).length===0)blockingReasons.push('PUBLIC_PAYLOAD_MISSING');
-  if(articleId.startsWith('VBE-')&&qaManifest==='PENDING_FACT_QA')blockingReasons.push('FACT_QA_PENDING');
-  // Production has explicitly marked these packages as awaiting the public
-  // article and layout. Resolved media alone must not turn them READY.
-  if(String(metadata.library_status??'')==='ASSET_INGESTED_PUBLIC_PAYLOAD_PENDING')blockingReasons.push('CONTENT_QA_PENDING');
-  if(articleId.startsWith('VBE-')&&contentType==='image_text'&&!hasVerifiedVisualQa(metadata,manifests))blockingReasons.push('VISUAL_QA_PENDING');
+  // GPT review labels are retained in the source manifest, but Publisher
+  // readiness means the selected public copy and media can be resolved. The
+  // user's confirmation is still required before any platform action.
   if(publicPayloadLeaks.length)blockingReasons.push('PUBLIC_PAYLOAD_INTERNAL_LEAK');
   if(qaManifest==='FAIL')blockingReasons.push('PACKAGE_QA_FAILED');
   else {
@@ -419,34 +417,14 @@ function buildPackage(articleId: string, paths: string[], publishedPlatforms: Su
   const imageIds=assets.filter(a=>a.role==='cover'||a.role==='gallery_image').map(a=>a.assetId);
   const variantAssets:Partial<Record<ContentVariantPlatform,string[]>>={};
   for(const platform of Object.keys(payloads) as ContentVariantPlatform[])variantAssets[platform]=[...imageIds];
-  const manifestDetail=localizeBlockingDetail(stringValue(metadata.blocking_issue));
+  const issue=stringValue(metadata.blocking_issue);
+  const manifestDetail=issue==='FACT_AND_VISUAL_QA_PENDING_AFTER_INLINE_ASSET_INGEST'?'':localizeBlockingDetail(issue);
   const blockingDetail=[
     stringValue(metadata.drive_discovery_detail),
     publicPayloadLeaks.length?`公开载荷含内部制作标记：${publicPayloadLeaks.join('；')}`:'',
-    blockingReasons.includes('FACT_QA_PENDING')?'文章事实核查尚未完成；图片导入或视觉检查不能替代主张—来源核验。':'',
-    blockingReasons.includes('VISUAL_QA_PENDING')?'素材存在不代表信息密度、图中文字、来源、手机可读性与正文位置已通过视觉验收。':'',
     manifestDetail
   ].filter(Boolean).join('；');
   return {articleId,version,title,contentType,packageRoot,assets,payloads,canonicalDocument:{contentId:articleId,driveFileId:sourceDocId,driveFolderId:sourceFolderId,sourceAnchor:sourceDoc.sourceAnchor,sourceUrl:stringValue(metadata.source_url)},variantAssets,readiness:blockingReasons.length?'BLOCKED':'READY',blockingReasons,blockingDetail,unresolvedAssets:qaManifest==='FAIL'?[]:mediaSelection.unresolved,duplicateCandidates:0,publishedPlatforms,sourceEvidence:sorted,canonicalSource:String(metadata.canonical_source??'')==='independent_rewrite_doc'};
-}
-
-function hasVerifiedVisualQa(metadata:Record<string,unknown>,manifests:string[]):boolean{
-  const status=String(metadata.visual_qa_status??'').toUpperCase();
-  if(status==='USER_CONFIRMED')return Boolean(String(metadata.visual_qa_evidence??'').trim());
-  if(status!=='PASS')return false;
-  const reportName=String(metadata.visual_density_report??'').trim();
-  if(!reportName||reportName.includes('/')||reportName.includes('\\'))return false;
-  for(const manifest of manifests){
-    const reportPath=join(dirname(manifest),reportName);
-    if(!existsSync(reportPath))continue;
-    try{
-      const report=JSON.parse(readFileSync(reportPath,'utf8')) as Record<string,unknown>;
-      const metrics=report.metrics&&typeof report.metrics==='object'?report.metrics as Record<string,unknown>:{};
-      const score=Number(metrics.information_quality_score??report.information_quality_score??0);
-      if(String(report.status??'').toUpperCase()==='PASS'&&score>=85&&Array.isArray(report.failures)&&report.failures.length===0)return true;
-    }catch{/* malformed quality evidence is not a pass */}
-  }
-  return false;
 }
 
 function normalizeSourceDocument(raw:unknown,declaredAnchor:unknown):{driveFileId?:string;sourceAnchor?:string}{

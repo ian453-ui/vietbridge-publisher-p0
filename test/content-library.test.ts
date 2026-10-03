@@ -190,7 +190,7 @@ test("visual asset manifest embedded in a public article blocks new publication"
   }finally{rmSync(root,{recursive:true,force:true});}
 });
 
-test("VBE image package requires a passing density report or explicit visual confirmation",()=>{
+test("missing visual report is source metadata, not a Publisher task-creation blocker",()=>{
   const root=mkdtempSync(join(tmpdir(),"content-visual-qa-gate-"));
   try{
     const content=join(root,"VBE-20260920-051");mkdirSync(content);
@@ -202,9 +202,8 @@ test("VBE image package requires a passing density report or explicit visual con
     writeFileSync(join(content,"VBE-20260920-051-wechat-public.md"),"# 标题\n正文");
     const library=new ContentLibrary({roots:[content]});
     const pending=library.index()[0];
-    assert.equal(pending.readiness,"BLOCKED");
-    assert.ok(pending.blockingReasons.includes("VISUAL_QA_PENDING"));
-    assert.match(String(pending.blockingDetail),/信息密度/);
+    assert.equal(pending.readiness,"READY");
+    assert.ok(!pending.blockingReasons.includes("VISUAL_QA_PENDING"));
     const reportName="visual_density_report.json";
     writeFileSync(join(content,reportName),JSON.stringify({status:"PASS",metrics:{information_quality_score:86},failures:[]}));
     writeFileSync(manifestPath,JSON.stringify({...metadata,visual_qa_status:"PASS",visual_density_report:reportName}));
@@ -248,7 +247,7 @@ test("declared frontload remains the cover ahead of alphabetically earlier body 
   }finally{rmSync(root,{recursive:true,force:true});}
 });
 
-test("production-pending public article is not made ready by resolved assets",()=>{
+test("source production label does not block a resolved public article",()=>{
   const root=mkdtempSync(join(tmpdir(),"content-pending-public-"));
   try{
     const content=join(root,"VBE-20260915-020");mkdirSync(content);
@@ -259,8 +258,8 @@ test("production-pending public article is not made ready by resolved assets",()
     writeFileSync(join(content,"VBE-20260915-020-wechat-public.md"),"# 标题\n公开正文\n【正文高密度信息图】");
     const library=new ContentLibrary({roots:[content]});
     const pending=library.index()[0];
-    assert.equal(pending.readiness,"BLOCKED");
-    assert.deepEqual(pending.blockingReasons,["CONTENT_QA_PENDING"]);
+    assert.equal(pending.readiness,"READY");
+    assert.deepEqual(pending.blockingReasons,[]);
     writeFileSync(manifest,JSON.stringify({...metadata,library_status:"CONTENT_QA_PASS"}));
     assert.equal(library.index()[0].readiness,"READY");
   }finally{rmSync(root,{recursive:true,force:true});}

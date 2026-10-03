@@ -32,7 +32,7 @@ test('full scan materializes current text plus inline image, then same Drive ide
   try{
     await sync.run('full');
     const first=new ContentLibrary({roots:[library]}).index();assert.equal(first.length,1);assert.equal(first[0].articleId,id);assert.equal(first[0].canonicalDocument.driveFileId,docId);
-    assert.match(readFileSync(first[0].payloads.wechat_official_account!,'utf8'),/正文旧版/);assert.equal(first[0].assets.length,1);assert.equal(first[0].readiness,'BLOCKED');assert.ok(first[0].blockingReasons.includes('FACT_QA_PENDING'));assert.ok(first[0].blockingReasons.includes('VISUAL_QA_PENDING'));
+    assert.match(readFileSync(first[0].payloads.wechat_official_account!,'utf8'),/正文旧版/);assert.equal(first[0].assets.length,1);assert.equal(first[0].readiness,'READY');assert.ok(!first[0].blockingReasons.includes('FACT_QA_PENDING'));assert.ok(!first[0].blockingReasons.includes('VISUAL_QA_PENDING'));
     const packageRoot=first[0].packageRoot,updatedBytes=makeDocx(root,id,'工厂成本先核算','正文新版：将同一单位成本口径写入采购与预算复核。');bytes.set(docId,updatedBytes);driveFile.modifiedTime='2026-10-01T00:10:00.000Z';
     await sync.run('full');const current=new ContentLibrary({roots:[library]}).index();assert.equal(current.length,1);assert.equal(current[0].packageRoot,packageRoot);assert.equal(current[0].duplicateCandidates,0);assert.match(readFileSync(current[0].payloads.wechat_official_account!,'utf8'),/正文新版/);
   }finally{db.close();rmSync(root,{recursive:true,force:true});}
@@ -51,7 +51,7 @@ test('a pending canonical revision refreshes visible text while keeping publicat
     const item=new ContentLibrary({roots:[library]}).index()[0];
     assert.match(readFileSync(item.payloads.wechat_official_account!,'utf8'),/GPT 新文字已经可读/);
     assert.doesNotMatch(readFileSync(item.payloads.wechat_official_account!,'utf8'),/旧文字需要替换/);
-    assert.equal(item.readiness,'BLOCKED');assert.ok(!item.blockingReasons.includes('SOURCE_QA_PENDING'));
+    assert.equal(item.readiness,'READY');assert.ok(!item.blockingReasons.includes('SOURCE_QA_PENDING'));
     assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE drive_file_id=? AND content_id=?').get(docId,id) as {disposition:string}).disposition,'SOURCE_QA_PENDING');
   }finally{db.close();rmSync(root,{recursive:true,force:true});}
 });
@@ -73,7 +73,7 @@ test('producer QA pass is distinct from Publisher fact and visual review',async(
   const root=mkdtempSync(join(tmpdir(),'publisher-drive-producer-pass-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));mkdirSync(library,{recursive:true});
   const id='VBE-20261001-205',docId='google-source-document-205',bytes=makeDocx(root,id,'经营许可复核','可预览的公开稿','CONTENT_VISUAL_QA_PASS');
   const sync=new GoogleDriveCanonicalSync(db,library,fakeDrive([source(docId,`${id}｜驻越经营实录`,bytes)],new Map([[docId,bytes]])),()=>true);
-  try{await sync.run('full');const item=new ContentLibrary({roots:[library]}).index()[0];assert.ok(!item.blockingReasons.includes('SOURCE_QA_PENDING'));assert.ok(item.blockingReasons.includes('FACT_QA_PENDING'));assert.ok(item.blockingReasons.includes('VISUAL_QA_PENDING'));assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE content_id=?').get(id) as {disposition:string}).disposition,'IMPORTED');}
+  try{await sync.run('full');const item=new ContentLibrary({roots:[library]}).index()[0];assert.ok(!item.blockingReasons.includes('SOURCE_QA_PENDING'));assert.ok(!item.blockingReasons.includes('FACT_QA_PENDING'));assert.ok(!item.blockingReasons.includes('VISUAL_QA_PENDING'));assert.equal(item.readiness,'READY');assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE content_id=?').get(id) as {disposition:string}).disposition,'IMPORTED');}
   finally{db.close();rmSync(root,{recursive:true,force:true});}
 });
 
@@ -115,7 +115,7 @@ test('a unique new single Doc automatically refreshes an older package without a
     await sync.run('full');assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE drive_file_id=?').get(newDoc) as {disposition:string}).disposition,'IMPORTED');
     const current=new ContentLibrary({roots:[library]}).index()[0];
     assert.equal(current.canonicalDocument.driveFileId,newDoc);assert.match(readFileSync(current.payloads.wechat_official_account!,'utf8'),/GPT 新公开正文/);
-    assert.equal(current.readiness,'BLOCKED');assert.ok(current.blockingReasons.includes('FACT_QA_PENDING'));
+    assert.equal(current.readiness,'READY');assert.ok(!current.blockingReasons.includes('FACT_QA_PENDING'));
     const manifest=JSON.parse(readFileSync(join(current.packageRoot,'manifest.json'),'utf8'));assert.equal(manifest.drive_rebind_from,oldDoc);assert.equal(manifest.drive_rebind_mode,'auto_unique_source');
   }finally{db.close();rmSync(root,{recursive:true,force:true});}
 });

@@ -97,7 +97,7 @@ test("DOCX text and inline sibling images materialize as one idempotent ContentI
     const item = new ContentLibrary({ roots: [target] }).index()[0];
     assert.equal(item.articleId, "VBE-20260920-050"); assert.equal(item.assets.length, 2);
     assert.equal(item.assets[0].role, "cover"); assert.equal(item.assets[1].role, "gallery_image");
-    assert.equal(item.readiness, "BLOCKED"); assert.ok(item.blockingReasons.includes("VISUAL_QA_PENDING")); assert.equal(item.canonicalDocument.driveFileId, "drive-doc");
+    assert.equal(item.readiness, "READY"); assert.ok(!item.blockingReasons.includes("VISUAL_QA_PENDING")); assert.equal(item.canonicalDocument.driveFileId, "drive-doc");
     assert.match(readFileSync(item.payloads.facebook!, "utf8"), /FB正文/);
     const transcript=join(target,"VBE-20260920-050","VBE-20260920-050-source-full-text-internal.md");
     assert.match(readFileSync(transcript,"utf8"),/LI正文/);
@@ -223,8 +223,8 @@ test("Google Doc FULL_DRAFT blocks merge by content id and inline images materia
     assert.doesNotMatch(payload,/QA:|DRAFT_FACT_QA|INTERNAL FACT NOTE|NOT_READY/);
     const manifest=JSON.parse(readFileSync(join(target,item.articleId,"manifest.json"),"utf8"));
     assert.equal(manifest.qa_status,"PENDING_FACT_QA");assert.equal(manifest.visual_qa_status,"PENDING");
-    assert.equal(item.readiness,"BLOCKED");assert.ok(item.blockingReasons.includes("VISUAL_QA_PENDING"));
-    assert.ok(item.blockingReasons.includes("FACT_QA_PENDING"));
+    assert.equal(item.readiness,"READY");assert.ok(!item.blockingReasons.includes("VISUAL_QA_PENDING"));
+    assert.ok(!item.blockingReasons.includes("FACT_QA_PENDING"));
     assert.equal(item.assets[0].qaState,"UNKNOWN","embedded-image ingestion must not imply image QA pass");
   }finally{rmSync(root,{recursive:true,force:true});}
 });

@@ -7,7 +7,7 @@ import { createPublisherServer } from "../src/web-server.ts";
 import { openDatabase } from "../src/database.ts";
 import { PublisherStore } from "../src/publisher-store.ts";
 
-test("pending fact and visual QA allow only a confirmed WeChat draft task",async()=>{
+test("pending GPT review metadata does not prevent a user-confirmed WeChat draft task",async()=>{
   const root=mkdtempSync(join(tmpdir(),"wechat-draft-gate-")),content=join(root,"content");mkdirSync(content);
   const id="VBE-20260928-083";
   writeFileSync(join(content,"manifest.json"),JSON.stringify({article_id:id,title:"公众号测试标题",source_doc_id:"canonical-doc",qa_status:"PENDING_FACT_QA",visual_qa_status:"PENDING",active_assets:[`${id}-cover.png`]}));
@@ -18,7 +18,7 @@ test("pending fact and visual QA allow only a confirmed WeChat draft task",async
   const address=server.address();assert.ok(address&&typeof address==='object');const base=`http://127.0.0.1:${address.port}`;
   try{
     const candidates=await(await fetch(`${base}/api/content/candidates?platforms=wechat_official_account&includeIncomplete=1`)).json() as any;
-    const item=candidates.candidates.find((x:any)=>x.articleId===id);assert.equal(item.readiness,"BLOCKED");assert.equal(item.wechatDraftEligible,true);
+    const item=candidates.candidates.find((x:any)=>x.articleId===id);assert.equal(item.readiness,"READY");assert.equal(item.wechatDraftEligible,true);
     const post=(platforms:string[])=>fetch(`${base}/api/tasks/execute`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({mode:"article_id",value:id,platforms})});
     assert.equal((await post(["facebook"])).status,409);
     assert.equal((await post(["wechat_official_account","facebook"])).status,409);
