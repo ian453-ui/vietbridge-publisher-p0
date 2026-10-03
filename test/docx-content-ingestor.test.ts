@@ -24,6 +24,42 @@ test("source review keeps metadata after an inline image inside the field block"
   }finally{rmSync(root,{recursive:true,force:true});}
 });
 
+test("GPT main article images and headings survive a plain-text WeChat adaptation",()=>{
+  const root=mkdtempSync(join(tmpdir(),"docx-gpt-compatible-"));
+  try{
+    const word=join(root,"bundle","word"),media=join(word,"media");mkdirSync(join(word,"_rels"),{recursive:true});mkdirSync(media);
+    const rows:[string,string][]=[
+      ["VBE-20260928-101｜案例", ""],["title: 能源项目", ""],["## 能源项目", ""],["", "rId1"],["", "rId2"],
+      ["第一段关于能源项目的正式内容。", ""],["## 项目制生意", ""],["第二段关于项目采购的正式内容。", ""],
+      ["【微信公众号母稿】", ""],["能源项目", ""],["第一段关于能源项目的正式内容。", ""],["项目制生意", ""],["第二段关于项目采购的正式内容。", ""],["【Facebook】", ""],["Facebook 版本", ""]
+    ];
+    const xml=rows.map(([value,rid])=>`<w:p><w:r>${value?`<w:t>${value}</w:t>`:""}${rid?`<w:drawing><a:blip r:embed="${rid}"/></w:drawing>`:""}</w:r></w:p>`).join("");
+    writeFileSync(join(word,"document.xml"),`<w:document>${xml}</w:document>`);
+    writeFileSync(join(word,"_rels","document.xml.rels"),'<Relationships><Relationship Id="rId1" Target="media/one.png"/><Relationship Id="rId2" Target="media/two.png"/></Relationships>');
+    writeFileSync(join(media,"one.png"),"first");writeFileSync(join(media,"two.png"),"second");
+    const docx=join(root,"source.docx");execFileSync("zip",["-q","-r",docx,"word"],{cwd:join(root,"bundle")});
+    const result=ingestDocxContentBundle(docx,join(root,"content")),wechat=readFileSync(join(result.imported[0].target,"VBE-20260928-101-wechat-public.md"),"utf8");
+    assert.equal((wechat.match(/!\[[^\]]*\]\(body_\d+_INGESTED\.png\)/gu)||[]).length,2);
+    assert.match(wechat,/## 项目制生意/);assert.doesNotMatch(wechat,/Facebook 版本/);
+    assert.equal((wechat.match(/^# 能源项目$/gmu)||[]).length,1);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+test("正文建议直接使用主文 resolves the authored article instead of publishing the instruction",()=>{
+  const root=mkdtempSync(join(tmpdir(),"docx-main-reference-"));
+  try{
+    const word=join(root,"bundle","word"),media=join(word,"media");mkdirSync(join(word,"_rels"),{recursive:true});mkdirSync(media);
+    const rows:[string,string][]=[["VBE-20260929-102｜主文",""],["title: 供应链本地化",""],["# 供应链本地化",""],["主文第一段。",""],["","rId1"],["## 判断重点",""],["主文详细事实。",""],["【事实核查】",""],["内部证据，不得公开。",""],["【微信公众号母稿】",""],["标题：供应链本地化",""],["导语：概要。",""],["正文建议直接使用主文。",""],["结尾CTA：检查供应链。",""]];
+    const xml=rows.map(([value,rid])=>`<w:p><w:r>${value?`<w:t>${value}</w:t>`:""}${rid?`<w:drawing><a:blip r:embed="${rid}"/></w:drawing>`:""}</w:r></w:p>`).join("");
+    writeFileSync(join(word,"document.xml"),`<w:document>${xml}</w:document>`);
+    writeFileSync(join(word,"_rels","document.xml.rels"),'<Relationships><Relationship Id="rId1" Target="media/one.png"/></Relationships>');writeFileSync(join(media,"one.png"),"image");
+    const docx=join(root,"source.docx");execFileSync("zip",["-q","-r",docx,"word"],{cwd:join(root,"bundle")});
+    const result=ingestDocxContentBundle(docx,join(root,"content")),wechat=readFileSync(join(result.imported[0].target,"VBE-20260929-102-wechat-public.md"),"utf8");
+    assert.match(wechat,/主文详细事实/);assert.match(wechat,/## 判断重点/);assert.match(wechat,/!\[[^\]]*\]\(body_01_INGESTED\.png\)/u);assert.match(wechat,/检查供应链/);
+    assert.doesNotMatch(wechat,/正文建议直接使用主文|内部证据/);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
 test("WeChat public BEGIN/END section excludes internal mother draft and preserves images",()=>{
   const root=mkdtempSync(join(tmpdir(),"docx-public-bounds-"));
   try{

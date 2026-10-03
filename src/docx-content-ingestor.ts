@@ -134,15 +134,17 @@ export function ingestDocxContentBundle(
       };
     });
     const markerToAsset=new Map(article.media.map((media,index)=>[media.marker,assetNames[index]]));
-    const wechat=sections.wechat.replace(/\[\[VB_INLINE_MEDIA:([^\]]+)\]\]/gu,(marker)=>{
+    const enrichedWechat=attachSourceBodyImages(sections.wechat,article);
+    const wechat=enrichedWechat.replace(/\[\[VB_INLINE_MEDIA:([^\]]+)\]\]/gu,(marker)=>{
       const filename=markerToAsset.get(marker);
       if(!filename)throw new Error(`${article.id} unresolved inline image marker in public copy`);
       const markerIndex=sections.wechat.indexOf(marker),following=sections.wechat.slice(markerIndex+marker.length);
       const alt=following.match(/(?:^|\n)(图\s*\d+\s*｜[^\n]+)/u)?.[1]?.trim()??filename;
       return `![${alt}](${filename})`;
     });
-    const bodyWithoutDuplicateTitle = wechat.trim().replace(/^#\s+(.+)\n+/u, (heading, value: string) => value.trim() === article.title ? "" : heading);
-    writeFileSync(join(target, `${article.id}-wechat-public.md`), `# ${article.title}\n\n${normalizeWechatHeadings(bodyWithoutDuplicateTitle.trim())}\n`);
+    const bodyWithoutDuplicateTitle = wechat.trim().replace(/^(?:#{1,6}\s+|标题\s*[:：]\s*)?([^\r\n]+)(?:\r?\n|$)+/u,
+      (heading, value: string) => value.trim() === article.title ? "" : heading);
+    writeFileSync(join(target, `${article.id}-wechat-public.md`), `# ${article.title}\n\n${normalizeWechatHeadings(bodyWithoutDuplicateTitle.trim().replace(/\r?\n(?!\n)/gu,'\n\n'))}\n`);
     if (isPublicVariant(sections.facebook)) writeFileSync(join(target, `${article.id}-facebook-public.txt`), `${article.title}\n\n${sections.facebook.trim()}\n`);
     if (isPublicVariant(sections.linkedin)) writeFileSync(join(target, `${article.id}-linkedin-public.txt`), `${article.title}\n\n${sections.linkedin.trim()}\n`);
     if (isPublicVariant(sections.xiaohongshu)) writeFileSync(join(target, `${article.id}-xiaohongshu-public.txt`), `${sections.xiaohongshu.trim()}\n`);
@@ -173,7 +175,7 @@ export function ingestDocxContentBundle(
       source_doc_id: source.driveFileId ?? previous.source_doc_id,
       source_folder_id: source.driveFolderId ?? previous.source_folder_id,
       source_url: source.sourceUrl ?? previous.source_url,
-      ingestion_contract: "drive-docx-inline-v1",
+      ingestion_contract: "drive-docx-inline-v2",
       source_filename: basename(sourcePath),
       source_revision: sourceRevision,
       canonical_source: "independent_rewrite_doc",
@@ -299,12 +301,56 @@ function publicSections(paragraphs: string[]) {
   const facebook = section(/【Facebook(?:版本|适配)?】\s*/u, [/【LinkedIn(?:版本|适配)?】/u, /【小红书(?:版本|适配)?】/u, /【SEO(?:_QA)?】/u, /【FACT_QA/u]) || markdownPlatform("Facebook",["LinkedIn","小红书"]);
   const linkedin = section(/【LinkedIn(?:版本|适配)?】\s*/u, [/【小红书(?:版本|适配)?】/u, /【SEO(?:_QA)?】/u, /【FACT_QA/u]) || markdownPlatform("LinkedIn",["小红书"]);
   const xiaohongshu = section(/【小红书(?:版本|适配)?】\s*/u, [/【SEO(?:_QA)?】/u, /【FACT_QA/u]) || markdownPlatform("小红书",[]);
+  // Some GPT documents intentionally use the long article as the WeChat
+  // body and put only a title/deck/CTA in the platform field. The directive
+  // is a reference, not publishable copy. Resolve it against the same Doc.
+  if(/正文建议直接使用主文/u.test(wechat)){
+    const markerIndex=paragraphs.findIndex(value=>/^(?:【微信公众号母稿】|#{1,3}\s*微信公众号(?:母稿|版本|版))$/u.test(value.trim()));
+    const before=paragraphs.slice(0,markerIndex<0?paragraphs.length:markerIndex);
+    const start=before.findIndex(value=>/^#{1,2}\s+\S/u.test(value.trim())&&!/公众号|Facebook|LinkedIn|小红书/u.test(value));
+    if(start>=0){
+      const end=before.findIndex((value,index)=>index>start&&/^【(?:事实核查|SEO检查|FACT_QA|INTERNAL_QA)】$/u.test(value.trim()));
+      const main=before.slice(start,end<0?before.length:end).join('\n').trim();
+      const cta=wechat.match(/^结尾CTA\s*[:：]\s*(.+)$/mu)?.[1]?.trim();
+      if(main)wechat=main+(cta?'\n\n'+cta:'');
+    }
+  }
   return {
     wechat,
     facebook,
     linkedin,
     xiaohongshu
   };
+}
+
+/** Preserve GPT's existing body infographics when its platform adaptation
+ * repeats the article text but omits the original DOCX image nodes. No new
+ * text or image is generated; images are attached near matching source copy. */
+function attachSourceBodyImages(wechat:string,article:Article):string{
+  let lines=wechat.split(/\r?\n/u);const insertions=new Map<number,string[]>();
+  const source=article.paragraphs;
+  const normalize=(value:string)=>value.trim().replace(/^#{1,6}\s*/u,'').replace(/^标题\s*[:：]\s*/u,'').trim();
+  const platformStart=source.findIndex(value=>/^(?:【微信公众号母稿】|#{1,3}\s*微信公众号(?:母稿|版本|版))$/u.test(value.trim()));
+  const mainSource=source.slice(0,platformStart<0?source.length:platformStart);
+  const headings=new Set(mainSource.map(value=>value.match(/^#{2,3}\s+(.+)$/u)?.[1]?.trim()).filter((value):value is string=>Boolean(value)));
+  lines=lines.map(line=>headings.has(line.trim())?`## ${line.trim()}`:line);
+  const bodyMedia=article.media.filter(media=>media.role==='body'&&!wechat.includes(media.marker));
+  for(const media of bodyMedia){
+    const sourceIndex=source.indexOf(media.marker);
+    let at=-1;
+    for(let index=sourceIndex-1;index>=0;index--){
+      const candidate=normalize(source[index]);
+      if(!candidate||candidate.startsWith('[[VB_INLINE_MEDIA:')||candidate.length<12)continue;
+      at=lines.findIndex(line=>normalize(line)===candidate);
+      if(at>=0)break;
+    }
+    if(at<0){
+      const titleLine=lines.findIndex(line=>/^#{1,6}\s|^标题\s*[:：]/u.test(line.trim()));
+      at=titleLine>=0?titleLine:0;
+    }
+    const list=insertions.get(at)??[];list.push(media.marker);insertions.set(at,list);
+  }
+  return lines.flatMap((line,index)=>[line,...(insertions.get(index)??[])]).join('\n');
 }
 
 function parseRelationships(xml: string): Map<string, string> {

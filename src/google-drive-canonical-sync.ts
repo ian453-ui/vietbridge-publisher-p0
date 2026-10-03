@@ -153,7 +153,8 @@ export class GoogleDriveCanonicalSync {
     const targetRoot=reusablePackage?dirname(dirname(reusablePackage.path)):join(this.contentRoot,'Drive-Canonical-Auto');
     const localManifest=reusablePackage?readFileSync(reusablePackage.path,'utf8'):'';
     const manifestRevision=localManifest?((JSON.parse(localManifest) as Record<string,unknown>).drive_source_revision??''):'';
-    if(prior?.package_root&&existsSync(reusablePackage?.path??'')&&manifestRevision===selected.source_revision){this.repairLegacyImageStatus(reusablePackage!.path);this.setDisposition(selected.drive_file_id,sourcePending?'SOURCE_QA_PENDING':'IMPORTED',sourcePending?sourcePendingDetail:null,prior.package_root,contentId);this.clearPackageDiscoveryState(contentId);return;}
+    const parserCurrent=localManifest?((JSON.parse(localManifest) as Record<string,unknown>).ingestion_contract==='drive-docx-inline-v2'):false;
+    if(prior?.package_root&&existsSync(reusablePackage?.path??'')&&manifestRevision===selected.source_revision&&parserCurrent){this.repairLegacyImageStatus(reusablePackage!.path);this.setDisposition(selected.drive_file_id,sourcePending?'SOURCE_QA_PENDING':'IMPORTED',sourcePending?sourcePendingDetail:null,prior.package_root,contentId);this.clearPackageDiscoveryState(contentId);return;}
     const temp=mkdtempSync(join(resolve(process.env.TMPDIR||'/tmp'),'vbp-drive-import-'));
     try{
       const docx=join(temp,'canonical.docx');writeFileSync(docx,await this.drive.exportDocx(selected.drive_file_id));
