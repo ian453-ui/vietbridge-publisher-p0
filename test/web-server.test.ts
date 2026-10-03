@@ -20,6 +20,9 @@ test("pending GPT review metadata does not prevent a user-confirmed WeChat draft
     const candidates=await(await fetch(`${base}/api/content/candidates?platforms=wechat_official_account&includeIncomplete=1`)).json() as any;
     const item=candidates.candidates.find((x:any)=>x.articleId===id);assert.equal(item.readiness,"READY");assert.equal(item.wechatDraftEligible,true);
     const post=(platforms:string[])=>fetch(`${base}/api/tasks/execute`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({mode:"article_id",value:id,platforms})});
+    const ui=await fetch(base).then(response=>response.text());assert.match(ui,/筛选候选内容（不改变发布平台）/);assert.match(ui,/发布平台（请明确勾选；默认不选）/);assert.doesNotMatch(ui,/data-platform value="[^"]+" checked/);
+    assert.equal((await post([])).status,400);
+    assert.equal((await post(undefined as any)).status,400);
     assert.equal((await post(["facebook"])).status,409);
     assert.equal((await post(["wechat_official_account","facebook"])).status,409);
     const response=await post(["wechat_official_account"]);assert.equal(response.status,201);
@@ -60,7 +63,7 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
     const page = await (await fetch(base)).text();
     assert.match(page, /VietBridge 多平台发布器/);
     assert.match(page, /日常流程不调用 AI/);
-    assert.match(page, /筛选可发布内容/);
+    assert.match(page, /筛选候选内容（不改变发布平台）/);
     assert.doesNotMatch(page, /保存任务草稿/);
     assert.doesNotThrow(()=>new Function(page.match(/<script>([\s\S]*?)<\/script>/)![1]));
     assert.match(page,/Facebook 发布账号/);

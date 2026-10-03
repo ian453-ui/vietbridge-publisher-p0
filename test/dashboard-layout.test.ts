@@ -7,7 +7,9 @@ test('active tasks precede content selection and completed history follows',()=>
   assert.ok(html.indexOf('id="active-tasks"')<html.indexOf('id="mode"'));
   assert.ok(html.indexOf('id="mode"')<html.indexOf('id="results"'));
   assert.match(html,/id="content-platform-filter"/);
-  assert.match(html,/筛选可发布内容/);
+  assert.match(html,/筛选候选内容（不改变发布平台）/);
+  assert.match(html,/发布平台（请明确勾选；默认不选）/);
+  assert.doesNotMatch(html,/data-platform value="[^"]+" checked/);
   assert.match(html,/id="reconcile-all"/);
   assert.match(html,/核对这条/);
   assert.match(html,/id="toggle-all-content"/);
