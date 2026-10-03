@@ -103,6 +103,7 @@ export function clientPublicPayload(source: string): {body: string; title?: stri
 export class ContentLibrary {
   readonly roots: string[];
   readonly ledgerPath?: string;
+  private indexedAssets?: Map<string,ContentAsset>;
 
   constructor(options: { roots: string[]; ledgerPath?: string }) {
     this.roots = options.roots.filter(existsSync).map(path => realpathSync(resolve(path)));
@@ -188,8 +189,14 @@ export class ContentLibrary {
     const indexed=allIndexed.filter(item=>item.canonicalSource||!explicitCanonicalIds.has(item.articleId));
     const counts=new Map<string,number>();for(const item of indexed)counts.set(item.articleId,(counts.get(item.articleId)||0)+1);
     for(const item of indexed){item.duplicateCandidates=(counts.get(item.articleId)||1)-1;if(item.articleId.startsWith('VBE-')&&item.duplicateCandidates>0){item.readiness='BLOCKED';item.blockingReasons.push('CANONICAL_ARTICLE_DUPLICATE');}item.wechatDraftEligible=canStageWechatDraft(item);}
-    return indexed
-      .sort((a, b) => b.articleId.localeCompare(a.articleId, undefined, { numeric: true }));
+    const ordered=indexed.sort((a, b) => b.articleId.localeCompare(a.articleId, undefined, { numeric: true }));
+    this.indexedAssets=new Map(ordered.flatMap(item=>item.assets.map(asset=>[asset.path,asset] as const)));
+    return ordered;
+  }
+
+  indexedAsset(path:string):ContentAsset|undefined{
+    if(!this.indexedAssets)this.index();
+    return this.indexedAssets?.get(path);
   }
 
   resolve(request: ResolveRequest): ResolveResult {

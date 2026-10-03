@@ -2,6 +2,7 @@ import { createServer, type Server, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import { existsSync,readFileSync,statSync } from "node:fs";
 import { homedir } from "node:os";
+import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { openDatabase } from "./database.ts";
 import { PublisherStore } from "./publisher-store.ts";
@@ -144,12 +145,14 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
     if(req.method==='POST'&&url.pathname==='/api/facebook/accounts/select'){try{return send(res,200,tasks.facebookAccounts.select(String((await readJson(req) as any).id||'')));}catch(error){return send(res,400,{error:String(error)});}}
     if((req.method==='GET'||req.method==='HEAD')&&url.pathname==='/api/content/asset'){
       const path=String(url.searchParams.get('path')||'');
-      const owner=tasks.library.resolve({mode:'local_path',value:path});
-      const asset=owner.status==='MATCHED'?owner.package.assets.find(asset=>asset.path===path):undefined;
+      let asset=tasks.library.indexedAsset(path);
+      if(!asset)return send(res,404,{error:'ASSET_NOT_FOUND'});
+      if(!existsSync(path))return send(res,404,{error:'ASSET_FILE_MISSING'});
+      const currentRevision=createHash('sha256').update(readFileSync(path)).digest('hex');
+      if(currentRevision!==asset.revision){tasks.library.index();asset=tasks.library.indexedAsset(path);}
       if(!asset)return send(res,404,{error:'ASSET_NOT_FOUND'});
       const requestedRevision=String(url.searchParams.get('revision')||'');
       if(requestedRevision&&requestedRevision!==asset.revision)return send(res,409,{error:'ASSET_REVISION_CHANGED',revision:asset.revision});
-      if(!existsSync(path))return send(res,404,{error:'ASSET_FILE_MISSING'});
       serveAsset(req,res,path,assetMime(path),asset.revision,Boolean(requestedRevision));return;
     }
     if(req.method==='POST'&&url.pathname==='/api/content/preview'){
