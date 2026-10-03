@@ -190,6 +190,20 @@ test("visual asset manifest embedded in a public article blocks new publication"
   }finally{rmSync(root,{recursive:true,force:true});}
 });
 
+test("ordinary article prose about modification records is not an internal workflow leak",()=>{
+  const root=mkdtempSync(join(tmpdir(),"content-records-prose-"));
+  try{
+    const content=join(root,"VBE-20260928-086");mkdirSync(content);
+    writeFileSync(join(content,"manifest.json"),JSON.stringify({article_id:"VBE-20260928-086",source_doc_id:"doc",active_assets:["body_01_INGESTED.png"]}));
+    writeFileSync(join(content,"body_01_INGESTED.png"),Buffer.from("image"));
+    writeFileSync(join(content,"VBE-20260928-086-wechat-public.md"),"# 标题\n企业需要保留重大修改记录。\n");
+    const item=new ContentLibrary({roots:[content]}).index()[0];
+    assert.equal(item.readiness,"READY");assert.ok(!item.blockingReasons.includes("PUBLIC_PAYLOAD_INTERNAL_LEAK"));
+    writeFileSync(join(content,"VBE-20260928-086-wechat-public.md"),"# 标题\n正文\n【修改记录】\n内部修订\n");
+    assert.ok(new ContentLibrary({roots:[content]}).index()[0].blockingReasons.includes("PUBLIC_PAYLOAD_INTERNAL_LEAK"));
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
 test("missing visual report is source metadata, not a Publisher task-creation blocker",()=>{
   const root=mkdtempSync(join(tmpdir(),"content-visual-qa-gate-"));
   try{

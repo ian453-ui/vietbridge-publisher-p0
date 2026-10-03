@@ -448,7 +448,7 @@ function publicPayloadInternalMarkers(path:string,hasResolvedBodyImage=false):st
     ["FACT_QA_INTERNAL_SECTION",/(?:【(?:FACT_QA|INTERNAL[_ ]QA)[^】]*】|\b(?:FACT_QA|ASSET_QA|PUBLISHER_QA|FINAL_STATUS)\s*:)/iu],
     ["VISUAL_ASSET_MANIFEST_INTERNAL",/(?:【VISUAL_ASSET_MANIFEST[^】]*】|^\s*active_assets\s*:)/imu],
     ["CANONICAL_METADATA_TEXT",/^\s*(?:schema_version|content_id|storyline_id|narrative_mode)\s*:/imu],
-    ["EDITORIAL_WORKFLOW_MARKER",/(?:修改记录|审核意见|返修单|READY_FOR_USER_APPROVAL|EDITORIAL_REVIEW|REVISION_REQUIRED)/u]
+    ["EDITORIAL_WORKFLOW_MARKER",/(?:^\s*(?:【(?:修改记录|审核意见|返修单)】|#{1,6}\s*(?:修改记录|审核意见|返修单)\s*$)|\b(?:READY_FOR_USER_APPROVAL|EDITORIAL_REVIEW|REVISION_REQUIRED)\b)/mu]
   ];
   const autoResolvedPlacementMarkers=new Set(["BODY_INFOGRAPHIC_QA_MARKER","BODY_INFOGRAPHIC_PLACEHOLDER"]);
   return patterns.filter(([label,pattern])=>pattern.test(text)&&!(hasResolvedBodyImage&&autoResolvedPlacementMarkers.has(label))).map(([label])=>label);
