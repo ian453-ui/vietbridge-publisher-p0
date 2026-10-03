@@ -55,15 +55,25 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
   const localRefresh=new LocalContentRefresher(tasks.library.roots[0]??resolve(socialRoot,'Content-Library'));
   const canonicalRoot=tasks.library.roots[0]??resolve(socialRoot,'Content-Library');
   let driveSync:GoogleDriveCanonicalSync|undefined,driveSyncError='GOOGLE_DRIVE_CONNECTOR_STARTING';
+  const batchScopeCache=new Map<string,{expiresAt:number;ids:Set<string>}>();
+  let lastVerifiedLedgerSync=0;
+  let lastDriveScopeRevision='';
   void GoogleDriveCanonicalSync.connect(db,canonicalRoot).then(sync=>{driveSync=sync;driveSyncError='';if(options.workerEnabled!==false)sync.start();}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
   if (options.workerEnabled !== false) worker.start();
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/") return html(res, renderDashboard());
     if (req.method === "GET" && url.pathname === "/api/health") return send(res, 200, { ok: true, aiRuntimeRequired: false, capabilities: PLATFORM_CAPABILITIES });
-    if(req.method==='GET'&&url.pathname==='/api/content/drive-sync/status')return send(res,200,driveSync?driveSync.status():{enabled:false,authorized:false,error:driveSyncError,publicationSideEffects:false});
+    if(req.method==='GET'&&url.pathname==='/api/content/drive-sync/status'){
+      const status:Record<string,unknown>=driveSync?driveSync.status():{enabled:false,authorized:false,error:driveSyncError,publicationSideEffects:false};
+      const revision=String(status.lastFullCompletedAt||'')+'|'+String(status.lastChangeCheckAt||'');
+      if(lastDriveScopeRevision&&revision!==lastDriveScopeRevision)batchScopeCache.clear();
+      lastDriveScopeRevision=revision;
+      return send(res,200,status);
+    }
     if(req.method==='POST'&&url.pathname==='/api/content/drive-sync/run'){
       if(!driveSync)return send(res,503,{error:driveSyncError||'GOOGLE_DRIVE_SYNC_UNAVAILABLE'});
+      batchScopeCache.clear();
       void driveSync.run('full').catch(()=>{});
       return send(res,202,{accepted:true,status:driveSync.status()});
     }
@@ -113,7 +123,8 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       try {
         const articleId=String(url.searchParams.get('articleId')??'');
         const bytes=await readBinary(req,30_000_000);
-        return send(res,200,localRefresh.refreshDocx(articleId,bytes));
+        const result=localRefresh.refreshDocx(articleId,bytes);batchScopeCache.clear();
+        return send(res,200,result);
       } catch(error) { return send(res,409,{error:String(error)}); }
     }
     if(req.method==='POST'&&url.pathname==='/api/content/refresh-image'){
@@ -121,7 +132,8 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
         const articleId=String(url.searchParams.get('articleId')??'');
         const filename=String(req.headers['x-filename']??'');
         const qaConfirmed=req.headers['x-qa-confirmed']==='true';
-        return send(res,200,localRefresh.refreshImage(articleId,filename,await readBinary(req,25_000_000),qaConfirmed));
+        const result=localRefresh.refreshImage(articleId,filename,await readBinary(req,25_000_000),qaConfirmed);batchScopeCache.clear();
+        return send(res,200,result);
       } catch(error) { return send(res,409,{error:String(error)}); }
     }
     if(req.method==='GET'&&url.pathname==='/api/content/candidates'){
@@ -219,13 +231,18 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       return send(res,200,{...inventory,reconciliation:ledgerReconciler.reconcileWechat(inventory.items,inventory.checked_at)});
     }
     if (req.method === "GET" && url.pathname === "/api/batches") {
-      ledgerReconciler.syncVerifiedJobs();
+      if(Date.now()-lastVerifiedLedgerSync>60_000){ledgerReconciler.syncVerifiedJobs();lastVerifiedLedgerSync=Date.now();}
       const workspace=String(url.searchParams.get('workspace')||'');
       const batches=tasks.listBatches();
       if(!workspace)return send(res,200,{batches:batches.filter(batch=>!(batch.jobs as Array<{article_id:string}>).some(job=>job.article_id.startsWith('CNVISA-')))});
       try{
-        const context=await clientWorkspace(workspace);
-        const ids=new Set(tasks.library.index().filter(item=>workspace==='ws-vietbridge'?!item.packageRoot.includes('/Content-Library/clients/'):item.packageRoot===context.contentRoot).map(item=>item.articleId));
+        let scope=batchScopeCache.get(workspace);
+        if(!scope||scope.expiresAt<Date.now()){
+          const context=workspace==='ws-vietbridge'?null:await clientWorkspace(workspace);
+          const ids=new Set(tasks.library.index().filter(item=>workspace==='ws-vietbridge'?!item.packageRoot.includes('/Content-Library/clients/'):item.packageRoot===context?.contentRoot).map(item=>item.articleId));
+          scope={ids,expiresAt:Date.now()+60_000};batchScopeCache.set(workspace,scope);
+        }
+        const ids=scope.ids;
         return send(res,200,{batches:batches.filter(batch=>(batch.jobs as Array<{article_id:string}>).some(job=>ids.has(job.article_id)))});
       }catch(error){return send(res,400,{error:String(error)});}
     }
@@ -269,29 +286,66 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
         return send(res, 200, tasks.library.resolveBytes(data, platforms));
       } catch (error) { return send(res, 400, { error: String(error) }); }
     }
+    if (req.method === "POST" && url.pathname === "/api/tasks/execute-bulk") {
+      try {
+        const body=await readJson(req) as {items?:ExecuteTaskInput[];workspace?:string;facebookAccountId?:string};
+        if(!Array.isArray(body.items)||body.items.length<1||body.items.length>50)throw new Error('一次请选择 1 到 50 篇文章');
+        const inputs=body.items.map(item=>({...item,workspace:body.workspace,facebookAccountId:body.facebookAccountId||item.facebookAccountId}));
+        const articleIds=inputs.map(item=>String(item.selectedArticleId||''));
+        if(articleIds.some(id=>!id)||new Set(articleIds).size!==articleIds.length)throw new Error('批量任务必须为每篇文章指定唯一内容编号');
+        if(inputs.some(item=>!item.selectedPackageRoot||!item.selectedVersion||!Array.isArray(item.platforms)||item.platforms.length===0))throw new Error('每篇文章都必须绑定当前内容版本并明确选择发布平台');
+        const indexedPackages=tasks.library.index();
+        const selectedPackages=inputs.map(item=>indexedPackages.find(pkg=>pkg.articleId===item.selectedArticleId&&pkg.packageRoot===item.selectedPackageRoot&&pkg.version===item.selectedVersion));
+        if(selectedPackages.some(pkg=>!pkg))throw new Error('有文章版本已变化，请刷新候选列表后重新选择；没有创建任务');
+        let context:Awaited<ReturnType<typeof clientWorkspace>>|null=null;
+        if(body.workspace&&body.workspace!=='ws-vietbridge')context=await clientWorkspace(body.workspace);
+        for(const item of inputs){
+          const packageRoot=String(item.selectedPackageRoot);
+          if(!body.workspace&&packageRoot.includes('/Content-Library/clients/'))throw new Error('客户内容必须从对应客户入口打开');
+          if(body.workspace==='ws-vietbridge'&&packageRoot.includes('/Content-Library/clients/'))throw new Error('所选内容不属于 VietBridge 主资料库');
+          if(body.workspace&&(!item.selectedArticleId||body.workspace!=='ws-vietbridge'&&packageRoot!==context?.contentRoot))throw new Error('所选内容不属于当前客户');
+          if(item.platforms?.includes('facebook')){
+            if(body.workspace==='ws-vietbridge'&&item.facebookAccountId!=='legacy-vietbridge')throw new Error('Facebook 账号与 VietBridge 客户不一致');
+            if(body.workspace&&body.workspace!=='ws-vietbridge'){
+              const imported=context?.account?.configUrl?tasks.facebookAccounts.importLocal(context.account.configUrl):undefined;
+              const chosen=item.facebookAccountId?tasks.facebookAccounts.get(item.facebookAccountId):undefined;
+              if(!imported?.page_id||!chosen||chosen.page_id!==imported.page_id||chosen.config_url!==context?.account?.configUrl)throw new Error('Facebook 账号与当前客户不一致，请重新打开客户发布器');
+            }
+          }
+        }
+        const results=inputs.map(item=>{
+          try{return {articleId:item.selectedArticleId,result:tasks.execute(item,indexedPackages)};}
+          catch(error){return {articleId:item.selectedArticleId,error:String(error)};}
+        });
+        batchScopeCache.clear();
+        return send(res,200,{results});
+      }catch(error){return send(res,400,{error:String(error)});}
+    }
     if (req.method === "POST" && url.pathname === "/api/tasks/execute") {
       try {
         const input=await readJson(req) as ExecuteTaskInput & {workspace?:string};
         if(!input.workspace&&input.selectedPackageRoot?.includes('/Content-Library/clients/'))throw new Error('客户内容必须从对应客户入口打开');
-        if(!input.workspace){
+        const indexedPackages=input.selectedArticleId&&input.selectedPackageRoot?tasks.library.index():undefined;
+        if(!input.workspace&&!indexedPackages){
           const candidate=tasks.library.index().find(item=>item.articleId===(input.selectedArticleId||input.value));
           if(candidate?.packageRoot.includes('/Content-Library/clients/'))throw new Error('客户内容必须从对应客户入口打开');
         }
         if(input.workspace){
-          const context=await clientWorkspace(input.workspace);
           if(!input.selectedPackageRoot||!input.selectedArticleId)throw new Error('请先从当前客户资源库选定内容');
-          if(input.workspace==='ws-vietbridge'?input.selectedPackageRoot.includes('/Content-Library/clients/'):input.selectedPackageRoot!==context.contentRoot)throw new Error('所选内容不属于当前客户');
+          const context=input.workspace==='ws-vietbridge'?null:await clientWorkspace(input.workspace);
+          if(input.workspace==='ws-vietbridge'?input.selectedPackageRoot.includes('/Content-Library/clients/'):input.selectedPackageRoot!==context?.contentRoot)throw new Error('所选内容不属于当前客户');
           if(input.platforms?.includes('facebook')){
             if(input.workspace==='ws-vietbridge'){
               if(input.facebookAccountId!=='legacy-vietbridge')throw new Error('Facebook 账号与 VietBridge 客户不一致');
             }else{
-            const imported=context.account?.configUrl?tasks.facebookAccounts.importLocal(context.account.configUrl):undefined;
+            const imported=context?.account?.configUrl?tasks.facebookAccounts.importLocal(context.account.configUrl):undefined;
             const chosen=input.facebookAccountId?tasks.facebookAccounts.get(input.facebookAccountId):undefined;
-            if(!imported?.page_id||!chosen||chosen.page_id!==imported.page_id||chosen.config_url!==context.account?.configUrl)throw new Error('Facebook 账号与当前客户不一致，请重新打开客户发布器');
+            if(!imported?.page_id||!chosen||chosen.page_id!==imported.page_id||chosen.config_url!==context?.account?.configUrl)throw new Error('Facebook 账号与当前客户不一致，请重新打开客户发布器');
             }
           }
         }
-        const result = tasks.execute(input);
+        const result = tasks.execute(input,indexedPackages);
+        batchScopeCache.clear();
         return send(res, "batch_id" in result ? 201 : 409, result);
       } catch (error) { return send(res, 400, { error: String(error) }); }
     }

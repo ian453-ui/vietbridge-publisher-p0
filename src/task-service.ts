@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import type { Db } from "./database.ts";
 import { transaction } from "./database.ts";
-import { ContentLibrary, canStageWechatDraft, type ResolveRequest, type ResolveResult } from "./content-library.ts";
+import { ContentLibrary, canStageWechatDraft, type ContentPackage, type ResolveRequest, type ResolveResult } from "./content-library.ts";
 import { ContentSnapshotStore } from "./content-snapshot.ts";
 import { PublisherStore } from "./publisher-store.ts";
 import { automaticTitle } from "./publication-control.ts";
@@ -63,7 +63,7 @@ export class TaskService {
     return result;
   }
 
-  execute(input: ExecuteTaskInput): Record<string, unknown> {
+  execute(input: ExecuteTaskInput, indexedPackages?: ContentPackage[]): Record<string, unknown> {
     if(!Array.isArray(input.platforms)||input.platforms.length===0)throw new Error("请明确选择至少一个发布平台；未创建任务");
     const platforms = normalizePlatforms(input.platforms);
     const facebookAccount=platforms.includes('facebook')?(input.facebookAccountId?this.facebookAccounts.select(input.facebookAccountId):this.facebookAccounts.selected()):undefined;
@@ -73,7 +73,7 @@ export class TaskService {
       ? { mode: "article_id", value: input.selectedArticleId, platforms }
       : { mode: input.mode, value: input.value, platforms };
     const selectedPackage = input.selectedArticleId && input.selectedPackageRoot
-      ? this.library.index().find(item => item.articleId === input.selectedArticleId && item.packageRoot === input.selectedPackageRoot && item.version === input.selectedVersion)
+      ? (indexedPackages ?? this.library.index()).find(item => item.articleId === input.selectedArticleId && item.packageRoot === input.selectedPackageRoot && item.version === input.selectedVersion)
       : undefined;
     if(input.selectedPackageRoot&&!selectedPackage)throw new Error('所选内容版本已变化，请刷新候选列表重新选择');
     const rawResult: ResolveResult = selectedPackage
