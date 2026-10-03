@@ -10,6 +10,10 @@ import { PublisherStore } from "../src/publisher-store.ts";
 test("pending GPT review metadata does not prevent a user-confirmed WeChat draft task",async()=>{
   const root=mkdtempSync(join(tmpdir(),"wechat-draft-gate-")),content=join(root,"content");mkdirSync(content);
   const id="VBE-20260928-083";
+  const secondId="VBE-20260928-084",second=join(content,secondId);mkdirSync(second);
+  writeFileSync(join(second,"manifest.json"),JSON.stringify({article_id:secondId,title:"第二篇公众号测试标题",source_doc_id:"canonical-doc-2",qa_status:"PENDING_FACT_QA",visual_qa_status:"PENDING",active_assets:[secondId+"-cover.png"]}));
+  writeFileSync(join(second,secondId+"-cover.png"),Buffer.from([137,80,78,71,13,10,26,10,2]));
+  writeFileSync(join(second,secondId+"-wechat-public.md"),"# 第二篇公众号测试标题\n\n第二篇仅供草稿箱审阅的正文。");
   writeFileSync(join(content,"manifest.json"),JSON.stringify({article_id:id,title:"公众号测试标题",source_doc_id:"canonical-doc",qa_status:"PENDING_FACT_QA",visual_qa_status:"PENDING",active_assets:[`${id}-cover.png`]}));
   writeFileSync(join(content,`${id}-cover.png`),Buffer.from([137,80,78,71,13,10,26,10,1]));
   writeFileSync(join(content,`${id}-wechat-public.md`),"# 公众号测试标题\n\n仅供草稿箱审阅的正文。");
@@ -19,14 +23,19 @@ test("pending GPT review metadata does not prevent a user-confirmed WeChat draft
   try{
     const candidates=await(await fetch(`${base}/api/content/candidates?platforms=wechat_official_account&includeIncomplete=1`)).json() as any;
     const item=candidates.candidates.find((x:any)=>x.articleId===id);assert.equal(item.readiness,"READY");assert.equal(item.wechatDraftEligible,true);
+    const secondItem=candidates.candidates.find((x:any)=>x.articleId===secondId);assert.equal(secondItem.readiness,"READY");
     const post=(platforms:string[])=>fetch(`${base}/api/tasks/execute`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({mode:"article_id",value:id,platforms})});
     const ui=await fetch(base).then(response=>response.text());assert.match(ui,/筛选候选内容（不改变发布平台）/);assert.match(ui,/发布平台（请明确勾选；默认不选）/);assert.doesNotMatch(ui,/data-platform value="[^"]+" checked/);
     assert.equal((await post([])).status,400);
     assert.equal((await post(undefined as any)).status,400);
     assert.equal((await post(["facebook"])).status,409);
     assert.equal((await post(["wechat_official_account","facebook"])).status,409);
-    const response=await post(["wechat_official_account"]);assert.equal(response.status,201);
-    const batch=await response.json() as any;assert.equal(batch.control_state,"AWAITING_APPROVAL");assert.deepEqual(batch.jobs.map((j:any)=>j.platform),["wechat_official_account"]);
+    const bulk=await fetch(`${base}/api/tasks/execute-bulk`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({workspace:"ws-vietbridge",items:[item,secondItem].map((candidate:any)=>({mode:"article_id",value:candidate.articleId,platforms:["wechat_official_account"],selectedArticleId:candidate.articleId,selectedPackageRoot:candidate.packageRoot,selectedVersion:candidate.version}))})});
+    assert.equal(bulk.status,200);const bulkResult=await bulk.json() as any;assert.equal(bulkResult.results.length,2);
+    const batch=bulkResult.results[0].result;assert.equal(batch.control_state,"AWAITING_APPROVAL");assert.deepEqual(batch.jobs.map((j:any)=>j.platform),["wechat_official_account"]);
+    assert.deepEqual(bulkResult.results.map((entry:any)=>entry.articleId),[id,secondId]);assert.ok(bulkResult.results.every((entry:any)=>entry.result.jobs.every((job:any)=>job.platform==="wechat_official_account")));
+    const stopped=await fetch(`${base}/api/batches/${batch.batch_id}/stop`,{method:"POST",headers:{"content-type":"application/json"},body:"{}"});assert.equal(stopped.status,200);assert.equal((await stopped.json() as any).control_state,"TERMINATED");
+    const refreshed=await(await fetch(`${base}/api/batches?workspace=ws-vietbridge`)).json() as any;assert.equal(refreshed.batches.find((x:any)=>x.batch_id===batch.batch_id).control_state,"TERMINATED");
   }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));rmSync(root,{recursive:true,force:true});}
 });
 
@@ -64,6 +73,9 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
     assert.match(page, /VietBridge 多平台发布器/);
     assert.match(page, /日常流程不调用 AI/);
     assert.match(page, /筛选候选内容（不改变发布平台）/);
+    assert.match(page, /正在一次性建立/);
+    assert.match(page, /正在停止…/);
+    assert.match(page, /setInterval\(load,15000\)/);
     assert.doesNotMatch(page, /保存任务草稿/);
     assert.doesNotThrow(()=>new Function(page.match(/<script>([\s\S]*?)<\/script>/)![1]));
     assert.match(page,/Facebook 发布账号/);
