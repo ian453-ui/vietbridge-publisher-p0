@@ -277,7 +277,11 @@ function publicSections(paragraphs: string[]) {
     }
     wechat = [...publicBody, ...captions].filter(Boolean).join("\n\n").trim();
   } else {
-    wechat = section(/【(?:(?:公开正文[｜|]\s*)?微信公众号母稿|公开母稿[｜|]\s*微信公众号)】\s*/u, [/【Facebook/u, /【FACT_QA/u, /【INTERNAL_QA/u]);
+    // Some canonical Docs bracket the public article after an internal mother
+    // draft. The BEGIN/END pair is authoritative; never ingest the preceding
+    // internal copy or the following platform variants as WeChat payload.
+    wechat = section(/^【微信公众号公开版\s*BEGIN】\s*$/mu, [/^【微信公众号公开版\s*END】\s*$/mu]);
+    if (!wechat) wechat = section(/【(?:(?:公开正文[｜|]\s*)?微信公众号母稿|公开母稿[｜|]\s*微信公众号)】\s*/u, [/【Facebook/u, /【FACT_QA/u, /【INTERNAL_QA/u]);
     if (!wechat) {
       // Recent Google Docs batches use Markdown-style platform headings rather
       // than the older 【微信公众号母稿】 wrapper. Select the explicit WeChat

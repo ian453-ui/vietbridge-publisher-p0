@@ -24,6 +24,24 @@ test("source review keeps metadata after an inline image inside the field block"
   }finally{rmSync(root,{recursive:true,force:true});}
 });
 
+test("WeChat public BEGIN/END section excludes internal mother draft and preserves images",()=>{
+  const root=mkdtempSync(join(tmpdir(),"docx-public-bounds-"));
+  try{
+    const unpacked=join(root,"docx"),word=join(unpacked,"word");mkdirSync(join(word,"_rels"),{recursive:true});mkdirSync(join(word,"media"));
+    const values=["VBE-20260928-089｜案例","content_id: VBE-20260928-089","title: 公开标题","【内部母稿 BEGIN｜不是公开载荷】","内部研究笔记不得公开","【内部母稿 END】","【微信公众号公开版 BEGIN】","公众号公开正文","【微信公众号公开版 END】","【Facebook版本】","Facebook 独立文案"];
+    const paragraphs=values.map((value,index)=>`<w:p><w:r><w:t>${value}</w:t>${index===7?'<w:drawing><a:blip r:embed="rId1"/></w:drawing>':''}</w:r></w:p>`).join('');
+    writeFileSync(join(word,"document.xml"),`<w:document>${paragraphs}</w:document>`);
+    writeFileSync(join(word,"_rels","document.xml.rels"),'<Relationships><Relationship Id="rId1" Target="media/image1.png"/></Relationships>');
+    writeFileSync(join(word,"media","image1.png"),"image");
+    const docx=join(root,"bundle.docx");execFileSync("zip",["-q","-r",docx,"word"],{cwd:unpacked});
+    const review=readDocxSourceReview(docx,"VBE-20260928-089");
+    assert.equal(review.publicSections.wechat,true);
+    assert.match(review.publicCopies.wechat,/公众号公开正文/);
+    assert.doesNotMatch(review.publicCopies.wechat,/内部研究笔记|Facebook 独立文案|微信公众号公开版 END/);
+    assert.equal(review.images.length,1);
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
 test("DOCX text and inline sibling images materialize as one idempotent ContentItem", () => {
   const root = mkdtempSync(join(tmpdir(), "docx-ingest-"));
   try {

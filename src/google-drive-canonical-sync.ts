@@ -100,8 +100,11 @@ export class GoogleDriveCanonicalSync {
     this.setState('last_change_check_at',now);this.setState('last_error','');await this.reconcileAll();return {mode:'changes',pages,processed,status:this.status()};
   }
   private async processFile(file:DriveFile){
-    const old=this.db.prepare('SELECT 1 FROM drive_sync_documents WHERE drive_file_id=? AND modified_time=? AND active=1 LIMIT 1').get(file.id,String(file.modifiedTime??''));
-    if(old)return;
+    // A previously unrecognized public section must be re-parsed on a manual
+    // scan even when Drive's modified_time is unchanged (for example after a
+    // Publisher parser upgrade). Otherwise the old empty fingerprint persists.
+    const old=this.db.prepare('SELECT body_fingerprint FROM drive_sync_documents WHERE drive_file_id=? AND modified_time=? AND active=1 LIMIT 1').get(file.id,String(file.modifiedTime??'')) as {body_fingerprint:string}|undefined;
+    if(old&&old.body_fingerprint!==EMPTY_BODY_SHA256)return;
     const temp=mkdtempSync(join(resolve(process.env.TMPDIR||'/tmp'),'vbp-drive-sync-'));
     try{
       const path=join(temp,'canonical.docx'),bytes=await this.drive.exportDocx(file.id);writeFileSync(path,bytes);let inspected;

@@ -85,6 +85,23 @@ test('an unsegmented GPT draft stays readable as Drive source but cannot replace
   finally{db.close();rmSync(root,{recursive:true,force:true});}
 });
 
+test('manual rescan rechecks an unrecognized public section without a Drive timestamp change',async()=>{
+  const root=mkdtempSync(join(tmpdir(),'publisher-drive-reparse-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));mkdirSync(library,{recursive:true});
+  const id='VBE-20261001-209',docId='google-source-document-209';
+  const file=source(docId,`${id}｜驻越经营实录`,makeDocx(root,id,'公开版重识别','公开正文','READY',false));
+  const bytes=new Map([[docId,makeDocx(root,id,'公开版重识别','公开正文','READY',false)]]);
+  const sync=new GoogleDriveCanonicalSync(db,library,fakeDrive([file],bytes),()=>true);
+  try{
+    await sync.run('full');
+    assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE content_id=?').get(id) as {disposition:string}).disposition,'SOURCE_PUBLIC_COPY_MISSING');
+    bytes.set(docId,makeDocx(root,id,'公开版重识别','公开正文','READY',true));
+    await sync.run('full');
+    assert.equal((db.prepare('SELECT disposition FROM drive_sync_documents WHERE content_id=?').get(id) as {disposition:string}).disposition,'IMPORTED');
+    const item=new ContentLibrary({roots:[library]}).index()[0];
+    assert.match(readFileSync(item.payloads.wechat_official_account!,'utf8'),/公开正文/);
+  }finally{db.close();rmSync(root,{recursive:true,force:true});}
+});
+
 test('a unique new single Doc automatically refreshes an older package without approving publication',async()=>{
   const root=mkdtempSync(join(tmpdir(),'publisher-drive-rebind-')),library=join(root,'Content-Library'),db=openDatabase(join(root,'publisher.sqlite'));mkdirSync(library,{recursive:true});
   const id='VBE-20261001-207',oldDoc='aggregate-source-207',newDoc='single-source-document-207';
