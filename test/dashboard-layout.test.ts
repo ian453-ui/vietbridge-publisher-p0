@@ -1,6 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {renderDashboard} from '../src/web-ui.ts';
+import {effectiveRepublish,renderDashboard} from '../src/web-ui.ts';
+
+test('republish permission is limited to selected platforms with an existing publication record',()=>{
+  assert.equal(effectiveRepublish(true,[],['facebook']),false);
+  assert.equal(effectiveRepublish(true,['facebook'],['facebook','xiaohongshu']),false);
+  assert.equal(effectiveRepublish(true,['facebook','xiaohongshu'],['facebook','xiaohongshu']),true);
+  assert.equal(effectiveRepublish(false,['facebook'],['facebook']),false);
+});
 
 test('active tasks precede content selection and completed history follows',()=>{
   const html=renderDashboard();
