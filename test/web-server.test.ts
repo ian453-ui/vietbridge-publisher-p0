@@ -80,6 +80,8 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
     assert.doesNotMatch(page, /保存任务草稿/);
     assert.doesNotThrow(()=>new Function(page.match(/<script>([\s\S]*?)<\/script>/)![1]));
     assert.match(page,/Facebook 发布账号/);
+    assert.match(page,/data-retry=/);
+    assert.match(page,/data-history-retry=/);
     assert.match(page,/完整 GPT 原文（仅内部）/);
     assert.match(page,/不会进入任何平台发布载荷/);
     const accountFile=join(root,'second.env');writeFileSync(accountFile,'FB_ACCOUNT_NAME=Second\nFB_PAGE_ID=2002\nFB_PAGE_NAME=Second Page\nFB_PAGE_ACCESS_TOKEN=never-return-this\n');chmodSync(accountFile,0o600);
@@ -153,6 +155,12 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
     editDb.prepare("UPDATE jobs SET submit_safety_domain='MAY_HAVE_SUBMITTED' WHERE job_id=?").run(retryId);
     editDb.prepare("UPDATE publication_batches SET control_state='COMPLETED' WHERE batch_id=?").run(batch.batch_id);
     assert.equal((await fetch(`${base}/api/jobs/${retryId}/retry`,{method:'POST'})).status,409);
+    editDb.prepare("UPDATE jobs SET submit_safety_domain='UNCLASSIFIED' WHERE job_id=?").run(retryId);
+    const unclassified=await (await fetch(`${base}/api/batches`)).json() as any;
+    assert.equal(unclassified.batches[0].jobs.find((j:any)=>j.job_id===retryId).can_retry,false);
+    const unsafeRetry=await fetch(`${base}/api/jobs/${retryId}/retry`,{method:'POST'});
+    assert.equal(unsafeRetry.status,409);
+    assert.match(JSON.stringify(await unsafeRetry.json()),/无法证明.*提交前停止/);
     editDb.close();
     assert.equal((await fetch(`${base}/api/batches/${batch.batch_id}/stop`,{method:'POST'})).status,200);
     const stopped = await (await fetch(`${base}/api/batches`)).json() as any;

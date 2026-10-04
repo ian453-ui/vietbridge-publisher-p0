@@ -277,10 +277,12 @@ export class TaskService {
 
   retryFailed(jobId: string): Record<string, unknown> {
     const original=this.store.getJob(jobId);
+    if (!['FAILED_PREFLIGHT', 'FAILED', 'BLOCKED_CAPABILITY'].includes(String(original.state))) throw new Error('此任务不能直接重试，请先核对平台结果');
+    if (original.submit_safety_domain !== 'BEFORE_EXTERNAL_SUBMIT') throw new Error('无法证明上次请求在提交前停止；请先核对平台结果，禁止直接重试');
     const explicitlyAuthorizedRepublish=this.store.jobHistory(jobId).some(row=>{try{return JSON.parse(String(row.evidence_json||'{}')).republish===true;}catch{return false;}});
     if(original.platform==='wechat_official_account'&&!explicitlyAuthorizedRepublish&&this.db.prepare("SELECT 1 FROM jobs WHERE article_id=? AND platform='wechat_official_account' AND state='DRAFT_API_WRITTEN_NOT_PUBLISHED' AND job_id<>? LIMIT 1").get(String(original.article_id),jobId))
       throw new Error('这篇文章已有公众号草稿并已回读；请使用原草稿，不要重复上传。');
-    if (original.state==='FAILED_PREFLIGHT' && original.submit_safety_domain!=='MAY_HAVE_SUBMITTED' && original.batch_id) {
+    if (original.state==='FAILED_PREFLIGHT' && original.submit_safety_domain==='BEFORE_EXTERNAL_SUBMIT' && original.batch_id) {
       const batch=this.rawBatch(String(original.batch_id));
       const row=this.db.prepare('SELECT canonical_payload_json FROM content_snapshots WHERE snapshot_id=?').get(String(batch.content_snapshot_id)) as {canonical_payload_json:string};
       if (!JSON.parse(row.canonical_payload_json).payloads?.[String(original.platform)]?.trim()) {
@@ -292,7 +294,7 @@ export class TaskService {
     return transaction(this.db, () => {
       const job = this.store.getJob(jobId);
       if (!['FAILED_PREFLIGHT', 'FAILED', 'BLOCKED_CAPABILITY'].includes(String(job.state))) throw new Error('此任务不能直接重试，请先核对平台结果');
-      if (job.submit_safety_domain === 'MAY_HAVE_SUBMITTED') throw new Error('上次可能已提交，请先核对作品列表，避免重复发布');
+      if (job.submit_safety_domain !== 'BEFORE_EXTERNAL_SUBMIT') throw new Error('无法证明上次请求在提交前停止；请先核对平台结果，禁止直接重试');
       const history = this.store.jobHistory(jobId);
       if (history.some(row => String(row.evidence_json).includes('VISUAL_LAYOUT_FAIL'))) throw new Error('素材排版未通过验收，请修复素材后重新创建任务');
       const batch = this.rawBatch(String(job.batch_id));
@@ -353,16 +355,18 @@ export class TaskService {
         XHS_ACCOUNT_UNVERIFIED:'小红书页面无法确认当前账号昵称；请先登录并确认是 Vietbridge 越南商学院，未提交。',
         XHS_ACCOUNT_MISMATCH:'小红书当前登录的不是 Vietbridge 越南商学院；请切换正确账号后重试，未提交。',
         XHS_TITLE_TOO_LONG:'小红书标题超过 20 字；请缩短标题并重新确认发布内容。未提交。',
-        'Xiaohongshu login/account mismatch':'历史任务的登录或账号核验失败；请重新登录并确认 Vietbridge 越南商学院后重试，未提交。'
+        'Xiaohongshu login/account mismatch':'历史任务的登录或账号核验失败；请重新登录并确认 Vietbridge 越南商学院后重试，未提交。',
+        'Illegal transition PLATFORM_PREFLIGHT -> BLOCKED_CAPABILITY':'旧版程序的状态规则阻止记录“平台能力不可用”；该任务没有发出发布请求。更新后可安全重试这个平台。'
       };
       const friendly = /setInputFiles.*Timeout/s.test(code) ? '上传控件响应超时。重试时将核验已上传的视频，匹配后继续填写和发布。'
         : /UNIQUE constraint failed: publication_intents/.test(code) ? '旧版重试记录冲突，已修复，可重试当前平台。'
+        : /fetch failed/i.test(code) && job.submit_safety_domain === 'BEFORE_EXTERNAL_SUBMIT' ? '发布前连接检查失败；记录确认没有发出发布请求。恢复网络或 VPN 后，可对这个平台安全重试。'
         : /MCP.*timed out/i.test(code) ? (job.submit_safety_domain==='BEFORE_EXTERNAL_SUBMIT'?'小红书账号资料读取超时，尚未提交；恢复读取后可重试。':'平台响应超时，提交结果待核对。')
         : /fetch failed/i.test(code) ? '网络或 VPN 在提交后中断；程序只会自动回读，不会自动重发。'
         : /locator\./.test(code) ? '平台页面控件未就绪，请查看详情中的具体步骤。' : '';
       const hasProblem=['FAILED_PREFLIGHT','FAILED','BLOCKED_CAPABILITY','RECONCILE_PENDING','UNKNOWN','JOB_WAITING_HUMAN','SESSION_EXPIRED'].includes(String(job.state));
       return {...job, history_hidden:Boolean(this.db.prepare('SELECT 1 FROM hidden_history WHERE job_id=?').get(String(job.job_id))), failure_reason: hasProblem ? (explanations[code] || friendly || code || job.attention_code || '') : '', failure_code:code,
-        can_retry:['FAILED_PREFLIGHT','FAILED','BLOCKED_CAPABILITY'].includes(String(job.state)) && job.submit_safety_domain !== 'MAY_HAVE_SUBMITTED' && !['VISUAL_LAYOUT_FAIL','DUPLICATE_OR_UNRESOLVED_JOB'].includes(code),
+        can_retry:['FAILED_PREFLIGHT','FAILED','BLOCKED_CAPABILITY'].includes(String(job.state)) && job.submit_safety_domain === 'BEFORE_EXTERNAL_SUBMIT' && !['VISUAL_LAYOUT_FAIL','DUPLICATE_OR_UNRESOLVED_JOB'].includes(code),
         can_resume_stopped:job.submit_safety_domain==='BEFORE_EXTERNAL_SUBMIT'&&['FAILED_PREFLIGHT','FAILED','BLOCKED_CAPABILITY','PLATFORM_PREFLIGHT','READY_FOR_USER_APPROVAL'].includes(String(job.state))&&!['VISUAL_LAYOUT_FAIL','DUPLICATE_OR_UNRESOLVED_JOB'].includes(code),
         history: history.map(row=>({state:row.to_state,time:row.created_at,evidence:row.evidence_json}))};
     });
