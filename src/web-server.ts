@@ -18,8 +18,9 @@ import { LocalContentRefresher } from './local-content-refresh.ts';
 import {assetMime,serveAsset} from './asset-response.ts';
 import {videoDetails} from './content-library.ts';
 import {GoogleDriveCanonicalSync} from './google-drive-canonical-sync.ts';
+import { isPublicIpv4, resolvePublicEgressIpv4 } from './public-egress-ip.ts';
 
-export type WebServerOptions = { dbPath?: string; host?: string; port?: number; contentRoots?: string[]; ledgerPath?: string; stagingRoot?: string; mirrorPath?: string; workerEnabled?: boolean };
+export type WebServerOptions = { dbPath?: string; host?: string; port?: number; contentRoots?: string[]; ledgerPath?: string; stagingRoot?: string; mirrorPath?: string; workerEnabled?: boolean; publicEgressIpv4Resolver?: () => Promise<string> };
 
 async function clientWorkspace(id:string):Promise<{id:string;name:string;contentRoot:string;account?:{pageId:string;name:string;configUrl:string}}> {
   if(!/^ws-[a-z0-9-]+$/i.test(id))throw new Error('客户编号无效');
@@ -64,6 +65,15 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/") return html(res, renderDashboard());
     if (req.method === "GET" && url.pathname === "/api/health") return send(res, 200, { ok: true, aiRuntimeRequired: false, capabilities: PLATFORM_CAPABILITIES });
+    if (req.method === "GET" && url.pathname === "/api/network/public-egress-ip") {
+      try {
+        const ip = await (options.publicEgressIpv4Resolver ?? resolvePublicEgressIpv4)();
+        if (!isPublicIpv4(ip)) throw new Error("PUBLIC_EGRESS_IPV4_UNAVAILABLE");
+        return send(res, 200, { ip, purpose: "wechat_official_account_ip_allowlist", checkedAt: new Date().toISOString() });
+      } catch {
+        return send(res, 503, { error: "无法读取发布器当前公网 IPv4，请检查网络后刷新。" });
+      }
+    }
     if(req.method==='GET'&&url.pathname==='/api/content/drive-sync/status'){
       const status:Record<string,unknown>=driveSync?driveSync.status():{enabled:false,authorized:false,error:driveSyncError,publicationSideEffects:false};
       const revision=String(status.lastFullCompletedAt||'')+'|'+String(status.lastChangeCheckAt||'');

@@ -53,7 +53,7 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
   const jobId = store.createJob({ articleId: "Daily-017", platform: "wechat_channels", accountId: "sph42vLa6y4BW9x", packageHash: "a".repeat(64), approvalRef: "approval-1" });
   store.transition(jobId, "FACT_CHECK", { source: "test" });
   db.close();
-  const server = createPublisherServer({ dbPath, contentRoots: [contentRoot], ledgerPath: join(root, "ledger.yaml"), stagingRoot: join(root, "staging"), mirrorPath: join(root, "events.jsonl"), workerEnabled: false });
+  const server = createPublisherServer({ dbPath, contentRoots: [contentRoot], ledgerPath: join(root, "ledger.yaml"), stagingRoot: join(root, "staging"), mirrorPath: join(root, "events.jsonl"), workerEnabled: false, publicEgressIpv4Resolver: async () => "1.52.215.46" });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   assert.ok(address && typeof address === "object");
@@ -62,6 +62,9 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
     const health = await (await fetch(`${base}/api/health`)).json() as any;
     assert.equal(health.aiRuntimeRequired, false);
     assert.equal(health.capabilities.wechat_channels.validation, "historically_verified_browser_flow");
+    const egress = await (await fetch(`${base}/api/network/public-egress-ip`)).json() as any;
+    assert.equal(egress.ip, "1.52.215.46");
+    assert.equal(egress.purpose, "wechat_official_account_ip_allowlist");
     const defaultWorkspaceCandidates = await fetch(`${base}/api/content/candidates?workspace=ws-vietbridge&includeIncomplete=1`);
     assert.equal(defaultWorkspaceCandidates.status, 200);
     assert.equal((await defaultWorkspaceCandidates.json() as any).status, "CANDIDATES");
@@ -72,6 +75,8 @@ test("local dashboard exposes read-only SQLite jobs and no-AI health contract", 
     const page = await (await fetch(base)).text();
     assert.match(page, /VietBridge 多平台发布器/);
     assert.match(page, /日常流程不调用 AI/);
+    assert.match(page, /公众号白名单 IP（发布器当前公网出口）/);
+    assert.match(page, /Mac 的局域网 IP/);
     assert.match(page, /筛选候选内容（不改变发布平台）/);
     assert.match(page, /正在一次性建立/);
     assert.match(page, /正在停止…/);
