@@ -27,4 +27,9 @@ test('active tasks precede content selection and completed history follows',()=>
   assert.doesNotMatch(html,/id="republish"[^>]* checked/);
   assert.match(html,/input\[data-platform\]:checked/);
   assert.equal((html.match(/id="tasks"/g)||[]).length,1);
+  assert.match(html,/id="global-loading"/);
+  assert.match(html,/请勿重复点击/);
+  assert.match(html,/loadingClock=setInterval\(updateGlobalLoading,1000\)/);
+  assert.match(html,/任务处理中/);
+  assert.match(html,/扫描中\|正在核对正文和图片/);
 });
