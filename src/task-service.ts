@@ -66,7 +66,7 @@ export class TaskService {
   execute(input: ExecuteTaskInput, indexedPackages?: ContentPackage[]): Record<string, unknown> {
     if(!Array.isArray(input.platforms)||input.platforms.length===0)throw new Error("请明确选择至少一个发布平台；未创建任务");
     const platforms = normalizePlatforms(input.platforms);
-    const facebookAccount=platforms.includes('facebook')?(input.facebookAccountId?this.facebookAccounts.select(input.facebookAccountId):this.facebookAccounts.selected()):undefined;
+    const facebookAccount=platforms.includes('facebook')?(input.facebookAccountId?this.facebookAccounts.get(input.facebookAccountId):this.facebookAccounts.selected()):undefined;
     const accountFor=(platform:SupportedPlatform)=>platform==='facebook'&&facebookAccount?this.facebookAccounts.jobIdentity(facebookAccount):ACCOUNTS[platform];
     if (!platforms.length) throw new Error("至少选择一个平台");
     const request: ResolveRequest = input.selectedArticleId
@@ -257,11 +257,13 @@ export class TaskService {
     });
   }
 
-  listBatches(): Record<string, unknown>[] {
-    const batches = this.db.prepare("SELECT * FROM publication_batches ORDER BY created_at DESC").all() as Record<string, unknown>[];
-    const jobs = this.batchJobs();
+  listBatches(batchIds?:string[]): Record<string, unknown>[] {
+    if(batchIds?.length===0)return [];
+    const scope=batchIds===undefined?undefined:JSON.stringify(batchIds);
+    const batches = this.db.prepare(`SELECT * FROM publication_batches ${scope===undefined?'':'WHERE batch_id IN (SELECT value FROM json_each(?))'} ORDER BY created_at DESC`).all(...(scope===undefined?[]:[scope])) as Record<string, unknown>[];
+    const jobs = this.batchJobs(batchIds);
     const histories = new Map<string, Record<string, unknown>[]>();
-    for (const row of this.db.prepare("SELECT * FROM state_transitions ORDER BY transition_id").all() as Record<string, unknown>[]) {
+    for (const row of this.db.prepare(`SELECT * FROM state_transitions ${scope===undefined?'':'WHERE job_id IN (SELECT job_id FROM jobs WHERE batch_id IN (SELECT value FROM json_each(?)))'} ORDER BY transition_id`).all(...(scope===undefined?[]:[scope])) as Record<string, unknown>[]) {
       const id = String(row.job_id), history = histories.get(id) ?? [];
       history.push(row); histories.set(id, history);
     }
@@ -328,14 +330,14 @@ export class TaskService {
     });
   }
 
-  private batchJobs(batchId?: string): Record<string, unknown>[] {
+  private batchJobs(batchId?: string|string[]): Record<string, unknown>[] {
     // Select one current attention request; multiple OPEN rows must not duplicate jobs.
     return this.db.prepare(`SELECT j.*, ar.message_code AS attention_code, ar.detail_json AS attention_detail,
       EXISTS(SELECT 1 FROM hidden_history h WHERE h.job_id=j.job_id) AS history_hidden
       FROM jobs j LEFT JOIN attention_requests ar ON ar.attention_id=(
         SELECT a.attention_id FROM attention_requests a WHERE a.job_id=j.job_id AND a.status='OPEN'
         ORDER BY a.created_at DESC, a.attention_id DESC LIMIT 1)
-      ${batchId === undefined ? '' : 'WHERE j.batch_id=?'} ORDER BY j.created_at`).all(...(batchId === undefined ? [] : [batchId])) as Record<string, unknown>[];
+      ${batchId === undefined ? '' : Array.isArray(batchId)?'WHERE j.batch_id IN (SELECT value FROM json_each(?))':'WHERE j.batch_id=?'} ORDER BY j.created_at`).all(...(batchId === undefined ? [] : [Array.isArray(batchId)?JSON.stringify(batchId):batchId])) as Record<string, unknown>[];
   }
 
   getBatch(batchId: string): Record<string, unknown> {
@@ -484,4 +486,3 @@ function transitionUnsafe(db: Db, jobId: string, from: string, to: string, evide
 function normalizePlatforms(input: SupportedPlatform[]): SupportedPlatform[] {
   return [...new Set(input)].filter(platform => SUPPORTED_PLATFORMS.includes(platform));
 }
-
