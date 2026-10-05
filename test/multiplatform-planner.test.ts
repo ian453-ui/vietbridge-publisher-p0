@@ -1,9 +1,14 @@
 import test from "node:test";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import assert from "node:assert/strict";
 import { planMultiplatform } from "../src/multiplatform-planner.ts";
 
-test("one content package produces independent platform plans", () => {
-  const video = "/Users/a1-6/Library/CloudStorage/GoogleDrive/My Drive/Codex/VietBridge-Enterprise-Training/TT-20260831-ENT-12-Daily017-Overtime-v2/final/Daily-017-vietnam-overtime-controls-video-v2.mp4";
+test("one content package produces independent platform plans", t => {
+  const root = mkdtempSync(join(tmpdir(), "publisher-plans-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const video = join(root, "video.mp4"); writeFileSync(video, "test video");
   const plans = planMultiplatform({
     articleId: "Daily-017", mediaRevision: "v2", targets: ["xiaohongshu", "facebook", "wechat_channels", "wechat_official_account"],
     accountId: "acct", mediaType: "video", title: "300小时加班，你理解反了", body: "正文", tags: ["越南用工"],
@@ -23,3 +28,4 @@ test("one content package produces independent platform plans", () => {
   assert.equal(plans.wechat_official_account.ok, true);
   assert.equal(plans.wechat_official_account.expectedOutcome, "DRAFT_API_WRITTEN_NOT_PUBLISHED");
 });
+

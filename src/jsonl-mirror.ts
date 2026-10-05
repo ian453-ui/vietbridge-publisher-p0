@@ -6,12 +6,14 @@ import type { PublisherStore } from "./publisher-store.ts";
 export type MirrorResult = { mirrored: number; skipped: number; failed: number };
 
 export function syncOutboxToJsonl(store: PublisherStore, path: string): MirrorResult {
+  const pending = store.pendingOutbox(true);
+  if (!pending.length) return { mirrored: 0, skipped: 0, failed: 0 };
   mkdirSync(dirname(path), { recursive: true });
   const known = loadEventIds(path);
   let mirrored = 0, skipped = 0, failed = 0;
   const fd = openSync(path, "a", 0o600);
   try {
-    for (const event of store.pendingOutbox()) {
+    for (const event of pending) {
       const eventId = String(event.event_id);
       if (known.has(eventId)) {
         store.markMirrored(eventId);

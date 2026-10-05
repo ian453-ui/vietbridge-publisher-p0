@@ -2,6 +2,9 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, realpa
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { FileHashCache } from "./file-hash.ts";
+
+const mediaHashes = new FileHashCache();
 import { execFileSync } from "node:child_process";
 import { parse as parseYaml } from "yaml";
 import type { SupportedPlatform } from "./platform-contract.ts";
@@ -133,7 +136,7 @@ export class ContentLibrary {
         const safe=(name:string)=>{const path=resolve(root,name);return isWithin(path,root)&&existsSync(path)&&isWithin(realpathSync(path),realpathSync(root));};
         const unresolvedAssets=media.filter(name=>!safe(name));
         const assets=media.filter(safe).map((name,index)=>{
-          const path=realpathSync(resolve(root,name)),stat=statSync(path),sha256=createHash('sha256').update(readFileSync(path)).digest('hex');
+          const path=realpathSync(resolve(root,name)),stat=statSync(path),sha256=mediaHashes.get(path);
           return {assetId:stableAssetId(articleId,basename(path)),contentId:articleId,path,filename:basename(path),sourcePath:path,sourceModifiedTime:stat.mtimeMs,sizeBytes:stat.size,sha256,revision:sha256,qaState:'PASS' as const,role:index===0?'cover' as const:'gallery_image' as const,ordinal:index+1,sequence:index};
         });
         const blockingReasons=[...(manifest.status!=='READY'||entry.status!=='READY'?['PACKAGE_QA_FAILED']:[]),...(!hasPublicBody?['PUBLIC_PAYLOAD_MISSING']:[]),...(!assets.some(asset=>asset.role==='cover')?['COVER_MISSING']:[]),...(unresolvedAssets.length?['ASSET_REFERENCE_UNRESOLVED']:[])];
@@ -194,6 +197,8 @@ export class ContentLibrary {
     return ordered;
   }
 
+  assetRevision(path: string): string { return mediaHashes.get(path); }
+
   indexedAsset(path:string):ContentAsset|undefined{
     if(!this.indexedAssets)this.index();
     return this.indexedAssets?.get(path);
@@ -250,7 +255,7 @@ export class ContentLibrary {
   resolveBytes(data: Buffer, platforms: SupportedPlatform[] = []): ResolveResult {
     const target = createHash("sha256").update(data).digest("hex");
     const matches = this.index().filter(item => item.assets.some(asset => {
-      try { return createHash("sha256").update(readFileSync(asset.path)).digest("hex") === target; }
+      try { return asset.sha256 === target; }
       catch { return false; }
     }));
     if (matches.length === 1) return matched(matches[0], platforms);
@@ -359,7 +364,7 @@ function buildPackage(articleId: string, paths: string[], publishedPlatforms: Su
       : /QA_PASS/i.test(filename)? 'PASS'
       : /BLOCKED|QA_FAIL/i.test(filename)? 'FAIL'
       : 'UNKNOWN';
-    const stat=statSync(path),sha256=createHash('sha256').update(readFileSync(path)).digest('hex');
+    const stat=statSync(path),sha256=mediaHashes.get(path);
     const sourceDriveId=sourceMetadata.driveFileId;
     return {assetId:stableAssetId(articleId,filename),contentId:articleId,path,filename,sourcePath:path,sourceDriveId,sourceFolderId,
       sourceDocId:sourceMetadata.sourceDocId,inlineObjectId:sourceMetadata.inlineObjectId,sourceKind:sourceMetadata.sourceKind,
@@ -672,3 +677,4 @@ function commonDirectory(paths: string[]): string {
   while (!paths.every(path => isWithin(path, current))) current = dirname(current);
   return current;
 }
+

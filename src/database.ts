@@ -246,6 +246,12 @@ function migrate(db: Db): void {
   ensureColumn(db, "jobs", "submitted_at", "TEXT");
   ensureColumn(db, "jobs", "published_at", "TEXT");
   ensureColumn(db, "jobs", "last_verified_at", "TEXT");
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_jobs_batch ON jobs(batch_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_transitions_job ON state_transitions(job_id, transition_id);
+    CREATE INDEX IF NOT EXISTS idx_attention_job_open ON attention_requests(job_id, created_at DESC) WHERE status='OPEN';
+    CREATE INDEX IF NOT EXISTS idx_outbox_due ON outbox_events(created_at, next_retry_at) WHERE mirrored_at IS NULL;
+  `);
 }
 
 function ensureColumn(db: Db, table: string, column: string, definition: string): void {
@@ -264,3 +270,4 @@ export function transaction<T>(db: Db, action: () => T): T {
     throw error;
   }
 }
+

@@ -258,7 +258,19 @@ export class TaskService {
   }
 
   listBatches(): Record<string, unknown>[] {
-    return (this.db.prepare("SELECT batch_id FROM publication_batches ORDER BY created_at DESC").all() as { batch_id: string }[]).map(row => this.getBatch(row.batch_id));
+    const batches = this.db.prepare("SELECT * FROM publication_batches ORDER BY created_at DESC").all() as Record<string, unknown>[];
+    const jobs = this.batchJobs();
+    const histories = new Map<string, Record<string, unknown>[]>();
+    for (const row of this.db.prepare("SELECT * FROM state_transitions ORDER BY transition_id").all() as Record<string, unknown>[]) {
+      const id = String(row.job_id), history = histories.get(id) ?? [];
+      history.push(row); histories.set(id, history);
+    }
+    const grouped = new Map<string, Record<string, unknown>[]>();
+    for (const job of jobs) {
+      const id = String(job.batch_id), group = grouped.get(id) ?? [];
+      group.push(job); grouped.set(id, group);
+    }
+    return batches.map(batch => this.describeBatch(batch, grouped.get(String(batch.batch_id)) ?? [], histories));
   }
 
   clearHistory(): {hidden:number} {
@@ -316,13 +328,23 @@ export class TaskService {
     });
   }
 
+  private batchJobs(batchId?: string): Record<string, unknown>[] {
+    // Select one current attention request; multiple OPEN rows must not duplicate jobs.
+    return this.db.prepare(`SELECT j.*, ar.message_code AS attention_code, ar.detail_json AS attention_detail,
+      EXISTS(SELECT 1 FROM hidden_history h WHERE h.job_id=j.job_id) AS history_hidden
+      FROM jobs j LEFT JOIN attention_requests ar ON ar.attention_id=(
+        SELECT a.attention_id FROM attention_requests a WHERE a.job_id=j.job_id AND a.status='OPEN'
+        ORDER BY a.created_at DESC, a.attention_id DESC LIMIT 1)
+      ${batchId === undefined ? '' : 'WHERE j.batch_id=?'} ORDER BY j.created_at`).all(...(batchId === undefined ? [] : [batchId])) as Record<string, unknown>[];
+  }
+
   getBatch(batchId: string): Record<string, unknown> {
-    const batch = this.rawBatch(batchId);
-    const jobs = this.db.prepare(`SELECT j.*, ar.message_code AS attention_code, ar.detail_json AS attention_detail
-      FROM jobs j LEFT JOIN attention_requests ar ON ar.job_id=j.job_id AND ar.status='OPEN'
-      WHERE j.batch_id=? ORDER BY j.created_at`).all(batchId);
-    const detailedJobs = (jobs as Record<string, unknown>[]).map(job => {
-      const history = this.store.jobHistory(String(job.job_id));
+    return this.describeBatch(this.rawBatch(batchId), this.batchJobs(batchId));
+  }
+
+  private describeBatch(batch: Record<string, unknown>, jobs: Record<string, unknown>[], histories?: Map<string, Record<string, unknown>[]>): Record<string, unknown> {
+    const detailedJobs = jobs.map(job => {
+      const history = histories ? histories.get(String(job.job_id)) ?? [] : this.store.jobHistory(String(job.job_id));
       // Only the latest state transition may explain the current state. Using
       // the last non-empty error from the whole history kept a resolved
       // ACCOUNT_MISMATCH visible after the job had already submitted.
@@ -361,7 +383,7 @@ export class TaskService {
         : /fetch failed/i.test(code) ? '网络或 VPN 在提交后中断；程序只会自动回读，不会自动重发。'
         : /locator\./.test(code) ? '平台页面控件未就绪，请查看详情中的具体步骤。' : '';
       const hasProblem=['FAILED_PREFLIGHT','FAILED','BLOCKED_CAPABILITY','RECONCILE_PENDING','UNKNOWN','JOB_WAITING_HUMAN','SESSION_EXPIRED'].includes(String(job.state));
-      return {...job, history_hidden:Boolean(this.db.prepare('SELECT 1 FROM hidden_history WHERE job_id=?').get(String(job.job_id))), failure_reason: hasProblem ? (explanations[code] || friendly || code || job.attention_code || '') : '', failure_code:code,
+      return {...job, history_hidden:Boolean(job.history_hidden), failure_reason: hasProblem ? (explanations[code] || friendly || code || job.attention_code || '') : '', failure_code:code,
         can_retry:['FAILED_PREFLIGHT','FAILED','BLOCKED_CAPABILITY'].includes(String(job.state)) && job.submit_safety_domain !== 'MAY_HAVE_SUBMITTED' && !['VISUAL_LAYOUT_FAIL','DUPLICATE_OR_UNRESOLVED_JOB'].includes(code),
         can_resume_stopped:job.submit_safety_domain==='BEFORE_EXTERNAL_SUBMIT'&&['FAILED_PREFLIGHT','FAILED','BLOCKED_CAPABILITY','PLATFORM_PREFLIGHT','READY_FOR_USER_APPROVAL'].includes(String(job.state))&&!['VISUAL_LAYOUT_FAIL','DUPLICATE_OR_UNRESOLVED_JOB'].includes(code),
         history: history.map(row=>({state:row.to_state,time:row.created_at,evidence:row.evidence_json}))};
@@ -462,3 +484,4 @@ function transitionUnsafe(db: Db, jobId: string, from: string, to: string, evide
 function normalizePlatforms(input: SupportedPlatform[]): SupportedPlatform[] {
   return [...new Set(input)].filter(platform => SUPPORTED_PLATFORMS.includes(platform));
 }
+

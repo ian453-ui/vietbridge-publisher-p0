@@ -2,7 +2,6 @@ import { createServer, type Server, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import { existsSync,readFileSync,statSync } from "node:fs";
 import { homedir } from "node:os";
-import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { openDatabase } from "./database.ts";
 import { PublisherStore } from "./publisher-store.ts";
@@ -170,7 +169,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       let asset=tasks.library.indexedAsset(path);
       if(!asset)return send(res,404,{error:'ASSET_NOT_FOUND'});
       if(!existsSync(path))return send(res,404,{error:'ASSET_FILE_MISSING'});
-      const currentRevision=createHash('sha256').update(readFileSync(path)).digest('hex');
+      const currentRevision=tasks.library.assetRevision(path);
       if(currentRevision!==asset.revision){tasks.library.index();asset=tasks.library.indexedAsset(path);}
       if(!asset)return send(res,404,{error:'ASSET_NOT_FOUND'});
       const requestedRevision=String(url.searchParams.get('revision')||'');
@@ -442,3 +441,4 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const address = server.address();
   console.log(`VietBridge Publisher: http://127.0.0.1:${typeof address === "object" && address ? address.port : 17880}`);
 }
+
