@@ -41,5 +41,10 @@ test('batch list equals individual details and does not query per job', () => {
     assert.equal(jobs.length, 1, 'multiple open attention requests must not duplicate a job');
     assert.equal(jobs[0].attention_code, 'NEW_LOGIN');
     assert.equal(jobs[0].history_hidden, true);
+    count=0;
+    const scoped=tasks.listBatches(['batch-0','batch-1']);
+    assert.equal(scoped.length,2);assert.equal(count,3,'scoped history must still use exactly three queries');
+    assert.deepEqual(scoped.map(batch=>batch.batch_id).sort(),['batch-0','batch-1']);
+    assert.deepEqual(tasks.listBatches([]),[]);
   } finally { db.close(); rmSync(root, { recursive: true, force: true }); }
 });

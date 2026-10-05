@@ -20,6 +20,7 @@ import {colorWechatHeadings,normalizeWechatHeadings,validWechatHeadingColor} fro
 
 type JobRow = Record<string, unknown> & { job_id: string; batch_id: string; platform: string; state: string; approval_ref: string };
 type Snapshot = { canonicalPayload: { title?: string; contentType?: string; payloads?: Record<string, string> }; assets: Record<string, unknown>[] };
+import type {BrowserResourceGuard} from './integration-context.ts';
 
 export class PlatformWorker {
   private timer?: NodeJS.Timeout;
@@ -38,7 +39,9 @@ export class PlatformWorker {
 
   private readonly db: Db;
   private readonly mirrorPath?: string;
-  constructor(db: Db, mirrorPath?: string) {
+  private readonly browserResources?:BrowserResourceGuard;
+  constructor(db: Db, mirrorPath?: string,browserResources?:BrowserResourceGuard) {
+    this.browserResources=browserResources;
     this.db = db;
     this.mirrorPath = mirrorPath;
     this.store = new PublisherStore(db);
@@ -194,9 +197,11 @@ export class PlatformWorker {
     const fields = form ? JSON.parse(String(form.fields_json)) : {};
     if (!fields.caption) throw new Error('缺少原始文案，不能可靠核对');
     const account=this.facebookAccounts.resolveJobIdentity(String(job.account_id));
-    if(fields.operation==='facebook_business_browser_photo'){
+    if(fields.operation==='facebook_business_browser_photo'||fields.browser_page_id&&fields.page_id===account.page_id){
       const config=browserPageConfig(account);if(!config)throw Error('Facebook 浏览器账号配置已改变，无法安全核对');
+      if(String(fields.browser_page_id)!==config.browserPageId||String(fields.page_id)!==account.page_id)throw Error('原浏览器发布身份与当前映射不一致，禁止重新绑定');
       const browser=new FacebookBusinessBrowser(account,config.port,config.browserPageId);
+      const release=this.browserResources?.acquire(config.port,'publisher:'+jobId,()=>this.store.getJob(jobId).state!=='PUBLISHED',true);
       try{
         await browser.connect();const match=await browser.publishedMatch(String(fields.caption));
         if(!match)return {matched:false,message:'已发表列表尚未找到同正文帖子；任务继续待核对，不会自动重发。'};
@@ -205,7 +210,7 @@ export class PlatformWorker {
         this.db.prepare('UPDATE jobs SET published_at=?,last_verified_at=? WHERE job_id=?').run(now(),now(),jobId);
         this.db.prepare("UPDATE attention_requests SET status='RESOLVED',resolved_at=?,resolution=? WHERE job_id=? AND status='OPEN'").run(now(),'FACEBOOK_BROWSER_EXACT_READBACK',jobId);
         return {matched:true,url:match.url,message:'已从 Facebook 已发表列表核实发布成功，没有重复发布。'};
-      }finally{await browser.close()}
+      }finally{try{await browser.close();}finally{if(this.store.getJob(jobId).state==='PUBLISHED')this.store.releaseProfile(`facebook-browser:${config.port}`,jobId);release?.();}}
     }
     if(fields.operation==='facebook_page_video_local'){
       if(String(fields.page)!==account.page_id)throw new Error('任务原 Page 与当前账号映射不一致，已阻止核对');
@@ -434,14 +439,19 @@ export class PlatformWorker {
     const lockId=`facebook-browser:${config.port}`;
     if(!this.store.acquireProfile(lockId,job.job_id))throw Error('Facebook 浏览器正在执行另一个任务');
     const browser=new FacebookBusinessBrowser(account,config.port,config.browserPageId);
+    let release:(()=>void)|undefined;
     try{
+      release=this.browserResources?.acquire(config.port,'publisher:'+job.job_id,()=>{
+        const current=this.store.getJob(job.job_id);
+        return ['SUBMITTED_PENDING_CONFIRMATION','RECONCILE_PENDING','UNKNOWN','PUBLISHED_ID_PENDING'].includes(String(current.state));
+      });
       await browser.connect();
       const prior=await browser.publishedMatch(caption);
       if(prior)throw Error(`Facebook 已发表列表存在相同正文（${prior.id}），请先核对，未再次发布`);
       const attempt=this.execution.createAttempt(job.job_id,'approved_local_ui','platform-worker');
       this.store.commitIntent(job.job_id,'facebook_business_browser_photo',String(job.payload_hash),snapshot.assets.map(a=>String(a.sha256)),job.approval_ref);
       this.store.transition(job.job_id,'FORM_FILLING',{browser:'facebook-business-suite',profileId:lockId});
-      this.store.saveFormSnapshot(job.job_id,{title,caption,images,page_id:account.page_id,browser_page_id:config.browserPageId,visibility:'Public'});
+      this.store.saveFormSnapshot(job.job_id,{operation:'facebook_business_browser_photo',title,caption,images,page_id:account.page_id,browser_page_id:config.browserPageId,visibility:'Public'});
       await browser.fill(caption,images);
       this.store.transition(job.job_id,'FORM_FILLED',{verified:true,captionAndImageCount:true,visibility:'Public'});
       this.assertNotStopped(job);
@@ -453,7 +463,7 @@ export class PlatformWorker {
       this.store.recordPlatformResult(job.job_id,result.id,result.url);
       this.db.prepare('UPDATE jobs SET published_at=?,last_verified_at=? WHERE job_id=?').run(now(),now(),job.job_id);
       this.store.transition(job.job_id,'PUBLISHED',{postId:result.id,url:result.url,readback:true,source:'facebook-business-suite'});
-    }finally{await browser.close();this.store.releaseProfile(lockId,job.job_id)}
+    }finally{try{await browser.close();}finally{this.store.releaseProfile(lockId,job.job_id);release?.();}}
   }
 
   private async publishFacebookVideo(job:JobRow,snapshot:Snapshot,file:string,caption:string,title:string):Promise<void>{
