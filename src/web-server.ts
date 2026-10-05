@@ -1,6 +1,6 @@
 import { createServer, type Server, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
-import { existsSync,readFileSync,statSync } from "node:fs";
+import { existsSync,readFileSync,statSync,realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { openDatabase } from "./database.ts";
@@ -19,8 +19,9 @@ import {videoDetails} from './content-library.ts';
 import {GoogleDriveCanonicalSync} from './google-drive-canonical-sync.ts';
 import {ManifestDriveSync,type ManifestSource} from './manifest-drive-sync.ts';
 import { isPublicIpv4, resolvePublicEgressIpv4 } from './public-egress-ip.ts';
+import type { IntegrationBridge, BrowserResourceGuard } from './integration-context.ts';
 
-export type WebServerOptions = { dbPath?: string; host?: string; port?: number; contentRoots?: string[]; ledgerPath?: string; stagingRoot?: string; mirrorPath?: string; workerEnabled?: boolean; publicEgressIpv4Resolver?: () => Promise<string> };
+export type WebServerOptions = { dbPath?: string; host?: string; port?: number; contentRoots?: string[]; ledgerPath?: string; stagingRoot?: string; mirrorPath?: string; workerEnabled?: boolean; driveSyncEnabled?: boolean; integration?: IntegrationBridge; browserResources?: BrowserResourceGuard; publicEgressIpv4Resolver?: () => Promise<string> };
 
 async function clientWorkspace(id:string):Promise<{id:string;name:string;contentRoot:string;account?:{pageId:string;name:string;configUrl:string}}> {
   if(!/^ws-[a-z0-9-]+$/i.test(id))throw new Error('客户编号无效');
@@ -50,22 +51,81 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
     ledgerPath,
     stagingRoot: options.stagingRoot ?? resolve(socialRoot, "Publisher-P0/data/content-snapshots")
   });
-  const worker = new PlatformWorker(db, options.mirrorPath ?? resolve(socialRoot, "Shared-Publication-State/publisher-events.jsonl"));
+  const worker = new PlatformWorker(db, options.mirrorPath ?? resolve(socialRoot, "Shared-Publication-State/publisher-events.jsonl"),options.browserResources);
   const wechatBrowser=new WechatOfficialBrowser();
   const ledgerReconciler=new PublicationLedgerReconciler(db,tasks.library,ledgerPath);
   const localRefresh=new LocalContentRefresher(tasks.library.roots[0]??resolve(socialRoot,'Content-Library'));
   const canonicalRoot=tasks.library.roots[0]??resolve(socialRoot,'Content-Library');
-  let driveSync:GoogleDriveCanonicalSync|undefined,manifestSync:ManifestDriveSync|undefined,driveSyncError='GOOGLE_DRIVE_CONNECTOR_STARTING';
+  let driveSync:GoogleDriveCanonicalSync|undefined,manifestSync:ManifestDriveSync|undefined,driveSyncError=options.driveSyncEnabled===false?'INTEGRATED_MANUAL_LIBRARY':'GOOGLE_DRIVE_CONNECTOR_STARTING';
   const registrationPath=resolve(import.meta.dirname,'../config/manifest-drive-sources.json');
   const manifestSources:ManifestSource[]=existsSync(registrationPath)?JSON.parse(readFileSync(registrationPath,'utf8')):[];
   const batchScopeCache=new Map<string,{expiresAt:number;ids:Set<string>}>();
   let lastVerifiedLedgerSync=0;
   let lastDriveScopeRevision='';
-  void GoogleDriveCanonicalSync.makeClient().then(client=>{if(!client.downloadRaw)throw new Error('GOOGLE_DRIVE_RAW_DOWNLOAD_UNAVAILABLE');driveSync=new GoogleDriveCanonicalSync(db,canonicalRoot,client);manifestSync=new ManifestDriveSync({downloadRaw:client.downloadRaw},canonicalRoot,manifestSources);driveSyncError='';if(options.workerEnabled!==false){driveSync.start();manifestSync.start();}}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
+  if(options.driveSyncEnabled!==false)void GoogleDriveCanonicalSync.makeClient().then(client=>{if(!client.downloadRaw)throw new Error('GOOGLE_DRIVE_RAW_DOWNLOAD_UNAVAILABLE');driveSync=new GoogleDriveCanonicalSync(db,canonicalRoot,client);manifestSync=new ManifestDriveSync({downloadRaw:client.downloadRaw},canonicalRoot,manifestSources);driveSyncError='';if(options.workerEnabled!==false){driveSync.start();manifestSync.start();}}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
   if (options.workerEnabled !== false) worker.start();
   const server = createServer(async (req, res) => {
+    try {
+    const scoped=options.integration?.context(req);
+    const clientWorkspaceForRequest=async(id:string)=>{
+      if(!scoped)return clientWorkspace(id);
+      if(id!==scoped.id)throw new Error('客户上下文不一致');
+      const account=tasks.facebookAccounts.get(scoped.publisherAccountId);
+      return {id:scoped.id,name:scoped.name,contentRoot:scoped.contentRoot,account:{pageId:account.page_id,name:account.display_name,configUrl:account.config_url}};
+    };
+    const allowedRoot=(root:string)=>{
+      if(!scoped)return true;
+      const path=realpathSync(root),base=realpathSync(scoped.contentRoot);
+      if(scoped.id==='ws-vietbridge'&&(path===resolve(base,'clients')||path.startsWith(resolve(base,'clients')+'/')))return false;
+      return path===base||path.startsWith(base+'/');
+    };
+    const batchAllowed=(id:string)=>{
+      if(!scoped)return true;
+      if(!options.integration!.batchAllowed(scoped,id))return false;
+      const jobs=db.prepare('SELECT platform,account_id FROM jobs WHERE batch_id=?').all(id);
+      return jobs.length>0&&jobs.every(job=>scoped.platforms.includes(String(job.platform))&&(job.platform!=='facebook'||tasks.facebookAccounts.resolveJobIdentity(String(job.account_id)).id===scoped.publisherAccountId));
+    };
+    const assertScopedArticle=(id:string)=>{
+      if(scoped&&db.prepare('SELECT DISTINCT batch_id FROM jobs WHERE article_id=?').all(id).some(job=>!batchAllowed(String(job.batch_id||''))))throw Error('此内容存在未确认归属的历史任务，请先核对归属；未创建或改动任务');
+    };
+    const registerResult=(result:Record<string,unknown>)=>{if(scoped&&typeof result.batch_id==='string')options.integration!.register(scoped,result.batch_id);return result;};
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
-    if (req.method === "GET" && url.pathname === "/") return html(res, renderDashboard());
+    if(scoped){
+      url.searchParams.set('workspace',scoped.id);
+      if(req.method==='GET'&&url.pathname==='/api/facebook/accounts'){
+        const account=tasks.facebookAccounts.get(scoped.publisherAccountId);
+        let mode='API';try{if(browserPageConfig(account))mode='BROWSER';}catch{mode='CONFIG_ERROR';}
+        return send(res,200,{accounts:[{...account,publishing_mode:mode}],selectedAccountId:account.id});
+      }
+      if(req.method==='POST'&&url.pathname==='/api/facebook/accounts/select'){
+        const input=await readJson(req) as any;
+        if(input.id!==scoped.publisherAccountId)throw Error('账号上下文不一致');
+        return send(res,200,tasks.facebookAccounts.get(scoped.publisherAccountId));
+      }
+      const entity=url.pathname.match(/^\/api\/(jobs|batches)\/([^/]+)/);
+      if(entity){
+        const id=decodeURIComponent(entity[2]);
+        const job=entity[1]==='jobs'?db.prepare('SELECT batch_id FROM jobs WHERE job_id=?').get(id):null;
+        if(entity[1]==='jobs'&&!job)return send(res,404,{error:'SCOPED_TASK_NOT_FOUND'});
+        const batch=entity[1]==='batches'?id:String(job!.batch_id||'');
+        if(!batchAllowed(batch))return send(res,404,{error:'SCOPED_TASK_NOT_FOUND'});
+        if(req.method==='POST'&&entity[1]==='batches'&&url.pathname.endsWith('/approve')&&options.workerEnabled===false)return send(res,409,{error:'验收模式尚未启用执行器；可以预览、建任务及停止，不能批准提交'});
+      }
+      const safeGet=new Set(['/','/api/health','/api/content/candidates','/api/facebook/accounts','/api/batches','/api/jobs','/api/workspace-context','/api/content/asset','/api/content/drive-sync/status','/api/network/public-egress-ip']);
+      const safePost=new Set(['/api/workspace-context/activate','/api/facebook/accounts/select','/api/content/preview','/api/content/resolve','/api/tasks/execute','/api/tasks/execute-bulk']);
+      if(!entity&&!((req.method==='GET'||req.method==='HEAD')&&safeGet.has(url.pathname)||req.method==='POST'&&safePost.has(url.pathname)))return send(res,403,{error:'INTEGRATION_ROUTE_NOT_SCOPED'});
+      if(req.method==='POST'&&!entity){
+        const input=await readJson(req) as any;
+        if(input.workspace&&input.workspace!==scoped.id)throw Error('客户上下文不一致');
+        if(input.facebookAccountId&&input.facebookAccountId!==scoped.publisherAccountId)throw Error('账号上下文不一致');
+        input.workspace=scoped.id;input.facebookAccountId=scoped.publisherAccountId;
+        for(const item of input.items||[input]){
+          if(item.selectedPackageRoot&&!allowedRoot(item.selectedPackageRoot)||item.packageRoot&&!allowedRoot(item.packageRoot))throw Error('内容不属于当前客户');
+          if(item.platforms?.some((p:string)=>!scoped.platforms.includes(p)))throw Error('平台未绑定当前客户账号');
+        }
+      }
+    }
+    if (req.method === "GET" && url.pathname === "/") return html(res, renderDashboard(scoped?{prefix:'/publisher',workspace:scoped.id,accountId:scoped.operatorAccountId,nonce:scoped.nonce,platforms:scoped.platforms,executionEnabled:options.workerEnabled!==false}:undefined),scoped?.nonce);
     if (req.method === "GET" && url.pathname === "/api/health") return send(res, 200, { ok: true, aiRuntimeRequired: false, capabilities: PLATFORM_CAPABILITIES });
     if (req.method === "GET" && url.pathname === "/api/network/public-egress-ip") {
       try {
@@ -116,7 +176,8 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
     }
     if(req.method==='GET'&&url.pathname==='/api/workspace-context'){
       try{
-        const context=await clientWorkspace(String(url.searchParams.get('workspace')||''));
+        const context=await clientWorkspaceForRequest(String(url.searchParams.get('workspace')||''));
+        if(scoped){const account=tasks.facebookAccounts.get(scoped.publisherAccountId);return send(res,200,{workspaceId:context.id,name:context.name,contentRoot:context.contentRoot,facebookPageId:account.page_id,facebookPageName:account.page_name,accountReady:true});}
         if(context.id==='ws-vietbridge'){
           const legacy=tasks.facebookAccounts.list().accounts.find(account=>account.id==='legacy-vietbridge');
           return send(res,200,{workspaceId:context.id,name:context.name,contentRoot:null,facebookPageId:legacy?.page_id||null,facebookPageName:legacy?.page_name||null,accountReady:Boolean(legacy)});
@@ -127,7 +188,8 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
     }
     if(req.method==='POST'&&url.pathname==='/api/workspace-context/activate'){
       try{
-        const input=await readJson(req) as any,context=await clientWorkspace(String(input.workspace||''));
+        const input=await readJson(req) as any,context=await clientWorkspaceForRequest(String(input.workspace||''));
+        if(scoped){const account=tasks.facebookAccounts.get(scoped.publisherAccountId);return send(res,200,{workspaceId:context.id,name:context.name,contentRoot:context.contentRoot,facebookAccountId:account.id,facebookPageId:account.page_id});}
         if(context.id==='ws-vietbridge'){
           const legacy=tasks.facebookAccounts.get('legacy-vietbridge');
           tasks.facebookAccounts.select(legacy.id);
@@ -163,6 +225,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       const requested=String(url.searchParams.get('platforms')??'').split(',').filter(Boolean);
       const platforms=requested.filter(value=>value in PLATFORM_CAPABILITIES) as (keyof typeof PLATFORM_CAPABILITIES)[];
       const candidates=tasks.candidates(platforms.length?platforms:undefined,url.searchParams.get('includePublished')==='1',url.searchParams.get('includeIncomplete')==='1');
+      if(scoped){if(candidates.status==='CANDIDATES')candidates.candidates=candidates.candidates.filter(item=>allowedRoot(item.packageRoot));return send(res,200,candidates);}
       const workspace=String(url.searchParams.get('workspace')||'');
       if(!workspace||workspace==='ws-vietbridge'){
         if(candidates.status==='CANDIDATES')candidates.candidates=candidates.candidates.filter(item=>!item.packageRoot.includes('/Content-Library/clients/'));
@@ -181,7 +244,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
     if((req.method==='GET'||req.method==='HEAD')&&url.pathname==='/api/content/asset'){
       const path=String(url.searchParams.get('path')||'');
       let asset=tasks.library.indexedAsset(path);
-      if(!asset)return send(res,404,{error:'ASSET_NOT_FOUND'});
+      if(!asset||!allowedRoot(path))return send(res,404,{error:'ASSET_NOT_FOUND'});
       if(!existsSync(path))return send(res,404,{error:'ASSET_FILE_MISSING'});
       const currentRevision=tasks.library.assetRevision(path);
       if(currentRevision!==asset.revision){tasks.library.index();asset=tasks.library.indexedAsset(path);}
@@ -194,7 +257,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       try{
         const input=await readJson(req) as {articleId?:string;packageRoot?:string;version?:string};
         const item=tasks.library.index().find(candidate=>candidate.articleId===input.articleId&&(!input.packageRoot||candidate.packageRoot===input.packageRoot)&&(!input.version||candidate.version===input.version));
-        if(!item)return send(res,404,{error:'CONTENT_PACKAGE_NOT_FOUND'});
+        if(!item||!allowedRoot(item.packageRoot))return send(res,404,{error:'CONTENT_PACKAGE_NOT_FOUND'});
         const payloads=Object.fromEntries(Object.entries(item.payloads).map(([platform,path])=>[platform,readFileSync(String(path),'utf8')]));
         const sourceTranscript=item.sourceEvidence.find(path=>path.endsWith(`${item.articleId}-source-full-text-internal.md`));
         const sourceTexts=sourceTranscript?{canonical_source_transcript:readFileSync(sourceTranscript,'utf8')}:{};
@@ -238,7 +301,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       }
       return send(res,200,{articleId:row.article_id,...canonical,payloads:preparedPayloads,previewSource:'FROZEN_TASK_ASSEMBLED',wechatPreviewError,assets,videos});
     }
-    if (req.method === "GET" && url.pathname === "/api/jobs") return send(res, 200, { jobs: store.listJobs(Number(url.searchParams.get("limit") ?? 200)) });
+    if (req.method === "GET" && url.pathname === "/api/jobs") return send(res, 200, { jobs: store.listJobs(Number(url.searchParams.get("limit") ?? 200)).filter(job=>batchAllowed(String(job.batch_id||''))) });
     if(req.method==='GET'&&url.pathname==='/api/verification/wechat'){
       try{const inventory=await readWechatInventory(new WechatDraftReader()) as Record<string,any>;
         if(inventory.published_complete&&!inventory.published_error)inventory.reconciliation=ledgerReconciler.reconcileWechat(inventory.published,inventory.checked_at);
@@ -254,9 +317,10 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       return send(res,200,{...inventory,reconciliation:ledgerReconciler.reconcileWechat(inventory.items,inventory.checked_at)});
     }
     if (req.method === "GET" && url.pathname === "/api/batches") {
-      if(Date.now()-lastVerifiedLedgerSync>60_000){ledgerReconciler.syncVerifiedJobs();lastVerifiedLedgerSync=Date.now();}
+      if(!scoped&&Date.now()-lastVerifiedLedgerSync>60_000){ledgerReconciler.syncVerifiedJobs();lastVerifiedLedgerSync=Date.now();}
       const workspace=String(url.searchParams.get('workspace')||'');
-      const batches=tasks.listBatches();
+      const batches=tasks.listBatches(scoped?options.integration!.batchIds(scoped):undefined);
+      if(scoped)return send(res,200,{batches:batches.filter(batch=>(batch.jobs as Array<Record<string,unknown>>).every(job=>scoped.platforms.includes(String(job.platform))&&(job.platform!=='facebook'||tasks.facebookAccounts.resolveJobIdentity(String(job.account_id)).id===scoped.publisherAccountId)))});
       if(!workspace)return send(res,200,{batches:batches.filter(batch=>!(batch.jobs as Array<{article_id:string}>).some(job=>job.article_id.startsWith('CNVISA-')))});
       try{
         let scope=batchScopeCache.get(workspace);
@@ -294,8 +358,8 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       try {
         const input=await readJson(req) as ExecuteTaskInput & {workspace?:string};
         const result=tasks.preview(input);
-        const context=input.workspace?await clientWorkspace(input.workspace):null;
-        const allowed=(root:string)=>context?(input.workspace==='ws-vietbridge'?!root.includes('/Content-Library/clients/'):root===context.contentRoot):!root.includes('/Content-Library/clients/');
+        const context=input.workspace?await clientWorkspaceForRequest(input.workspace):null;
+        const allowed=(root:string)=>scoped?allowedRoot(root):context?(input.workspace==='ws-vietbridge'?!root.includes('/Content-Library/clients/'):root===context.contentRoot):!root.includes('/Content-Library/clients/');
         if(result.status==='MATCHED'&&!allowed(result.package.packageRoot))return send(res,200,{status:'REJECTED',reason:'内容不属于当前客户'});
         if(result.status==='CANDIDATES')result.candidates=result.candidates.filter(item=>allowed(item.packageRoot));
         return send(res,200,result);
@@ -316,20 +380,21 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
         const inputs=body.items.map(item=>({...item,workspace:body.workspace,facebookAccountId:body.facebookAccountId||item.facebookAccountId}));
         const articleIds=inputs.map(item=>String(item.selectedArticleId||''));
         if(articleIds.some(id=>!id)||new Set(articleIds).size!==articleIds.length)throw new Error('批量任务必须为每篇文章指定唯一内容编号');
+        articleIds.forEach(assertScopedArticle);
         if(inputs.some(item=>!item.selectedPackageRoot||!item.selectedVersion||!Array.isArray(item.platforms)||item.platforms.length===0))throw new Error('每篇文章都必须绑定当前内容版本并明确选择发布平台');
         const indexedPackages=tasks.library.index();
         const selectedPackages=inputs.map(item=>indexedPackages.find(pkg=>pkg.articleId===item.selectedArticleId&&pkg.packageRoot===item.selectedPackageRoot&&pkg.version===item.selectedVersion));
         if(selectedPackages.some(pkg=>!pkg))throw new Error('有文章版本已变化，请刷新候选列表后重新选择；没有创建任务');
         let context:Awaited<ReturnType<typeof clientWorkspace>>|null=null;
-        if(body.workspace&&body.workspace!=='ws-vietbridge')context=await clientWorkspace(body.workspace);
+        if(body.workspace&&body.workspace!=='ws-vietbridge')context=await clientWorkspaceForRequest(body.workspace);
         for(const item of inputs){
           const packageRoot=String(item.selectedPackageRoot);
           if(!body.workspace&&packageRoot.includes('/Content-Library/clients/'))throw new Error('客户内容必须从对应客户入口打开');
-          if(body.workspace==='ws-vietbridge'&&packageRoot.includes('/Content-Library/clients/'))throw new Error('所选内容不属于 VietBridge 主资料库');
-          if(body.workspace&&(!item.selectedArticleId||body.workspace!=='ws-vietbridge'&&packageRoot!==context?.contentRoot))throw new Error('所选内容不属于当前客户');
+          if(!scoped&&body.workspace==='ws-vietbridge'&&packageRoot.includes('/Content-Library/clients/'))throw new Error('所选内容不属于 VietBridge 主资料库');
+          if(body.workspace&&(!item.selectedArticleId||(scoped?!allowedRoot(packageRoot):body.workspace!=='ws-vietbridge'&&packageRoot!==context?.contentRoot)))throw new Error('所选内容不属于当前客户');
           if(item.platforms?.includes('facebook')){
-            if(body.workspace==='ws-vietbridge'&&item.facebookAccountId!=='legacy-vietbridge')throw new Error('Facebook 账号与 VietBridge 客户不一致');
-            if(body.workspace&&body.workspace!=='ws-vietbridge'){
+            if(!scoped&&body.workspace==='ws-vietbridge'&&item.facebookAccountId!=='legacy-vietbridge')throw new Error('Facebook 账号与 VietBridge 客户不一致');
+            if(!scoped&&body.workspace&&body.workspace!=='ws-vietbridge'){
               const imported=context?.account?.configUrl?tasks.facebookAccounts.importLocal(context.account.configUrl):undefined;
               const chosen=item.facebookAccountId?tasks.facebookAccounts.get(item.facebookAccountId):undefined;
               if(!imported?.page_id||!chosen||chosen.page_id!==imported.page_id||chosen.config_url!==context?.account?.configUrl)throw new Error('Facebook 账号与当前客户不一致，请重新打开客户发布器');
@@ -337,7 +402,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
           }
         }
         const results=inputs.map(item=>{
-          try{return {articleId:item.selectedArticleId,result:tasks.execute(item,indexedPackages)};}
+          try{return {articleId:item.selectedArticleId,result:registerResult(tasks.execute(item,indexedPackages))};}
           catch(error){return {articleId:item.selectedArticleId,error:String(error)};}
         });
         batchScopeCache.clear();
@@ -347,6 +412,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
     if (req.method === "POST" && url.pathname === "/api/tasks/execute") {
       try {
         const input=await readJson(req) as ExecuteTaskInput & {workspace?:string};
+        assertScopedArticle(String(input.selectedArticleId||input.value||''));
         if(!input.workspace&&input.selectedPackageRoot?.includes('/Content-Library/clients/'))throw new Error('客户内容必须从对应客户入口打开');
         const indexedPackages=input.selectedArticleId&&input.selectedPackageRoot?tasks.library.index():undefined;
         if(!input.workspace&&!indexedPackages){
@@ -355,10 +421,11 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
         }
         if(input.workspace){
           if(!input.selectedPackageRoot||!input.selectedArticleId)throw new Error('请先从当前客户资源库选定内容');
-          const context=input.workspace==='ws-vietbridge'?null:await clientWorkspace(input.workspace);
-          if(input.workspace==='ws-vietbridge'?input.selectedPackageRoot.includes('/Content-Library/clients/'):input.selectedPackageRoot!==context?.contentRoot)throw new Error('所选内容不属于当前客户');
+          const context=input.workspace==='ws-vietbridge'?null:await clientWorkspaceForRequest(input.workspace);
+          if(scoped?!allowedRoot(input.selectedPackageRoot):input.workspace==='ws-vietbridge'?input.selectedPackageRoot.includes('/Content-Library/clients/'):input.selectedPackageRoot!==context?.contentRoot)throw new Error('所选内容不属于当前客户');
           if(input.platforms?.includes('facebook')){
-            if(input.workspace==='ws-vietbridge'){
+            if(scoped){if(input.facebookAccountId!==scoped.publisherAccountId)throw Error('账号上下文不一致');}
+            else if(input.workspace==='ws-vietbridge'){
               if(input.facebookAccountId!=='legacy-vietbridge')throw new Error('Facebook 账号与 VietBridge 客户不一致');
             }else{
             const imported=context?.account?.configUrl?tasks.facebookAccounts.importLocal(context.account.configUrl):undefined;
@@ -367,7 +434,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
             }
           }
         }
-        const result = tasks.execute(input,indexedPackages);
+        const result = registerResult(tasks.execute(input,indexedPackages));
         batchScopeCache.clear();
         return send(res, "batch_id" in result ? 201 : 409, result);
       } catch (error) { return send(res, 400, { error: String(error) }); }
@@ -401,6 +468,7 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       catch (error) { return send(res, 409, { error: String(error) }); }
     }
     return send(res, req.method === "GET" ? 404 : 405, { error: req.method === "GET" ? "NOT_FOUND" : "METHOD_NOT_ALLOWED" });
+    }catch(error){return send(res,409,{error:error instanceof Error?error.message:'INTEGRATION_REQUEST_FAILED'});}
   });
   server.on("close", () => { driveSync?.stop(); void worker.stop().finally(() => db.close()); });
   return server;
@@ -413,13 +481,14 @@ async function readWechatInventory(reader:WechatDraftReader):Promise<unknown>{
 }
 
 async function readJson(req: import("node:http").IncomingMessage): Promise<unknown> {
+  if((req as any).publisherJson)return (req as any).publisherJson;
   if (!String(req.headers["content-type"] ?? "").startsWith("application/json")) throw new Error("application/json required");
   let body = "";
   for await (const chunk of req) {
     body += chunk;
     if (body.length > 1_000_000) throw new Error("request too large");
   }
-  return JSON.parse(body || "{}");
+  return (req as any).publisherJson=JSON.parse(body || "{}");
 }
 
 async function readBinary(req: import("node:http").IncomingMessage, limit: number): Promise<Buffer> {
@@ -445,8 +514,8 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-function html(res: ServerResponse, body: string): void {
-  res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY", "content-security-policy": "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" });
+function html(res: ServerResponse, body: string, nonce?:string): void {
+  res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": nonce?"SAMEORIGIN":"DENY", "content-security-policy": nonce?`default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'nonce-${nonce}'; style-src-attr 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'self'; base-uri 'none'`:"default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'" });
   res.end(body);
 }
 
