@@ -141,7 +141,8 @@ export class PublisherStore {
         input.devtoolsReady ? 1 : 0, input.editorReady ? 1 : 0, canonicalJson(input.detail ?? {})));
   }
 
-  pendingOutbox(): Record<string, unknown>[] {
+  pendingOutbox(dueOnly = false): Record<string, unknown>[] {
+    if (dueOnly) return this.db.prepare("SELECT * FROM outbox_events WHERE mirrored_at IS NULL AND (next_retry_at IS NULL OR next_retry_at<=?) ORDER BY created_at LIMIT 500").all(now()) as Record<string, unknown>[];
     return this.db.prepare("SELECT * FROM outbox_events WHERE mirrored_at IS NULL ORDER BY created_at").all() as Record<string, unknown>[];
   }
 

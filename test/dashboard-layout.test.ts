@@ -1,6 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {renderDashboard} from '../src/web-ui.ts';
+import {effectiveRepublish,renderDashboard} from '../src/web-ui.ts';
+
+test('republish permission is limited to selected platforms with an existing publication record',()=>{
+  assert.equal(effectiveRepublish(true,[],['facebook']),false);
+  assert.equal(effectiveRepublish(true,['facebook'],['facebook','xiaohongshu']),false);
+  assert.equal(effectiveRepublish(true,['facebook','xiaohongshu'],['facebook','xiaohongshu']),true);
+  assert.equal(effectiveRepublish(false,['facebook'],['facebook']),false);
+});
 
 test('active tasks precede content selection and completed history follows',()=>{
   const html=renderDashboard();
@@ -20,4 +27,9 @@ test('active tasks precede content selection and completed history follows',()=>
   assert.doesNotMatch(html,/id="republish"[^>]* checked/);
   assert.match(html,/input\[data-platform\]:checked/);
   assert.equal((html.match(/id="tasks"/g)||[]).length,1);
+  assert.match(html,/id="global-loading"/);
+  assert.match(html,/请勿重复点击/);
+  assert.match(html,/loadingClock=setInterval\(updateGlobalLoading,1000\)/);
+  assert.match(html,/任务处理中/);
+  assert.match(html,/扫描中\|正在核对正文和图片/);
 });

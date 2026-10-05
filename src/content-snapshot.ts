@@ -1,4 +1,5 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, statSync } from "node:fs";
+import { hashFile } from './file-hash.ts';
 import { basename, extname, join, resolve } from "node:path";
 import type { Db } from "./database.ts";
 import { transaction } from "./database.ts";
@@ -59,7 +60,7 @@ export class ContentSnapshotStore {
       const safeName = `${String(asset.ordinal).padStart(3, "0")}-${asset.role}-${basename(asset.path)}`;
       const stagingPath = join(snapshotRoot, safeName);
       if (!existsSync(stagingPath)) copyFileSync(asset.path, stagingPath);
-      if (sha256(readFileSync(stagingPath)) !== asset.sha256) throw new Error(`staging hash mismatch: ${safeName}`);
+      if (hashFile(stagingPath).sha256 !== asset.sha256) throw new Error(`staging hash mismatch: ${safeName}`);
       return { ...asset, stagingPath };
     });
 
@@ -89,8 +90,8 @@ function inspectAsset(input: SnapshotAssetInput) {
   const path = resolve(input.path);
   const stat = statSync(path);
   if (!stat.isFile()) throw new Error(`asset is not a file: ${path}`);
-  const data = readFileSync(path);
-  return { ...input, path, sha256: sha256(data), mimeDetected: detectMime(data, extname(path)), sizeBytes: data.length };
+  const data = hashFile(path);
+  return { ...input, path, sha256: data.sha256, mimeDetected: detectMime(data.header, extname(path)), sizeBytes: data.sizeBytes };
 }
 
 function detectMime(data: Buffer, extension: string): string {

@@ -1,8 +1,14 @@
-import test from "node:test";
+import test, { after } from "node:test";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import assert from "node:assert/strict";
 import { planPublication, type UnifiedPublication } from "../src/platform-contract.ts";
 
-const video = "/Users/a1-6/Library/CloudStorage/GoogleDrive/My Drive/Codex/VietBridge-Enterprise-Training/TT-20260831-ENT-12-Daily017-Overtime-v2/final/Daily-017-vietnam-overtime-controls-video-v2.mp4";
+const root = mkdtempSync(join(tmpdir(), "publisher-plan-"));
+after(() => rmSync(root, { recursive: true, force: true }));
+const video = join(root, "video.mp4");
+writeFileSync(video, "test video");
 const base: UnifiedPublication = {
   articleId: "Daily-017", mediaRevision: "v2", platform: "xiaohongshu", accountId: "acct",
   mediaType: "video", title: "300小时加班，你理解反了", body: "正文", tags: ["越南用工"],
@@ -42,3 +48,4 @@ test("Official Account is draft-only and refuses MP4 substitution", () => {
   assert.equal(article.ok, true);
   assert.equal(article.expectedOutcome, "DRAFT_API_WRITTEN_NOT_PUBLISHED");
 });
+

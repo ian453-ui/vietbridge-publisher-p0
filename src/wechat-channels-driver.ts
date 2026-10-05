@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync } from "node:fs";
-import { createHash } from 'node:crypto';
+import { mkdirSync } from "node:fs";
+import { hashFile } from "./file-hash.ts";
 import { spawn, type ChildProcess } from "node:child_process";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
@@ -138,7 +138,7 @@ export class WechatChannelsDriver {
     checkContinue();
     const file = await findFileInput(page);
     if (!file) throw new Error("CHANNELS_FILE_INPUT_NOT_FOUND");
-    const expectedHash=createHash('sha256').update(readFileSync(input.videoPath)).digest('hex');
+    const expectedHash=hashFile(input.videoPath).sha256;
     if (!await uploadedVideoMatches(page,expectedHash)) {
       try { await file.setInputFiles(input.videoPath,{timeout:60_000}); }
       catch(error) {
@@ -459,3 +459,4 @@ export function normalizeChannelsTitle(value: string): string {
 }
 function truncate(value: string, max: number): string { return [...value].slice(0, max).join(""); }
 function escapeRegExp(value: string): string { return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+

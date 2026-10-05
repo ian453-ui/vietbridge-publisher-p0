@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
+import { hashFile } from './file-hash.ts';
 import { resolve } from "node:path";
 import { canonicalJson } from "./util.ts";
 
@@ -14,9 +15,9 @@ export function verifyPackage(root: string, manifest: PackageManifest): { ok: bo
   for (const file of manifest.files) {
     const absolute = resolve(root, file.path);
     try {
-      const data = readFileSync(absolute);
-      if (data.length !== file.bytes) errors.push(`${file.path}: byte count changed`);
-      const actual = createHash("sha256").update(data).digest("hex");
+      const data = hashFile(absolute);
+      if (data.sizeBytes !== file.bytes) errors.push(`${file.path}: byte count changed`);
+      const actual = data.sha256;
       if (actual !== file.sha256) errors.push(`${file.path}: sha256 changed`);
     } catch (error) {
       errors.push(`${file.path}: ${String(error)}`);
