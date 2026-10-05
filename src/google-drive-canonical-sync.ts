@@ -12,7 +12,7 @@ const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.readonly';
 const KEYCHAIN_HELPER=resolve(dirname(fileURLToPath(import.meta.url)),'../scripts/mac-keychain.swift');
 const SERVICE_NAME='com.vietbridge.publisher.google-drive-refresh-token';
 type DriveFile={id:string;name:string;mimeType:string;modifiedTime?:string;version?:string;parents?:string[];webViewLink?:string;trashed?:boolean};
-type DriveClient={listCanonicalDocs():Promise<DriveFile[]>;changes(pageToken:string):Promise<{changes:Array<{fileId:string;removed?:boolean;file?:DriveFile}>;nextPageToken?:string;newStartPageToken?:string}>;startPageToken():Promise<string>;exportDocx(id:string):Promise<Buffer>};
+export type DriveClient={listCanonicalDocs():Promise<DriveFile[]>;changes(pageToken:string):Promise<{changes:Array<{fileId:string;removed?:boolean;file?:DriveFile}>;nextPageToken?:string;newStartPageToken?:string}>;startPageToken():Promise<string>;exportDocx(id:string):Promise<Buffer>;downloadRaw?(id:string):Promise<Buffer>};
 type SourceRow={drive_file_id:string;content_id:string;title:string;slug:string;body_fingerprint:string;asset_fingerprint:string;source_revision:string;modified_time:string;source_url:string;status:string;active:number;disposition:string;detail:string|null;package_root:string|null};
 const EMPTY_BODY_SHA256=createHash('sha256').update('').digest('hex');
 function contentReviewPending(status:string){const value=status.toUpperCase();return !['READY','CONTENT_VISUAL_QA_PASS','PUBLISHER_PENDING'].includes(value)&&!/^CONTENT_QA_PASS(?:__|$)/u.test(value);}
@@ -46,6 +46,7 @@ export class GoogleDriveCanonicalSync {
       if(!response.ok)throw new Error(`GOOGLE_DRIVE_API_HTTP_${response.status}`);return response.json() as Promise<any>;
     };
     return {
+      async downloadRaw(id:string){const url=new URL(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`);url.searchParams.set('alt','media');const response=await fetch(url,{headers:{authorization:`Bearer ${await accessToken()}`},signal:AbortSignal.timeout(90_000)});if(!response.ok)throw new Error(`GOOGLE_DRIVE_DOWNLOAD_HTTP_${response.status}`);return Buffer.from(await response.arrayBuffer());},
       async listCanonicalDocs(){
         const result:DriveFile[]=[];let pageToken:string|undefined;
         do{const page=await api('files',{q:`trashed = false and mimeType = '${DOC_MIME}' and (fullText contains '\"驻越经营实录\"' or name contains 'VBE-' or name contains '驻越经营实录')`,fields:'nextPageToken,files(id,name,mimeType,modifiedTime,version,parents,webViewLink,trashed)',pageSize:'1000',spaces:'drive',supportsAllDrives:'true',includeItemsFromAllDrives:'true',...(pageToken?{pageToken}:{})});result.push(...(page.files??[]));pageToken=page.nextPageToken;}while(pageToken);

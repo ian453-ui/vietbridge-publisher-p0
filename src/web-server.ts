@@ -17,6 +17,7 @@ import { LocalContentRefresher } from './local-content-refresh.ts';
 import {assetMime,serveAsset} from './asset-response.ts';
 import {videoDetails} from './content-library.ts';
 import {GoogleDriveCanonicalSync} from './google-drive-canonical-sync.ts';
+import {ManifestDriveSync,type ManifestSource} from './manifest-drive-sync.ts';
 import { isPublicIpv4, resolvePublicEgressIpv4 } from './public-egress-ip.ts';
 
 export type WebServerOptions = { dbPath?: string; host?: string; port?: number; contentRoots?: string[]; ledgerPath?: string; stagingRoot?: string; mirrorPath?: string; workerEnabled?: boolean; publicEgressIpv4Resolver?: () => Promise<string> };
@@ -54,11 +55,13 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
   const ledgerReconciler=new PublicationLedgerReconciler(db,tasks.library,ledgerPath);
   const localRefresh=new LocalContentRefresher(tasks.library.roots[0]??resolve(socialRoot,'Content-Library'));
   const canonicalRoot=tasks.library.roots[0]??resolve(socialRoot,'Content-Library');
-  let driveSync:GoogleDriveCanonicalSync|undefined,driveSyncError='GOOGLE_DRIVE_CONNECTOR_STARTING';
+  let driveSync:GoogleDriveCanonicalSync|undefined,manifestSync:ManifestDriveSync|undefined,driveSyncError='GOOGLE_DRIVE_CONNECTOR_STARTING';
+  const registrationPath=resolve(import.meta.dirname,'../config/manifest-drive-sources.json');
+  const manifestSources:ManifestSource[]=existsSync(registrationPath)?JSON.parse(readFileSync(registrationPath,'utf8')):[];
   const batchScopeCache=new Map<string,{expiresAt:number;ids:Set<string>}>();
   let lastVerifiedLedgerSync=0;
   let lastDriveScopeRevision='';
-  void GoogleDriveCanonicalSync.connect(db,canonicalRoot).then(sync=>{driveSync=sync;driveSyncError='';if(options.workerEnabled!==false)sync.start();}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
+  void GoogleDriveCanonicalSync.makeClient().then(client=>{if(!client.downloadRaw)throw new Error('GOOGLE_DRIVE_RAW_DOWNLOAD_UNAVAILABLE');driveSync=new GoogleDriveCanonicalSync(db,canonicalRoot,client);manifestSync=new ManifestDriveSync({downloadRaw:client.downloadRaw},canonicalRoot,manifestSources);driveSyncError='';if(options.workerEnabled!==false){driveSync.start();manifestSync.start();}}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
   if (options.workerEnabled !== false) worker.start();
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -74,6 +77,11 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       }
     }
     if(req.method==='GET'&&url.pathname==='/api/content/drive-sync/status'){
+      if(url.searchParams.get('workspace')&&url.searchParams.get('workspace')!=='ws-vietbridge'){
+        const workspace=url.searchParams.get('workspace')||'';
+        if(!manifestSources.some(source=>source.workspaceId===workspace))return send(res,404,{error:'此客户尚未注册 Drive 内容来源'});
+        return send(res,200,manifestSync?{...manifestSync.status(),lastFullCompletedAt:manifestSync.status().lastCompletedAt}:{enabled:false,authorized:false,error:driveSyncError,publicationSideEffects:false});
+      }
       const status:Record<string,unknown>=driveSync?driveSync.status():{enabled:false,authorized:false,error:driveSyncError,publicationSideEffects:false};
       const revision=String(status.lastFullCompletedAt||'')+'|'+String(status.lastChangeCheckAt||'');
       if(lastDriveScopeRevision&&revision!==lastDriveScopeRevision)batchScopeCache.clear();
@@ -81,6 +89,12 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
       return send(res,200,status);
     }
     if(req.method==='POST'&&url.pathname==='/api/content/drive-sync/run'){
+      if(url.searchParams.get('workspace')&&url.searchParams.get('workspace')!=='ws-vietbridge'){
+        const workspace=url.searchParams.get('workspace')||'';
+        if(!manifestSources.some(source=>source.workspaceId===workspace))return send(res,404,{error:'此客户尚未注册 Drive 内容来源'});
+        if(!manifestSync)return send(res,503,{error:driveSyncError||'GOOGLE_DRIVE_SYNC_UNAVAILABLE'});
+        void manifestSync.run().catch(()=>{});return send(res,202,{accepted:true,status:manifestSync.status()});
+      }
       if(!driveSync)return send(res,503,{error:driveSyncError||'GOOGLE_DRIVE_SYNC_UNAVAILABLE'});
       batchScopeCache.clear();
       void driveSync.run('full').catch(()=>{});
@@ -441,4 +455,3 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const address = server.address();
   console.log(`VietBridge Publisher: http://127.0.0.1:${typeof address === "object" && address ? address.port : 17880}`);
 }
-
