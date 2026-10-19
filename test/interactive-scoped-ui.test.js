@@ -1,0 +1,23 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,rmSync,writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {DatabaseSync} from 'node:sqlite';
+import {chromium} from 'playwright-core';
+import {Store} from '../src/store.js';
+import {UnifiedPublisher} from '../src/unified-publisher.js';
+import {createApp} from '../src/server.js';
+
+test('authenticated normal UI opens exact group and rules review without a platform send',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'interactive-scope-ui-')),db=join(root,'publisher.sqlite'),store=new Store(db,{seedDemo:false}),publisher=new UnifiedPublisher(store),w=store.saveWorkspace({name:'Fixture client',content_root:root}),profile=store.saveProfile(w.id,{name:'Fixture',cdp_port:59990,user_data_dir:join(root,'chrome')}),account=publisher.saveAccount(w.id,{display_name:'Fixture Page',expected_identity:'Fixture Page',identity_type:'PAGE',external_id:'123456',operator_actor_id:'123456',target_page_id:'654321',profile_id:profile.id});store.selectAccount(w.id,account.id);
+ const group=store.addGroup(w.id,{account_id:account.id,name:'Help group',url:'https://www.facebook.com/groups/10000/'}),content=store.createContent(w.id,{title:'Help',body:'Exact group body for UI review',media:[]});store.createGroupJobs(w.id,{account_id:account.id,content_id:content.id,group_ids:[group.id]});store.close();
+ const v1=join(root,'v1.sqlite'),events=join(root,'events.jsonl'),verified=join(root,'verified.jsonl'),yaml=join(root,'ledger.yaml');const old=new DatabaseSync(v1);old.exec('CREATE TABLE jobs(job_id TEXT,article_id TEXT,platform TEXT,account_id TEXT,state TEXT,current_attempt_id TEXT,submitted_at TEXT,published_at TEXT,updated_at TEXT);CREATE TABLE facebook_accounts(id TEXT,page_id TEXT);CREATE TABLE platform_attempts(job_id TEXT,started_at TEXT);CREATE TABLE platform_receipts(job_id TEXT,raw_status TEXT);CREATE TABLE content_snapshots(article_id TEXT,canonical_payload_json TEXT)');old.close();writeFileSync(events,'');writeFileSync(verified,'');writeFileSync(yaml,'published_history: {}\n');const additionalHistory=[{kind:'V1',path:v1,ledger_paths:{events:[events,verified],yaml}}];
+ const cloud={mode:'mac-tunnel',executionConnected:true,host:'publisher.vietbridge.one',origin:'https://publisher.vietbridge.one',user:'fixture',password:'disposable-interactive-ui-password',dataDir:root,accessFile:join(root,'access.json')};
+ const server=createApp(db,{unified:true,cloud,executionEnabled:false,pageExecution:{accountId:account.id,newJobsAfter:Date.now(),blockedOperatingDay:'2026-10-15',additionalHistory},interactiveScoped:{accountId:account.id,additionalHistory},scanScheduler:false,contentSync:{automatic:false},drivers:{create:async()=>{throw Error('unexpected platform call');}}});await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;const external=[],finalPosts=[],errors=[];
+ try{
+  browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});const context=await browser.newContext();await context.route('**/*',r=>new URL(r.request().url()).origin===`http://127.0.0.1:${server.address().port}`?r.continue():(external.push(r.request().url()),r.abort()));const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()==='POST'&&/auto-publish|\/execute$/.test(r.url()))finalPosts.push(r.url());});
+  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.getByLabel('用户名',{exact:true}).fill(cloud.user);await page.getByLabel('密码',{exact:true}).fill(cloud.password);await page.getByRole('button',{name:'登录',exact:true}).click();await page.locator('#ws').selectOption(w.id);await page.locator('[data-route=groups]').click();await page.waitForFunction(()=>document.querySelectorAll('[data-prepare]').length===1);
+  const action=page.locator('[data-prepare]').first();assert.equal(await action.isDisabled(),false);await action.click();const dialog=page.locator('dialog.execution-confirmation');await dialog.waitFor();assert.match(await dialog.innerText(),/Exact group body for UI review/);assert.match(await dialog.innerText(),/Help group/);assert.equal(await dialog.locator('[data-rules-summary]').count(),1);assert.equal(await dialog.locator('[data-submit]').isDisabled(),true);await dialog.locator('[data-cancel]').click();assert.deepEqual(finalPosts,[]);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+ }finally{await browser?.close();await new Promise(r=>server.close(r));rmSync(root,{recursive:true,force:true});}
+});

@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {Store} from '../src/store.js';
+import {apiEnabled,FacebookEngagement} from '../src/facebook-engagement.js';
+
+test('transport selection persists separately for each operating account and across restart',t=>{
+ const root=mkdtempSync(join(tmpdir(),'v2-account-transport-')),db=join(root,'db.sqlite');
+ t.after(()=>rmSync(root,{recursive:true,force:true}));
+ let store=new Store(db);t.after(()=>store.close());
+ const ws='ws-vietbridge',profile=store.saveProfile(ws,{name:'Test profile',cdp_port:19240,user_data_dir:join(root,'chrome')});
+ const a=store.saveAccount(ws,{display_name:'Browser account',profile_id:profile.id,execution_transport:'BROWSER'});
+ const b=store.saveAccount(ws,{display_name:'API account',profile_id:profile.id,execution_transport:'API'});
+ store.selectAccount(ws,a.id);assert.equal(apiEnabled(store.account(ws,a.id)),false);
+ store.selectAccount(ws,b.id);assert.equal(apiEnabled(store.account(ws,b.id)),true);
+ assert.equal(store.account(ws,a.id).execution_transport,'BROWSER');
+ store.saveAccount(ws,{id:a.id,display_name:'Renamed browser',profile_id:profile.id});
+ assert.equal(store.account(ws,a.id).execution_transport,'BROWSER');
+ assert.throws(()=>store.saveAccount(ws,{id:a.id,display_name:'A',profile_id:profile.id,execution_transport:'INVALID'}),/执行方式/);
+ assert.equal(store.account(ws,a.id).execution_transport,'BROWSER');
+ store.close();store=new Store(db);
+ assert.equal(store.facebookView(ws).selectedAccountId,b.id);
+ assert.equal(store.account(ws,a.id).execution_transport,'BROWSER');
+ assert.equal(store.account(ws,b.id).execution_transport,'API');
+ assert.throws(()=>store.saveAccount('ws-abc',{id:a.id,display_name:'A',profile_id:profile.id,execution_transport:'API'}),/不属于/);
+});
+test('explicit account choice overrides legacy config flag; browser mode never invokes API',async t=>{
+ const root=mkdtempSync(join(tmpdir(),'v2-legacy-api-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const path=join(root,'flags.env');writeFileSync(path,'FB_API_ENABLED=false\n');
+ assert.equal(apiEnabled({config_url:path}),false);
+ assert.equal(apiEnabled({config_url:path,execution_transport:'API'}),true);
+ assert.equal(apiEnabled({config_url:path,execution_transport:'BROWSER'}),false);
+ const engagement=new FacebookEngagement({account:()=>({id:'a',execution_transport:'BROWSER'})});
+ engagement.withClient=()=>{throw Error('API must never be called');};
+ assert.equal((await engagement.sync('ws','a')).skipped,true);
+});
+test('existing database receives a compatible nullable transport column without changing old account records',t=>{
+ const root=mkdtempSync(join(tmpdir(),'v2-transport-migrate-')),db=join(root,'db.sqlite');
+ t.after(()=>rmSync(root,{recursive:true,force:true}));
+ let store=new Store(db);t.after(()=>store.close());
+ const ws='ws-vietbridge',profile=store.saveProfile(ws,{name:'Legacy',cdp_port:19241,user_data_dir:join(root,'chrome')});
+ const account=store.saveAccount(ws,{display_name:'Legacy account',profile_id:profile.id,config_url:join(root,'legacy.env')});
+ store.db.exec('ALTER TABLE facebook_accounts DROP COLUMN execution_transport');store.close();store=new Store(db);
+ assert.equal(store.account(ws,account.id).execution_transport,null);
+ assert.equal(store.account(ws,account.id).config_url,join(root,'legacy.env'));
+ store.saveAccount(ws,{id:account.id,display_name:'Legacy account',profile_id:profile.id,execution_transport:'BROWSER'});
+ assert.equal(apiEnabled(store.account(ws,account.id)),false);
+});

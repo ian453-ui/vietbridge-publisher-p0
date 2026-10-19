@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "workspace": "ws-99076aaf-0bfb-4766-9d30-cf6d0411f4b6",
+  "account_id": "63296af8-7f41-42bc-bdf2-529c5ae28c5b",
+  "actor_id": "61594159443807",
+  "target_page_id": "1459220443931651",
+  "issued_at": null,
+  "expires_at": null,
+  "max_groups": 2,
+  "max_daily_actions": 3,
+  "max_followups": 5
+}

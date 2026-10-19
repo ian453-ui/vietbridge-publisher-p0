@@ -1,0 +1,17 @@
+services:
+  publisher:
+    build: .
+    restart: unless-stopped
+    environment:
+      PUBLISHER_MODE: cloud
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set HTTPS public origin}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set a random password of at least 24 characters}
+      DATA_DIR: /data
+      PORT: 8080
+    volumes:
+      - publisher-data:/data
+    ports:
+      - "127.0.0.1:18082:8080"
+volumes:
+  publisher-data:

@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "scopeAuthorization": {
+    "workspace": "ws-99076aaf-0bfb-4766-9d30-cf6d0411f4b6",
+    "account_id": "63296af8-7f41-42bc-bdf2-529c5ae28c5b",
+    "actor_id": "61594159443807",
+    "target_page_id": "1459220443931651",
+    "profile_id": "REQUIRES_EXACT_REVIEWED_PROFILE_ID",
+    "operations": ["PAGE", "GROUP", "INTERACTION"],
+    "expires_at": 0,
+    "authorization": {
+      "task_id": "VB-PUBLISHER-V1-V2-INTEGRATION-PLAN-20261005-001",
+      "approval_thread_id": "01a10b95-3862-704e-99eb-177948c3e023",
+      "approval_message_id": "REQUIRES_CURRENT_EXPLICIT_APPROVAL_REFERENCE"
+    },
+    "additional_history": [{
+      "kind": "V1",
+      "path": "/Users/a1-6/Library/CloudStorage/GoogleDrive/My Drive/Codex/VietBridge-Social-Automation/Publisher-P0/data/publisher.sqlite",
+      "ledger_paths": {
+        "events": [
+          "/Users/a1-6/Library/CloudStorage/GoogleDrive/My Drive/Codex/VietBridge-Social-Automation/Shared-Publication-State/publisher-events.jsonl",
+          "/Users/a1-6/Library/CloudStorage/GoogleDrive/My Drive/Codex/VietBridge-Social-Automation/Shared-Publication-State/verified-publications.jsonl"
+        ],
+        "yaml": "/Users/a1-6/Library/CloudStorage/GoogleDrive/My Drive/Codex/VietBridge-Social-Automation/Shared-Publication-State/shared-publication-ledger.yaml"
+      }
+    }]
+  },
+  "targets": [],
+  "preparations": []
+}

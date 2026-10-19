@@ -1,0 +1,18 @@
+{
+  "dbPath": "/ABSOLUTE/EXISTING/publisher.sqlite",
+  "scopeFile": "/ABSOLUTE/CONTROL/publisher-scopes.json",
+  "resourceDir": "/ABSOLUTE/CONTROL/browser-resource-locks",
+  "stagingRoot": "/ABSOLUTE/EXISTING/publisher-content-snapshots",
+  "ledgerPath": "/ABSOLUTE/EXISTING/shared-publication-ledger.yaml",
+  "mirrorPath": "/ABSOLUTE/EXISTING/publisher-events.jsonl",
+  "workerEnabled": false,
+  "bindings": [
+    {
+      "workspace": "ws-vietbridge",
+      "accountId": "EXISTING_V2_ACCOUNT_ID",
+      "publisherAccountId": "EXISTING_V1_ACCOUNT_ID",
+      "contentRoot": "/ABSOLUTE/EXISTING/Content-Library",
+      "platforms": ["facebook", "xiaohongshu", "wechat_official_account", "wechat_channels"]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "vietbridge-social-operator-v2",
+  "version": "2.3.0-alpha.2",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "start": "node src/unified-server.js",
+    "test": "node --test test/*.test.js",
+    "unified": "node src/unified-server.js",
+    "test:unified": "node --test test/unified-*.test.js test/group-selection.test.js",
+    "start:legacy": "node src/server.js",
+    "admin:password": "node scripts/set-admin-password.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "playwright-core": "^1.63.0",
+    "yaml": "^2.9.0",
+    "axios": "^1.20.0"
+  }
+}

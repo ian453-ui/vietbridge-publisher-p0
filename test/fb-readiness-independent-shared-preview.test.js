@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {observeReadiness,captureReadinessFailure,boundedRead,waitForImageReadiness,recheckImageReadiness} from '../src/publisher-core/facebook-readiness-observation.ts';
+
+function domPage({decoded=true,progress=0,overlay=false,uploading=false}={}){
+  const image={complete:decoded,naturalWidth:decoded?1080:0};
+  const container={parentElement:null,querySelectorAll(selector){return selector==='img'?[image]:[];}};
+  const button={textContent:'Publish',tagName:'DIV',getAttribute:()=>null,hasAttribute:()=>false,contains:()=>false,getBoundingClientRect:()=>({x:10,y:20,width:90,height:30})};
+  const remove={textContent:'Remove photo',parentElement:container,getAttribute:()=>null};
+  const obstruction={tagName:'DIV',getAttribute:name=>name==='role'?'dialog':null};
+  const document={body:{innerText:uploading?'Uploading':'private frozen body'},querySelectorAll(selector){if(selector==='[role="progressbar"]')return Array(progress).fill({});return [button,remove];},elementFromPoint:()=>overlay?obstruction:button};
+  return {async evaluate(fn){const names=['document','getComputedStyle','innerWidth','innerHeight'],before=names.map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]);Object.assign(globalThis,{document,getComputedStyle:()=>({visibility:'visible',display:'block'}),innerWidth:1000,innerHeight:700});try{return fn();}finally{for(const [k,d] of before){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k];}}}};
+}
+test('independent: a shared single decoded preview must not satisfy two attachment controls',async()=>{const image={complete:true,naturalWidth:1080};const container={parentElement:null,querySelectorAll:selector=>selector==='img'?[image]:[]};const publish={textContent:'Publish',getAttribute:()=>null,hasAttribute:()=>false,contains:()=>false,getBoundingClientRect:()=>({x:10,y:20,width:90,height:30})};const remove=()=>({textContent:'Remove photo',parentElement:container,getAttribute:()=>null});const document={body:{innerText:''},querySelectorAll:selector=>selector==='[role="progressbar"]'?[]:[publish,remove(),remove()],elementFromPoint:()=>publish};const page={evaluate:async fn=>{const names=['document','getComputedStyle','innerWidth','innerHeight'],saved=names.map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]);Object.assign(globalThis,{document,getComputedStyle:()=>({visibility:'visible',display:'block'}),innerWidth:1000,innerHeight:700});try{return fn();}finally{for(const [k,d] of saved){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k];}}}};const observed=await observeReadiness(page);console.log('SHARED PREVIEW',JSON.stringify({attachmentControls:observed.mediaCount,decodedImages:1,mediaDecoded:observed.mediaDecoded}));await assert.rejects(()=>waitForImageReadiness(page,2,{}, {totalMs:20,callMs:5,intervalMs:1,stableSamples:3}));});

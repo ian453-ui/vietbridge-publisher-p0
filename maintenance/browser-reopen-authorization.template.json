@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "id": "lp-visa-reopen-user-20261011-1040",
+  "operation": "REOPEN_EXISTING_BROWSER_PROFILE",
+  "issued_at": null,
+  "expires_at": null,
+  "task_id": "VB-PUBLISHER-V1-V2-INTEGRATION-PLAN-20261005-001",
+  "approval_thread_id": "01a10b95-3862-704e-99eb-177948c3e023",
+  "approval_message_id": "Sentinel_32abdd6a883c8191a90d6bd4fa18b4aa",
+  "attempt_id": "edf8f7d4-3215-437b-bc20-df7ffb5920e2",
+  "scope": {
+    "job_id": "0ceb0570-c797-418c-ad7c-97383991ba8f",
+    "content_id": "a766486f-43b2-4d64-b9c6-7c144a566371",
+    "workspace": "ws-99076aaf-0bfb-4766-9d30-cf6d0411f4b6",
+    "account_id": "63296af8-7f41-42bc-bdf2-529c5ae28c5b",
+    "operator_actor_id": "61594159443807",
+    "target_page_id": "1459220443931651",
+    "platform": "facebook",
+    "transport": "BROWSER",
+    "snapshot_hash": "b6928c432047a84986c0209a79d60f401bcf5f61ff7b0a5b53a0312b4201cfb1",
+    "media_count": 1,
+    "profile_id": "44668402-a0e5-4c73-9dfb-a735fd130a16",
+    "profile_dir": "/Users/a1-6/Library/Application Support/VietBridgeSocialOperatorV2/chrome-profiles/lp-visa",
+    "cdp_port": 17921
+  }
+}

@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {chromium} from 'playwright-core';
+import {Store} from '../src/store.js';
+import {UnifiedPublisher} from '../src/unified-publisher.js';
+import {createApp} from '../src/server.js';
+
+test('bounded normal entry keeps group and interaction preparation visible without a final send',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'bounded-normal-ui-')),db=join(root,'publisher.sqlite');
+ const store=new Store(db,{seedDemo:false});new UnifiedPublisher(store);
+ const workspace=store.saveWorkspace({name:'Bounded client'}).id;
+ const profile=store.saveProfile(workspace,{name:'Fixture',cdp_port:59989,user_data_dir:join(root,'chrome')});
+ const account=store.saveAccount(workspace,{display_name:'Fixture Page',expected_identity:'Fixture Page',external_id:'123456',profile_id:profile.id,execution_transport:'BROWSER'});
+ store.selectAccount(workspace,account.id);
+ for(let i=0;i<127;i++)store.addGroup(workspace,{account_id:account.id,name:`Group ${i+1}`,url:`https://www.facebook.com/groups/${10000+i}`});
+ const content=store.createContent(workspace,{title:'Prepared copy',body:'Prepared body',media:[]});
+ const group=store.facebookView(workspace).facebookGroups[0];
+ store.createGroupJobs(workspace,{account_id:account.id,content_id:content.id,group_ids:[group.id]});
+ store.close();
+ const cloud={mode:'mac-tunnel',executionConnected:true,host:'publisher.vietbridge.one',origin:'https://publisher.vietbridge.one',user:'fixture',password:'disposable-bounded-ui-password',dataDir:root,accessFile:join(root,'access.json')};
+ const server=createApp(db,{unified:true,cloud,executionEnabled:false,pageExecution:{accountId:account.id,newJobsAfter:Date.now(),blockedOperatingDay:'2026-10-15',additionalHistory:[{kind:'V1'}]},scanScheduler:false,contentSync:{automatic:false},drivers:{create:async()=>{throw Error('unexpected platform call');}}});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ const priorHead=process.env.PUBLISHER_BUILD_HEAD;process.env.PUBLISHER_BUILD_HEAD='a'.repeat(40);
+ let browser;const external=[],finalPosts=[],errors=[];
+ try{
+  const anonymous=await fetch(`http://127.0.0.1:${server.address().port}/api/health`);assert.equal(anonymous.status,401);assert.equal(anonymous.headers.get('x-publisher-deployment-sha'),'a'.repeat(40));
+  browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
+  const context=await browser.newContext();await context.route('**/*',r=>new URL(r.request().url()).origin===`http://127.0.0.1:${server.address().port}`?r.continue():(external.push(r.request().url()),r.abort()));
+  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()==='POST'&&/auto-publish|\/execute$|\/reserve$/.test(r.url()))finalPosts.push(r.url());});
+  await page.goto(`http://127.0.0.1:${server.address().port}`);
+  await page.getByLabel('用户名',{exact:true}).fill(cloud.user);await page.getByLabel('密码',{exact:true}).fill(cloud.password);await page.getByRole('button',{name:'登录',exact:true}).click();
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('#ws').selectOption(workspace);await page.locator('[data-route=groups]').click();
+  await page.waitForFunction(()=>document.querySelectorAll('.group-list [data-group]').length===127);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'phone-width layout has no page-level horizontal overflow');
+  const nav=await page.locator('nav').evaluate(element=>({scrollWidth:element.scrollWidth,clientWidth:element.clientWidth,buttons:[...element.querySelectorAll('button')].map(button=>({text:button.textContent,whiteSpace:getComputedStyle(button).whiteSpace,flexShrink:getComputedStyle(button).flexShrink}))}));
+  assert.ok(nav.scrollWidth>nav.clientWidth,'navigation scrolls inside its own strip');
+  assert.ok(nav.buttons.every(button=>button.whiteSpace==='nowrap'&&button.flexShrink==='0'),'navigation labels stay on one line');
+  assert.equal(await page.locator('#create-jobs').isDisabled(),true);
+  assert.equal(await page.locator('#create-only').isDisabled(),false);
+  const send=page.locator('[data-prepare]').first();assert.equal(await send.isDisabled(),true);
+  await page.locator('#group-name-include').fill('Group');assert.equal(await send.isDisabled(),true);
+  assert.match(await page.locator('main .notice').first().innerText(),/群组发帖与互动提交尚未开放/);
+  await page.locator('[data-route=proactive]').click();assert.match(await page.locator('main .notice').first().innerText(),/群组发帖与互动提交尚未开放/);
+  assert.deepEqual(finalPosts,[]);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+ }finally{if(priorHead===undefined)delete process.env.PUBLISHER_BUILD_HEAD;else process.env.PUBLISHER_BUILD_HEAD=priorHead;await browser?.close();await new Promise(r=>server.close(r));rmSync(root,{recursive:true,force:true});}
+});
