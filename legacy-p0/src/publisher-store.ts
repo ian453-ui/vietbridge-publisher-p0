@@ -31,8 +31,10 @@ export class PublisherStore {
     return row as Record<string, unknown>;
   }
 
-  listJobs(limit = 200): Record<string, unknown>[] {
+  listJobs(limit = 200, scope?: {batchIds: readonly string[]}): Record<string, unknown>[] {
     const safeLimit = Math.max(1, Math.min(1000, Math.trunc(limit)));
+    // Scope before LIMIT so another binding cannot crowd out this history.
+    if(scope)return this.db.prepare("SELECT * FROM jobs WHERE batch_id IN (SELECT value FROM json_each(?)) ORDER BY updated_at DESC, created_at DESC, job_id DESC LIMIT ?").all(JSON.stringify(scope.batchIds),safeLimit) as Record<string, unknown>[];
     return this.db.prepare("SELECT * FROM jobs ORDER BY updated_at DESC, created_at DESC LIMIT ?").all(safeLimit) as Record<string, unknown>[];
   }
 

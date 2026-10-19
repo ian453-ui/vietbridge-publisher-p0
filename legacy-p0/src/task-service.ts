@@ -35,9 +35,11 @@ export class TaskService {
   private readonly snapshots: ContentSnapshotStore;
   private readonly store: PublisherStore;
   readonly facebookAccounts: FacebookAccounts;
+  private readonly statusBatchAllowed?: (batchId: string) => boolean;
 
-  constructor(db: Db, options: { roots: string[]; ledgerPath?: string; stagingRoot: string }) {
+  constructor(db: Db, options: { roots: string[]; ledgerPath?: string; stagingRoot: string; statusBatchAllowed?: (batchId: string) => boolean }) {
     this.db = db;
+    this.statusBatchAllowed = options.statusBatchAllowed;
     this.library = new ContentLibrary({ roots: options.roots, ledgerPath: options.ledgerPath });
     this.snapshots = new ContentSnapshotStore(db, options.stagingRoot);
     this.store = new PublisherStore(db);
@@ -401,12 +403,15 @@ export class TaskService {
 
   private withSqliteStatus(result: ResolveResult, requested: SupportedPlatform[]): ResolveResult {
     const enrich = (item: import("./content-library.ts").ContentPackage) => {
-      const rows = this.db.prepare(`SELECT platform,state FROM jobs WHERE article_id=? AND state IN
+      const rows = this.db.prepare(`SELECT platform,state,batch_id FROM jobs WHERE article_id=? AND state IN
         ('PUBLISHED','PUBLISHED_ID_PENDING','DRAFT_API_WRITTEN_NOT_PUBLISHED','PLATFORM_DELETED')
-        ORDER BY updated_at ASC, created_at ASC`).all(item.articleId) as { platform: SupportedPlatform;state:string }[];
-      const platforms=new Set(item.publishedPlatforms);
-      const drafts=new Set(item.draftPlatforms||[]);
+        ORDER BY updated_at ASC, created_at ASC`).all(item.articleId) as { platform: SupportedPlatform;state:string;batch_id:string|null }[];
+      // Article-only legacy ledgers carry no binding provenance. In scoped mode,
+      // derive status exclusively from registered batches for this binding.
+      const platforms=new Set(this.statusBatchAllowed?[]:item.publishedPlatforms);
+      const drafts=new Set(this.statusBatchAllowed?[]:item.draftPlatforms||[]);
       for(const row of rows){
+        if(this.statusBatchAllowed&&!this.statusBatchAllowed(String(row.batch_id)))continue;
         if(row.state==='PUBLISHED'||row.state==='PUBLISHED_ID_PENDING')platforms.add(row.platform);
         else if(row.state==='DRAFT_API_WRITTEN_NOT_PUBLISHED')drafts.add(row.platform);
         else if(row.state==='PLATFORM_DELETED'){

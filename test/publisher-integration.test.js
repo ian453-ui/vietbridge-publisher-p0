@@ -178,3 +178,82 @@ test('integrated boot never creates a sync connector; headers cannot replace int
   assert.equal(result.status,400);assert.match(result.text,/INTERNAL_CONTEXT_REQUIRED/);assert.equal(connects,0);
  }finally{GoogleDriveCanonicalSync.makeClient=original;server?.emit('close');await new Promise(r=>setImmediate(r));rmSync(f.root,{recursive:true,force:true});}
 });
+
+// Fixture provenance uses the same documented binding shape as the handoff file.
+async function historyFixture(){
+ const f=fixtures(),store=new Store(f.operatorDb);
+ store.db.prepare('INSERT INTO facebook_accounts(id,workspace,display_name,identity_type,profile_id,expected_identity,session_health) VALUES(?,?,?,?,?,?,?)').run('b','ws-vietbridge','Another bound account','PAGE','fixture-profile','Other','UNKNOWN');store.close();
+ f.publisher.bindings.push({...f.publisher.bindings[0],accountId:'b'});
+ const {scopeFingerprint}=await import('../src/publisher-integration.js');
+ const db=openDatabase(f.publisherDb),scopes=[];
+ function batch(id,bindingIndex){
+  const time='2026-10-05';db.prepare('INSERT INTO publication_batches(batch_id,title,source_mode,platforms_json,default_all_platforms,control_state,created_at,updated_at) VALUES(?,?,?, ?,0,?,?,?)').run(id,id,'article_id','["facebook","wechat_official_account"]','AWAITING_APPROVAL',time,time);
+  if(bindingIndex!==undefined){const b=f.publisher.bindings[bindingIndex],c={id:b.workspace,operatorAccountId:b.accountId,publisherAccountId:b.publisherAccountId,contentRoot:b.contentRoot,platforms:b.platforms};scopes.push({batchId:id,workspace:b.workspace,accountId:b.accountId,publisherAccountId:b.publisherAccountId,fingerprint:scopeFingerprint(c),sourceRef:'isolated-test-fixture'});writeFileSync(f.scopeFile,JSON.stringify(scopes));}
+ }
+ function job(id,batchId,state,platform='facebook',time='2026-10-06'){
+  db.prepare('INSERT INTO jobs(job_id,article_id,platform,account_id,package_hash,state,batch_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)').run(id,f.id,platform,'fixture-history',id,state,batchId,time,time);
+ }
+ return {...f,db,batch,job,auth:{authorization:'Basic '+Buffer.from(f.cloud.user+':'+f.cloud.password).toString('base64')}};
+}
+
+test('candidate published/draft/deleted status uses only the exact registered account binding, including article-only ledger mirrors',async()=>{
+ const f=await historyFixture();let server;
+ try{
+  writeFileSync(join(f.content,f.id+'-facebook-public.txt'),'Approved Facebook fixture body');
+  writeFileSync(f.publisher.ledgerPath,`published_history:\n  ${f.id}:\n    facebook:\n      status: PUBLISHED\n    wechat:\n      status: PUBLISHED\n`);
+  f.batch('other',1);f.batch('own',0);
+  f.job('other-published','other','PUBLISHED');f.job('other-draft','other','DRAFT_API_WRITTEN_NOT_PUBLISHED','wechat_official_account');
+  server=createApp(f.operatorDb,{cloud:f.cloud,publisher:f.publisher});
+  const candidates=async(includePublished=false)=>{
+   const result=await request(server,'/publisher/api/content/candidates'+query+(includePublished?'&includePublished=1':''),{headers:f.auth});assert.equal(result.status,200,result.text);return result.json().candidates;
+  };
+  let item=(await candidates()).find(p=>p.articleId===f.id);assert.ok(item,'another account must not hide the candidate');assert.deepEqual(item.publishedPlatforms,[]);assert.deepEqual(item.draftPlatforms,[]);
+  f.job('own-draft','own','DRAFT_API_WRITTEN_NOT_PUBLISHED','wechat_official_account','2026-10-07');
+  item=(await candidates()).find(p=>p.articleId===f.id);assert.ok(item);assert.deepEqual(item.publishedPlatforms,[]);assert.deepEqual(item.draftPlatforms,['wechat_official_account']);
+  f.job('own-published','own','PUBLISHED','facebook','2026-10-07');assert.equal((await candidates()).length,0,'own completed platforms still hide the candidate by default');
+  f.job('other-delete-fb','other','PLATFORM_DELETED','facebook','2026-10-08');f.job('other-delete-draft','other','PLATFORM_DELETED','wechat_official_account','2026-10-08');
+  item=(await candidates(true)).find(p=>p.articleId===f.id);assert.deepEqual(item.publishedPlatforms,['facebook']);assert.deepEqual(item.draftPlatforms,['wechat_official_account']);
+  f.job('own-delete-draft','own','PLATFORM_DELETED','wechat_official_account','2026-10-09');item=(await candidates()).find(p=>p.articleId===f.id);assert.ok(item);assert.deepEqual(item.draftPlatforms,[]);assert.deepEqual(item.publishedPlatforms,['facebook']);
+ }finally{server?.emit('close');await new Promise(r=>setImmediate(r));f.db.close();rmSync(f.root,{recursive:true,force:true});}
+});
+
+test('unregistered UNKNOWN history never becomes a candidate completion flag or gains adoption/execution authority',async()=>{
+ const f=await historyFixture();let server;
+ try{
+  f.batch('unregistered');f.job('unknown-unregistered','unregistered','UNKNOWN','wechat_official_account');
+  server=createApp(f.operatorDb,{cloud:f.cloud,publisher:f.publisher});
+  const result=await request(server,'/publisher/api/content/candidates'+query,{headers:f.auth}),item=result.json().candidates.find(p=>p.articleId===f.id);assert.ok(item);assert.deepEqual(item.publishedPlatforms,[]);assert.deepEqual(item.draftPlatforms,[]);
+  const state=(await request(server,'/api/state?workspace=ws-vietbridge',{headers:f.auth})).json(),headers={...f.auth,origin:f.cloud.origin,'content-type':'application/json','x-local-token':state.token};
+  const creation=await request(server,'/publisher/api/tasks/execute'+query,{method:'POST',headers,body:{mode:'article_id',value:f.id,selectedArticleId:f.id,selectedPackageRoot:item.packageRoot,selectedVersion:item.version,platforms:['wechat_official_account']}});assert.equal(creation.status,400);assert.match(creation.text,/未确认归属/);
+  for(const op of ['retry','reconcile'])assert.equal((await request(server,'/publisher/api/jobs/unknown-unregistered/'+op+query,{method:'POST',headers,body:{}})).status,404);
+  assert.equal(f.db.prepare("SELECT state FROM jobs WHERE job_id='unknown-unregistered'").get().state,'UNKNOWN');assert.equal(f.db.prepare('SELECT COUNT(*) n FROM jobs').get().n,1);
+ }finally{server?.emit('close');await new Promise(r=>setImmediate(r));f.db.close();rmSync(f.root,{recursive:true,force:true});}
+});
+
+test('jobs applies the binding before its 200-row limit so 205 newer foreign jobs cannot displace old owned history',async()=>{
+ const f=await historyFixture();let server;
+ try{
+  f.batch('busy-other',1);f.batch('old-own',0);f.batch('unregistered');
+  f.job('owned-old-ready','old-own','READY_FOR_USER_APPROVAL','facebook','2020-01-01');f.job('owned-old-unknown','old-own','UNKNOWN','facebook','2020-01-02');
+  for(let i=0;i<205;i++)f.job('foreign-'+i,'busy-other','PUBLISHED','facebook','2026-10-09');
+  f.job('unregistered-new','unregistered','UNKNOWN','facebook','2026-10-10');
+  server=createApp(f.operatorDb,{cloud:f.cloud,publisher:f.publisher});
+  const own=await request(server,'/publisher/api/jobs'+query,{headers:f.auth});assert.equal(own.status,200);assert.deepEqual(own.json().jobs.map(j=>j.job_id),['owned-old-unknown','owned-old-ready']);assert.equal(own.json().jobs[0].state,'UNKNOWN');
+  const other=await request(server,'/publisher/api/jobs'+query.replace('accountId=a','accountId=b'),{headers:f.auth});assert.equal(other.status,200);assert.equal(other.json().jobs.length,200);assert.ok(other.json().jobs.every(j=>j.batch_id==='busy-other'));
+  assert.equal(f.db.prepare('SELECT COUNT(*) n FROM jobs').get().n,208);
+ }finally{server?.emit('close');await new Promise(r=>setImmediate(r));f.db.close();rmSync(f.root,{recursive:true,force:true});}
+});
+
+
+test('owned UNKNOWN history remains visible but cannot be replaced by staging a fresh content version',async()=>{
+ const f=await historyFixture();let server;
+ try{
+  f.batch('owned-pending',0);f.job('owned-unknown','owned-pending','UNKNOWN','wechat_official_account');
+  server=createApp(f.operatorDb,{cloud:f.cloud,publisher:f.publisher});
+  const item=(await request(server,'/publisher/api/content/candidates'+query,{headers:f.auth})).json().candidates.find(p=>p.articleId===f.id);assert.ok(item);
+  const state=(await request(server,'/api/state?workspace=ws-vietbridge',{headers:f.auth})).json(),headers={...f.auth,origin:f.cloud.origin,'content-type':'application/json','x-local-token':state.token};
+  const input={mode:'article_id',value:f.id,selectedArticleId:f.id,selectedPackageRoot:item.packageRoot,selectedVersion:item.version,platforms:['wechat_official_account']};
+  for(const republish of [false,true]){const result=await request(server,'/publisher/api/tasks/execute'+query,{method:'POST',headers,body:{...input,republish}});assert.equal(result.status,409);assert.match(result.text,/结果待核对/);}
+  assert.equal((await request(server,'/publisher/api/jobs'+query,{headers:f.auth})).json().jobs[0].state,'UNKNOWN');assert.equal(f.db.prepare('SELECT COUNT(*) n FROM jobs').get().n,1);
+ }finally{server?.emit('close');await new Promise(r=>setImmediate(r));f.db.close();rmSync(f.root,{recursive:true,force:true});}
+});

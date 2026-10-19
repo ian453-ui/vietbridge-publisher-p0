@@ -15,7 +15,7 @@ export async function integratedRequest(req:IncomingMessage,res:ServerResponse,d
  const bridge=options.integration!;
  try {
   const context=bridge.context(req),url=new URL(req.url||'/','http://localhost');
-  const tasks=new TaskService(db,{roots:[context.contentRoot],ledgerPath:options.ledgerPath,stagingRoot:options.stagingRoot!}),store=new PublisherStore(db);
+  const tasks=new TaskService(db,{roots:[context.contentRoot],ledgerPath:options.ledgerPath,stagingRoot:options.stagingRoot!,statusBatchAllowed:id=>bridge.batchAllowed(context,id)}),store=new PublisherStore(db);
   const allowed=(path:string)=>{const rel=relative(realpathSync(context.contentRoot),realpathSync(path));return rel===''||!isAbsolute(rel)&&rel!=='..'&&!rel.startsWith('../');};
   const batchAllowed=(id:string)=>bridge.batchAllowed(context,id);
   const jobMatch=url.pathname.match(/^\/api\/jobs\/([^/]+)(?:\/|$)/);
@@ -30,7 +30,7 @@ export async function integratedRequest(req:IncomingMessage,res:ServerResponse,d
    res.writeHead(200,{'content-type':'text/html; charset=utf-8','x-frame-options':'SAMEORIGIN','content-security-policy':`default-src 'self'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'`});return res.end(page);
   }
   if(req.method==='GET'&&url.pathname==='/api/batches')return send(200,{batches:tasks.listBatches().filter(b=>batchAllowed(String(b.batch_id)))});
-  if(req.method==='GET'&&url.pathname==='/api/jobs')return send(200,{jobs:store.listJobs(200).filter(j=>batchAllowed(String(j.batch_id)))});
+  if(req.method==='GET'&&url.pathname==='/api/jobs')return send(200,{jobs:store.listJobs(200,{batchIds:bridge.batchIds(context).filter(batchAllowed)})});
   if(req.method==='GET'&&jobMatch&&url.pathname===`/api/jobs/${jobMatch[1]}`){const id=decodeURIComponent(jobMatch[1]);return send(200,{job:store.getJob(id),history:store.jobHistory(id),formSnapshot:store.latestFormSnapshot(id)});}
   if(req.method==='GET'&&url.pathname==='/api/content/candidates'){
    const platforms=context.platforms as any;const result=tasks.candidates(platforms,url.searchParams.get('includePublished')==='1',url.searchParams.get('includeIncomplete')==='1');
@@ -44,8 +44,9 @@ export async function integratedRequest(req:IncomingMessage,res:ServerResponse,d
    if(!Array.isArray(input.platforms)||!input.platforms.length||input.platforms.some((p:string)=>!context.platforms.includes(p)))return send(409,{error:'平台不属于当前绑定'});
    const article=String(input.selectedArticleId||input.value||'');
    // Do not adopt or change any unowned history, including an UNKNOWN attempt.
-   const prior=db.prepare('SELECT batch_id FROM jobs WHERE article_id=?').all(article);
+   const prior=db.prepare('SELECT batch_id,state FROM jobs WHERE article_id=?').all(article);
    if(prior.some(j=>!batchAllowed(String(j.batch_id))))return send(400,{error:'历史任务未确认归属，禁止自动采用或重新发布'});
+   if(prior.some(j=>['UNKNOWN','SUBMITTED_PENDING_CONFIRMATION','RECONCILE_PENDING'].includes(String(j.state))))return send(409,{error:'历史任务结果待核对，禁止创建替代任务或重发'});
    const packages=tasks.library.index().filter(p=>allowed(p.packageRoot));
    const selected=packages.find(p=>p.articleId===article&&p.packageRoot===input.selectedPackageRoot&&p.version===input.selectedVersion);
    if(!selected)return send(409,{error:'请明确选择当前客户的完整内容版本'});
