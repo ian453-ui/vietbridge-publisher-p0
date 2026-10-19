@@ -7,7 +7,7 @@ import {request as httpRequest} from 'node:http';
 import {Readable} from 'node:stream';
 import {Store} from '../src/store.js';
 import {createApp} from '../src/server.js';
-import {openDatabase} from '../../Publisher-P0/src/database.ts';
+import {openDatabase} from '../legacy-p0/src/database.ts';
 
 function fixtures(){
  const root=mkdtempSync(join(tmpdir(),'vb-production-mount-')),operatorDb=join(root,'operator.sqlite'),publisherDb=join(root,'publisher.sqlite'),content=join(root,'content'),scopeFile=join(root,'scopes.json');mkdirSync(content);

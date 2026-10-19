@@ -29,7 +29,7 @@ export class PublisherIntegration {
       if(!profile)throw Error('V1 浏览器端口尚未登记到 V2 执行配置，禁止绕过共享锁');
       return this.resources.acquire(profile.user_data_dir,owner,pending,{reconcile});
     }};
-    this.ready=(options.createPublisherServer?Promise.resolve({createPublisherServer:options.createPublisherServer}):import('../../Publisher-P0/src/web-server.ts')).then(({createPublisherServer})=>{
+    this.ready=(options.createPublisherServer?Promise.resolve({createPublisherServer:options.createPublisherServer}):import('../legacy-p0/src/web-server.ts')).then(({createPublisherServer})=>{
     this.server=createPublisherServer({...options,contentRoots:options.contentRoots||[...new Set([...this.bindings.values()].map(b=>b.contentRoot))],browserResources,workerEnabled:options.workerEnabled===true,driveSyncEnabled:options.driveSyncEnabled===true,integration:{
       context:req=>{if(!req[integrationContext])throw Error('内部客户上下文缺失');return req[integrationContext];},
       batchAllowed:(context,id)=>this.batchAllowed(context,id),batchIds:context=>this.scopes.filter(s=>this.batchAllowed(context,s.batchId)).map(s=>s.batchId),register:(context,id)=>this.register(context,id)

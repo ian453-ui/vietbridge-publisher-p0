@@ -5,9 +5,9 @@ import {join} from 'node:path';
 import {setup} from './helpers/scoped-fixture.js';
 import {ScopedOperations} from '../src/scoped-operations.js';
 import {scopeDigest} from '../src/task-action-permit.js';
-import {openDatabase} from '../../Publisher-P0/src/database.ts';
+import {openDatabase} from '../legacy-p0/src/database.ts';
 import {DatabaseSync} from 'node:sqlite';
-import {PublisherStore} from '../../Publisher-P0/src/publisher-store.ts';
+import {PublisherStore} from '../legacy-p0/src/publisher-store.ts';
 
 // Actual reviewed V1 schema/store and task-service canonical_payload_json shape.
 function history(t, {state='PUBLISHED', body='Actual V1 string body', today=false, mirror, safety}={}) {
