@@ -74,17 +74,18 @@ test('double click and another database connection can produce only one submit',
 for(const stage of ['beforePrepare','prepare','submit','readback'])test(`consumed permit remains spent after ${stage} failure, reopen and restart`,async t=>{
   const f=setup(t);f.grant();f.failAt=stage;
   await assert.rejects(()=>f.executor.execute(f.workspace.id,f.job.id));
-  const state=stage==='beforePrepare'?'BLOCKED':'UNKNOWN';assert.equal(f.publisher.job(f.workspace.id,f.job.id).state,state);
+  const state=['beforePrepare','prepare'].includes(stage)?'BLOCKED':'UNKNOWN';assert.equal(f.publisher.job(f.workspace.id,f.job.id).state,state);
   assert.equal(f.publisher.job(f.workspace.id,f.job.id).evidence.browserDiagnostics.phase,stage);
   assert.equal(f.executor.executionCapability(f.workspace.id,f.job.id).permitStatus,'CONSUMED');
   const second=f.reopen();assert.equal(second.executor.executionCapability(f.workspace.id,f.job.id).canExecute,false);
   await assert.rejects(()=>second.executor.execute(f.workspace.id,f.job.id));assert.equal(f.creates,1);
-  if(state==='BLOCKED'){f.executor.reopen(f.workspace.id,f.job.id);f.executor.approve(f.workspace.id,f.job.id,f.job.snapshot_hash);await assert.rejects(()=>f.executor.execute(f.workspace.id,f.job.id),/消费/);}
+  if(stage==='prepare'){assert.throws(()=>f.executor.reopen(f.workspace.id,f.job.id),/准备副作用/);assert.equal(f.publisher.job(f.workspace.id,f.job.id).evidence.preparationEffectsMayRemain,true);}
+  if(stage==='beforePrepare'){f.executor.reopen(f.workspace.id,f.job.id);f.executor.approve(f.workspace.id,f.job.id,f.job.snapshot_hash);await assert.rejects(()=>f.executor.execute(f.workspace.id,f.job.id),/消费/);}
   assert.throws(f.grant);assert.equal(f.submits,stage==='submit'||stage==='readback'?1:0);
 });
-test('crash immediately after claim persists consumption and recovery yields UNKNOWN without renewal',async t=>{
+test('crash before preparation recovers as BLOCKED with consumed permit and no renewal',async t=>{
   const f=setup(t);f.grant();f.executor.claim(f.workspace.id,f.job.id);
-  const second=f.reopen();second.publisher.recoverAfterShutdown();assert.equal(second.publisher.job(f.workspace.id,f.job.id).state,'UNKNOWN');
+  const second=f.reopen();second.publisher.recoverAfterShutdown();assert.equal(second.publisher.job(f.workspace.id,f.job.id).state,'BLOCKED');assert.equal(second.publisher.job(f.workspace.id,f.job.id).evidence.submitCallMayHaveStarted,false);
   assert.equal(second.executor.permits.record(f.job.id).status,'CONSUMED');await assert.rejects(()=>second.executor.execute(f.workspace.id,f.job.id));assert.equal(f.creates,0);assert.throws(f.grant);
 });
 test('unconsumed scope survives restart while changed content and execution traces deny',async t=>{

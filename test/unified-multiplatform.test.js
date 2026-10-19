@@ -66,13 +66,17 @@ test('video list confirmation preserves ID-pending semantics and rejects a fake 
   const executor=f.executor(driver);executor.approve(f.ws.id,job.id,job.snapshot_hash);assert.equal((await executor.execute(f.ws.id,job.id)).state,'PUBLISHED_ID_PENDING');
   assert.equal(f.publisher.job(f.ws.id,job.id).evidence.publicLinkUnavailable,true);
 });
-test('preparation side effects interrupted before final intent stay unknown and cannot be mistaken for a post',async t=>{
+test('preparation effects before final intent stay blocked; historical UNKNOWN still needs explicit resolution',async t=>{
   const f=fixture(t),job=f.job(f.account('facebook'),[f.video]);let submits=0;
   const driver={async prepare(s,a,onWrite){onWrite();throw Error('upload interrupted');},async submit(){submits++;},async readback(s){return proof(s,{id:'12345',outcome:'PUBLISHED'});},failureEvidence(){return {finalClickAttempted:false};},async close(){}};
   mkdirSync(job.snapshot.profileDir,{recursive:true});const executor=f.executor(driver);executor.approve(f.ws.id,job.id,job.snapshot_hash);await assert.rejects(()=>executor.execute(f.ws.id,job.id));
-  assert.equal(f.publisher.job(f.ws.id,job.id).state,'UNKNOWN');assert.equal(submits,0);
-  assert.throws(()=>executor.reopen(f.ws.id,job.id),/重新审核/);
-  await assert.rejects(()=>executor.reconcile(f.ws.id,job.id),/最终提交意图/);assert.equal(f.publisher.job(f.ws.id,job.id).state,'UNKNOWN');
+  assert.equal(f.publisher.job(f.ws.id,job.id).state,'BLOCKED');assert.equal(submits,0);
+  assert.throws(()=>executor.reopen(f.ws.id,job.id),/准备副作用/);
+  assert.equal(f.publisher.job(f.ws.id,job.id).evidence.submitCallMayHaveStarted,false);
+  await assert.rejects(()=>executor.reconcile(f.ws.id,job.id),/当前不需要核对/);
+  // Simulate an unresolved record written by the earlier UNKNOWN preparation model.
+  f.publisher.db.prepare("UPDATE publisher_jobs SET state='UNKNOWN' WHERE id=?").run(job.id);
+  await assert.rejects(()=>executor.reconcile(f.ws.id,job.id),/人工平台作品 ID/);assert.equal(f.publisher.job(f.ws.id,job.id).state,'UNKNOWN');
   await assert.rejects(()=>executor.resolvePreparation(f.ws.id,job.id),/EXACT_ATTEMPT/);
   const resolved=await executor.resolvePreparation(f.ws.id,job.id,{acknowledge_preparation_effects:true,expected_attempt_id:f.publisher.job(f.ws.id,job.id).attempt_id,snapshot_hash:job.snapshot_hash});
   assert.equal(resolved.state,'BLOCKED');assert.equal(resolved.evidence.preparationEffectsMayRemain,true);assert.equal(submits,0);

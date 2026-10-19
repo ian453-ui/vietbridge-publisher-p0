@@ -27,7 +27,7 @@ test('bounded normal entry keeps group and interaction preparation visible witho
  let browser;const external=[],finalPosts=[],errors=[];
  try{
   const anonymous=await fetch(`http://127.0.0.1:${server.address().port}/api/health`);assert.equal(anonymous.status,401);assert.equal(anonymous.headers.get('x-publisher-deployment-sha'),'a'.repeat(40));
-  browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
+  browser=await chromium.launch({executablePath:process.env.PUBLISHER_TEST_BROWSER_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
   const context=await browser.newContext();await context.route('**/*',r=>new URL(r.request().url()).origin===`http://127.0.0.1:${server.address().port}`?r.continue():(external.push(r.request().url()),r.abort()));
   const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()==='POST'&&/auto-publish|\/execute$|\/reserve$/.test(r.url()))finalPosts.push(r.url());});
   await page.goto(`http://127.0.0.1:${server.address().port}`);

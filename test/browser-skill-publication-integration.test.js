@@ -39,7 +39,7 @@ for(const scenario of [{failAt:'submit'},{failAt:'readback'},{readbackMediaCount
 });
 for(const point of ['fill','Next'])test('wired Page exact expiry after '+point+' blocks final Post and retains spent claim',async t=>{
  const f=setup(t);let clock=Date.now();const deadline=clock+1000,{client}=wirePublication(f,{now:()=>clock,policy:{expires_at:deadline},onEvent:(command,ref)=>{if(point==='fill'&&command==='fill'||point==='Next'&&ref==='@e6')clock=deadline;}}),j=f.makePage('Expiry image',true),cap=f.executor.executionCapability(f.w.id,j.id);
- await assert.rejects(f.executor.execute(f.w.id,j.id,confirmation(cap)),/EXPIRED/);assert.equal(client.submits,0);assert.equal(f.scoped.permits.read('PAGE:'+j.id).status,'CONSUMED');assert.equal(f.publisher.job(f.w.id,j.id).state,'UNKNOWN');
+ await assert.rejects(f.executor.execute(f.w.id,j.id,confirmation(cap)),/EXPIRED/);assert.equal(client.submits,0);assert.equal(f.scoped.permits.read('PAGE:'+j.id).status,'CONSUMED');assert.equal(f.publisher.job(f.w.id,j.id).state,point==='fill'?'BLOCKED':'UNKNOWN');assert.equal(f.executor.executionCapability(f.w.id,j.id).canExecute,false);
 });
 test('wired Page permits fresh readback after deadline crosses following its only final Post',async t=>{
  const f=setup(t);let clock=Date.now();const deadline=clock+1000,{client}=wirePublication(f,{now:()=>clock,policy:{expires_at:deadline},onEvent:(command,ref)=>{if(ref==='@e7')clock=deadline;}}),j=f.makePage('Post then expiry',true),cap=f.executor.executionCapability(f.w.id,j.id);

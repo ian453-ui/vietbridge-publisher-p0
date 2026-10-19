@@ -18,12 +18,12 @@ test('existing publisher UI selects original-style MCP/video mappings, previews 
   const accounts=f.publisher.accountsView(f.ws.id).publisherAccounts,xhs=accounts.find(a=>a.platform==='xiaohongshu'),channel=accounts.find(a=>a.platform==='wechat_channels'),profile=f.publisher.context(f.ws.id,channel.id).profile;
   assert.equal(profile.user_data_dir,f.channelDir);assert.equal(profile.cdp_port,19224);
   const frozen=join(f.root,'frozen'),image=join(frozen,'cover.png'),video=join(frozen,'movie.mp4');mkdirSync(frozen);copyFileSync(f.image,image);
-  execFileSync('/opt/homebrew/bin/ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:s=320x240:d=1','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',video]);
+  execFileSync(process.env.PUBLISHER_TEST_FFMPEG_PATH||'/opt/homebrew/bin/ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','color=c=blue:s=320x240:d=1','-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',video]);
   const content=f.content({media:[image],platform_payloads:{xiaohongshu:{title:'Fixture XHS',body:'Complete XHS fixture body.\nSecond XHS paragraph.',tags:['Fixture'],media:[image]},wechat_channels:{title:'Fixture Channel',body:'Complete video fixture body.\nSecond video paragraph.',tags:['Fixture'],media:[video]}}});
   const cloud={mode:'mac-tunnel',executionConnected:true,host:'publisher.vietbridge.one',origin:'https://publisher.vietbridge.one',user:'fixture',password:'disposable-compat-password',dataDir:f.root,accessFile:join(f.root,'access.json')};
   server=createApp(f.dbPath,{unified:true,cloud,executionEnabled:false,scanScheduler:false,contentSync:{automatic:false,sources:[]},library:{roots:[f.contentRoot],snapshotRoot:frozen,gptInboxBase:null},drivers:{create:async()=>{driverCalls++;throw Error('No real connector or platform operations allowed');}}});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
-  browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});const context=await browser.newContext();
+  browser=await chromium.launch({executablePath:process.env.PUBLISHER_TEST_BROWSER_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});const context=await browser.newContext();
   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():(external.push(route.request().url()),route.abort()));
   const page=await context.newPage();page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()==='POST')writes.push(new URL(r.url()).pathname);});
   await page.goto(origin);await page.getByLabel('用户名',{exact:true}).fill(cloud.user);await page.getByLabel('密码',{exact:true}).fill(cloud.password);await page.getByRole('button',{name:'登录',exact:true}).click();await page.locator('#ws').selectOption(f.ws.id);

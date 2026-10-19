@@ -1,3 +1,5 @@
+import { integratedRequest } from "./integration-http.ts";
+import type { IntegrationBridge, BrowserResourceGuard } from "../../src/publisher-core/integration-context.ts";
 import { createServer, type Server, type ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import { existsSync,readFileSync,statSync } from "node:fs";
@@ -20,7 +22,7 @@ import {GoogleDriveCanonicalSync} from './google-drive-canonical-sync.ts';
 import {ManifestDriveSync,type ManifestSource} from './manifest-drive-sync.ts';
 import { isPublicIpv4, resolvePublicEgressIpv4 } from './public-egress-ip.ts';
 
-export type WebServerOptions = { dbPath?: string; host?: string; port?: number; contentRoots?: string[]; ledgerPath?: string; stagingRoot?: string; mirrorPath?: string; workerEnabled?: boolean; workspaceServiceUrl?: string; publicEgressIpv4Resolver?: () => Promise<string> };
+export type WebServerOptions = { dbPath?: string; host?: string; port?: number; contentRoots?: string[]; ledgerPath?: string; stagingRoot?: string; mirrorPath?: string; workerEnabled?: boolean; workspaceServiceUrl?: string; integration?: IntegrationBridge; browserResources?: BrowserResourceGuard; driveSyncEnabled?: boolean; publicEgressIpv4Resolver?: () => Promise<string> };
 
 export async function clientWorkspace(id:string,serviceUrl:string):Promise<{id:string;name:string;contentRoot:string;account?:{pageId:string;name:string;configUrl:string}}> {
   if(!/^ws-[a-z0-9-]+$/i.test(id))throw new Error('客户编号无效');
@@ -41,6 +43,7 @@ export async function clientWorkspace(id:string,serviceUrl:string):Promise<{id:s
 }
 
 export function createPublisherServer(options: WebServerOptions = {}): Server {
+  if(options.integration&&options.workerEnabled!==false)throw new Error('INTEGRATED_LEGACY_EXECUTION_NOT_SUPPORTED');
   const workspaceServiceUrl=options.workspaceServiceUrl??process.env.SOCIAL_OPERATOR_V2_URL??'http://127.0.0.1:17882';
   const resolveWorkspace=(id:string)=>clientWorkspace(id,workspaceServiceUrl);
   const db = openDatabase(options.dbPath ?? process.env.PUBLISHER_DB ?? resolve("data/publisher.sqlite"));
@@ -64,9 +67,10 @@ export function createPublisherServer(options: WebServerOptions = {}): Server {
   const batchScopeCache=new Map<string,{expiresAt:number;ids:Set<string>}>();
   let lastVerifiedLedgerSync=0;
   let lastDriveScopeRevision='';
-  void GoogleDriveCanonicalSync.makeClient().then(client=>{if(!client.downloadRaw)throw new Error('GOOGLE_DRIVE_RAW_DOWNLOAD_UNAVAILABLE');driveSync=new GoogleDriveCanonicalSync(db,canonicalRoot,client);manifestSync=new ManifestDriveSync({downloadRaw:client.downloadRaw},canonicalRoot,manifestSources);driveSyncError='';if(options.workerEnabled!==false){driveSync.start();manifestSync.start();}}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
+  if(!options.integration&&options.driveSyncEnabled!==false)void GoogleDriveCanonicalSync.makeClient().then(client=>{if(!client.downloadRaw)throw new Error('GOOGLE_DRIVE_RAW_DOWNLOAD_UNAVAILABLE');driveSync=new GoogleDriveCanonicalSync(db,canonicalRoot,client);manifestSync=new ManifestDriveSync({downloadRaw:client.downloadRaw},canonicalRoot,manifestSources);driveSyncError='';if(options.workerEnabled!==false){driveSync.start();manifestSync.start();}}).catch(error=>{driveSyncError=error instanceof Error?error.message:'GOOGLE_DRIVE_SYNC_UNAVAILABLE';});
   if (options.workerEnabled !== false) worker.start();
   const server = createServer(async (req, res) => {
+    if(options.integration)return integratedRequest(req,res,db,options);
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/") return html(res, renderDashboard());
     if (req.method === "GET" && url.pathname === "/api/health") return send(res, 200, { ok: true, aiRuntimeRequired: false, capabilities: PLATFORM_CAPABILITIES });

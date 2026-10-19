@@ -34,6 +34,25 @@ Open `http://127.0.0.1:17882`.
 npm test
 ```
 
+### Isolated cloud validation
+
+Use Node >=23.6. Install the locked dependencies with a writable temporary npm cache:
+
+```sh
+npm ci --ignore-scripts --no-audit --no-fund --cache /tmp/vietbridge-npm-cache
+npm run test:unified
+```
+
+Browser UI tests accept an explicit local browser executable. Their default remains Mac Chrome; video fixture tests also accept an explicit ffmpeg executable:
+
+```sh
+PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg npm test -- --test-concurrency=4
+```
+
+UI journeys use temporary fixture databases and loopback services with mocked platform execution and blocked external browser requests. These commands do not start the production service.
+
+The embedded legacy integration now requires an internal ownership context for every request. Only registered batches are visible to their exact customer/account binding; unowned history cannot be adopted or retried. This integration supports isolated task staging/listing/stopping only. Integrated worker execution, platform inventory, synchronization and unported endpoints fail closed; enabling its worker is rejected until a scoped execution/readback adapter is available. Standalone legacy routes remain separate.
+
 The prototype keeps product lifecycle state separate from the proven Publisher-P0 execution state. Real integration stays disabled until the M0 review and mock QA are accepted.
 
 ## Operating account execution preference

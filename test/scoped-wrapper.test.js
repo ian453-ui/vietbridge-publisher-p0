@@ -12,6 +12,8 @@ async function mount(t,f,config){const cloud=cloudFor(f),server=createControlled
 test('exact production composition loads scope itself; auth/CSRF/app tokens and object/queue boundaries retain default deny',async t=>{
  const f=setup(t),j=f.makePage('Wrapper approved Page'),cap=f.executor.executionCapability(f.w.id,j.id),other=f.makePage('Unselected queued Page'),{config}=configFor(f,[{kind:'PAGE',id:j.id,scope_hash:cap.scopeHash}]),m=await mount(t,f,config),execute=`/api/unified/workspaces/${f.w.id}/jobs/${j.id}/execute`;
  assert.equal((await m.get('/scoped-confirmation-ui.js')).status,200);
+ assert.equal((await m.get('/api-response.js')).status,200);
+ assert.equal((await m.get('/unlisted-module.js')).status,423);
  assert.equal((await m.post(execute,{confirm:true,scope_hash:cap.scopeHash},{cookie:''})).status,401);
  assert.equal((await m.post(execute,{confirm:true,scope_hash:cap.scopeHash},{'x-local-token':'bad'})).status,409);
  const tokenReply=await m.post('/api/access/tokens',{});assert.equal(tokenReply.status,423);

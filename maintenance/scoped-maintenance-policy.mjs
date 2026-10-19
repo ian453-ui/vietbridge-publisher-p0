@@ -70,8 +70,9 @@ export function restrict(server,sha,{diagnosticPaths=[],postPaths=new Set(),dyna
  if(!['read-only','scoped-task-confirmation'].includes(maintenanceMode)||!/^[a-f0-9]{40}$/.test(sha)||!Array.isArray(diagnosticPaths)||diagnosticPaths.length>1||diagnosticPaths.some(p=>!/^\/api\/unified\/workspaces\/ws-[a-z0-9-]+\/jobs\/[a-f0-9-]{36}\/diagnostics$/.test(p)))fail('MAINTENANCE_RELEASE_OR_DIAGNOSTIC_SCOPE_INVALID');
  const diagnostics=new Set(diagnosticPaths),handlers=server.listeners('request');server.removeAllListeners('request');
  const safe=new Set(['/','/login','/api/health','/api/state','/api/facebook','/api/group-library','/api/group-library/media','/api/group-library/content-media','/api/content-sync','/api/automation/capabilities','/api/publisher-integration']);
- // Exactly one added module. No profile, scan, prepare, reserve, queue or wildcard POST.
- const staticFiles=/^\/(?:client|unified-client|publisher-form-state|group-selection|group-filters|publisher-access-ui|publication-selection|scoped-confirmation-ui|operating-settings-ui)\.js$|^\/styles\.css$/;
+ // Exact static module paths only; api-response is a dependency of client.js.
+ // No profile, scan, prepare, reserve, queue or wildcard POST.
+ const staticFiles=/^\/(?:client|api-response|unified-client|publisher-form-state|group-selection|group-filters|publisher-access-ui|publication-selection|scoped-confirmation-ui|operating-settings-ui)\.js$|^\/styles\.css$/;
  server.on('request',(req,res)=>{
   res.setHeader('X-Publisher-Deployment-SHA',sha);res.setHeader('X-Publisher-Maintenance',maintenanceMode);
   if(operatingSettingsScope)res.setHeader('X-Publisher-Operating-Settings',encodeURIComponent(JSON.stringify(operatingSettingsView(operatingSettingsScope))));

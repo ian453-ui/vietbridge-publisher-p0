@@ -17,7 +17,7 @@ test('Chrome profile check accepts a data-directory argument at the end only for
 });
 
 test('composer targets the modal editor, not the nested Create post heading dialog',async()=>{
-  const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
+  const browser=await chromium.launch({executablePath:process.env.PUBLISHER_TEST_BROWSER_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
   try{const page=await browser.newPage();await page.setContent('<div role="dialog" aria-label="Notifications"></div><div role="dialog" aria-modal="true"><div role="dialog" aria-label="Create post">Create post</div><div role="textbox" contenteditable="true" aria-placeholder="Create a public post…"></div><input type="file"><button>Post</button></div>');
     const {dialog,box}=postComposer(page);await box.fill('Approved body');
     assert.equal(await box.textContent(),'Approved body');assert.equal(await dialog.locator('input[type=file]').count(),1);
@@ -25,7 +25,7 @@ test('composer targets the modal editor, not the nested Create post heading dial
 });
 
 test('manual group-post readback finds the image-backed permalink and rejects other groups',async()=>{
-  const browser=await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
+  const browser=await chromium.launch({executablePath:process.env.PUBLISHER_TEST_BROWSER_PATH||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
   try{const page=await browser.newPage();await page.setContent('<section><span>LP Travel Visa</span><p>Approved opening and final CTA</p><a href="https://www.facebook.com/photo/?fbid=9&set=gm.456&idorvanity=123">Image</a></section>');
     assert.deepEqual(await groupPostCandidates(page,'https://www.facebook.com/groups/123','Approved opening and final CTA','LP Travel Visa'),['https://www.facebook.com/groups/123/posts/456/']);
     assert.deepEqual(await groupPostCandidates(page,'https://www.facebook.com/groups/999','Approved opening and final CTA','LP Travel Visa'),[]);

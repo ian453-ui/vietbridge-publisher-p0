@@ -8,6 +8,8 @@ import {Readable} from 'node:stream';
 import {Store} from '../src/store.js';
 import {createApp} from '../src/server.js';
 import {openDatabase} from '../legacy-p0/src/database.ts';
+import {createPublisherServer} from '../legacy-p0/src/web-server.ts';
+import {GoogleDriveCanonicalSync} from '../legacy-p0/src/google-drive-canonical-sync.ts';
 
 function fixtures(){
  const root=mkdtempSync(join(tmpdir(),'vb-production-mount-')),operatorDb=join(root,'operator.sqlite'),publisherDb=join(root,'publisher.sqlite'),content=join(root,'content'),scopeFile=join(root,'scopes.json');mkdirSync(content);
@@ -122,4 +124,57 @@ test('a second valid customer/account cannot read or stop another customer publi
   assert.equal((await request(server,'/publisher/api/batches/'+created.batch_id+'/stop'+other,{method:'POST',body:{},headers})).status,404);
   assert.equal((await request(server,'/publisher/api/batches'+query,{headers:auth})).json().batches[0].control_state,'AWAITING_APPROVAL');
  }finally{server.emit('close');await new Promise(r=>setImmediate(r));rmSync(f.root,{recursive:true,force:true});}
+});
+
+test('same customer with another account cannot adopt, read, stop or retry an owned legacy task',async()=>{
+ const f=fixtures(),store=new Store(f.operatorDb);
+ store.db.prepare('INSERT INTO facebook_accounts(id,workspace,display_name,identity_type,profile_id,expected_identity,session_health) VALUES(?,?,?,?,?,?,?)').run('b','ws-vietbridge','Second account','PAGE','fixture-profile','Second','UNKNOWN');store.close();
+ f.publisher.bindings.push({...f.publisher.bindings[0],accountId:'b'});
+ const server=createApp(f.operatorDb,{cloud:f.cloud,publisher:f.publisher});
+ try{
+  const auth={authorization:'Basic '+Buffer.from(f.cloud.user+':'+f.cloud.password).toString('base64')};
+  const session=(await request(server,'/api/state?workspace=ws-vietbridge',{headers:auth})).json();
+  const headers={...auth,origin:f.cloud.origin,'content-type':'application/json','x-local-token':session.token};
+  const item=(await request(server,'/publisher/api/content/candidates'+query+'&includeIncomplete=1',{headers:auth})).json().candidates[0];
+  const input={mode:'article_id',value:f.id,platforms:['wechat_official_account'],selectedArticleId:f.id,selectedPackageRoot:item.packageRoot,selectedVersion:item.version};
+  const created=(await request(server,'/publisher/api/tasks/execute'+query,{method:'POST',body:input,headers})).json();assert.ok(created.batch_id);
+  const other=query.replace('accountId=a','accountId=b');
+  assert.deepEqual((await request(server,'/publisher/api/batches'+other,{headers:auth})).json().batches,[]);
+  for(const suffix of ['', '/preview','/assets/forged','/retry','/reconcile']){
+   const method=['/retry','/reconcile'].includes(suffix)?'POST':'GET';
+   assert.equal((await request(server,'/publisher/api/jobs/'+created.jobs[0].job_id+suffix+other,{method,body:method==='POST'?{}:undefined,headers})).status,404);
+  }
+  assert.equal((await request(server,'/publisher/api/batches/'+created.batch_id+'/stop'+other,{method:'POST',body:{},headers})).status,404);
+  assert.equal((await request(server,'/publisher/api/tasks/execute'+other,{method:'POST',body:input,headers})).status,400);
+  assert.equal((await request(server,'/publisher/api/facebook/accounts'+other,{headers:auth})).status,404);
+  const check=openDatabase(f.publisherDb);assert.equal(check.prepare('SELECT COUNT(*) n FROM publication_batches').get().n,1);assert.equal(check.prepare('SELECT control_state FROM publication_batches WHERE batch_id=?').get(created.batch_id).control_state,'AWAITING_APPROVAL');check.close();
+ }finally{server.emit('close');await new Promise(r=>setImmediate(r));rmSync(f.root,{recursive:true,force:true});}
+});
+
+test('unowned UNKNOWN history cannot be retried, stopped, exposed or adopted through integrated routes',async()=>{
+ const f=fixtures(),db=openDatabase(f.publisherDb),time='2026-10-05';
+ db.prepare("INSERT INTO publication_batches(batch_id,title,source_mode,platforms_json,default_all_platforms,control_state,created_at,updated_at) VALUES('unknown','private','ledger','[\"facebook\"]',0,'AWAITING_APPROVAL',?,?)").run(time,time);
+ db.prepare("INSERT INTO jobs(job_id,article_id,platform,account_id,package_hash,state,batch_id,created_at,updated_at) VALUES('unknown-job',?,'facebook','private','private','UNKNOWN','unknown',?,?)").run(f.id,time,time);db.close();
+ const server=createApp(f.operatorDb,{cloud:f.cloud,publisher:f.publisher});
+ try{
+  const auth={authorization:'Basic '+Buffer.from(f.cloud.user+':'+f.cloud.password).toString('base64')};
+  const state=(await request(server,'/api/state?workspace=ws-vietbridge',{headers:auth})).json(),headers={...auth,origin:f.cloud.origin,'content-type':'application/json','x-local-token':state.token};
+  for(const path of ['/api/jobs/unknown-job/retry','/api/jobs/unknown-job/reconcile','/api/batches/unknown/stop'])assert.equal((await request(server,'/publisher'+path+query,{method:'POST',body:{},headers})).status,404);
+  assert.deepEqual((await request(server,'/publisher/api/jobs'+query,{headers:auth})).json().jobs,[]);
+  assert.equal((await request(server,'/publisher/api/tasks/execute'+query,{method:'POST',body:{mode:'article_id',value:f.id,platforms:['facebook']},headers})).status,400);
+  const check=openDatabase(f.publisherDb);assert.equal(check.prepare("SELECT state FROM jobs WHERE job_id='unknown-job'").get().state,'UNKNOWN');check.close();
+ }finally{server.emit('close');await new Promise(r=>setImmediate(r));rmSync(f.root,{recursive:true,force:true});}
+});
+
+
+test('integrated boot never creates a sync connector; headers cannot replace internal ownership and worker mode is rejected',async()=>{
+ const f=fixtures(),original=GoogleDriveCanonicalSync.makeClient;let connects=0,server;
+ GoogleDriveCanonicalSync.makeClient=async()=>{connects++;throw Error('unexpected sync connector');};
+ const integration={context(){throw Error('INTERNAL_CONTEXT_REQUIRED');},batchAllowed(){return false;},batchIds(){return [];},register(){throw Error('no authority');}};
+ try{
+  assert.throws(()=>createPublisherServer({...f.publisher,integration,workerEnabled:true}),/INTEGRATED_LEGACY_EXECUTION_NOT_SUPPORTED/);
+  server=createPublisherServer({...f.publisher,integration});
+  const result=await request(server,'/api/batches?workspace=ws-vietbridge&accountId=a',{headers:{'x-workspace':'ws-vietbridge','x-account-id':'a'}});
+  assert.equal(result.status,400);assert.match(result.text,/INTERNAL_CONTEXT_REQUIRED/);assert.equal(connects,0);
+ }finally{GoogleDriveCanonicalSync.makeClient=original;server?.emit('close');await new Promise(r=>setImmediate(r));rmSync(f.root,{recursive:true,force:true});}
 });

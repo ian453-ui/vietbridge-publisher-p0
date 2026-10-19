@@ -47,7 +47,7 @@ test('vanity group with verified numeric ID accepts a real feed card outside emp
  assert.equal(facebookPostTarget('https://www.facebook.com/groups/522768946486257/posts/456/',{groupUrl:verifiedProactiveGroupUrl(vanity)}).postId,'456');
  assert.throws(()=>verifiedProactiveGroupUrl({...vanity,external_id:'other-slug'}),/未可靠绑定/);
  assert.throws(()=>facebookPostTarget('https://www.facebook.com/groups/999/posts/456/',{groupUrl:verifiedProactiveGroupUrl(vanity)}),/不属于冻结目标群组/);
- const chrome=await chromium.launch({channel:'chrome',headless:true});
+ const chrome=await chromium.launch({...process.env.PUBLISHER_TEST_BROWSER_PATH?{executablePath:process.env.PUBLISHER_TEST_BROWSER_PATH}:{channel:'chrome'},headless:true});
  try{
   const page=await chrome.newPage();
   const originalGetByRole=page.getByRole.bind(page);

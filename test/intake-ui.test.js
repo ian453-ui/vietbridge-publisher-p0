@@ -7,7 +7,7 @@ const source=readFileSync(new URL('../src/client.js',import.meta.url),'utf8');
 const functionLine=name=>source.split('\n').find(line=>line.startsWith(`function ${name}(`)||line.startsWith(`async function ${name}(`));
 const updateFunction=source.slice(source.indexOf('async function checkGptUpdates('),source.indexOf('\nsetInterval(',source.indexOf('async function checkGptUpdates(')));
 function updateContext(get){
- const context=vm.createContext({workspace:'ws-test',loadEpoch:0,loadedWorkspace:'ws-test',route:'groups',gptUpdateBusy:false,gptUpdateWorkspace:'',gptUpdateCheckedAt:'',gptUpdateError:'',libraryItems:[{key:'old'}],libraryWorkspace:'ws-test',libraryPicked:new Set(['old']),pendingLibraryScopes:new Set(),libraryScope:()=> 'ws-test:account-test',selectedContents:new Set(),message:'',get,render(){},encodeURIComponent,Date,Set});
+ const context=vm.createContext({librarySummary:false,catalogueReadError:'',workspace:'ws-test',loadEpoch:0,loadedWorkspace:'ws-test',route:'groups',gptUpdateBusy:false,gptUpdateWorkspace:'',gptUpdateCheckedAt:'',gptUpdateError:'',libraryItems:[{key:'old'}],libraryWorkspace:'ws-test',libraryPicked:new Set(['old']),pendingLibraryScopes:new Set(),libraryScope:()=> 'ws-test:account-test',selectedContents:new Set(),message:'',get,render(){},encodeURIComponent,Date,Set});
  vm.runInContext(updateFunction,context);return context;
 }
 
@@ -42,7 +42,7 @@ test('unavailable library preserves page and permits refresh retry',async()=>{
  let rendered=0,requests=0;
  const state={workspace:'ws-test',workspaces:[{id:'ws-test'}]};
  const context=vm.createContext({
-  core:null,fb:null,workspace:'ws-test',route:'groups',libraryWorkspace:'',
+  clearTimeout,librarySearchTimer:null,librarySearchController:null,catalogueReadError:'',core:null,fb:null,workspace:'ws-test',route:'groups',libraryWorkspace:'',
   libraryItems:[{articleId:'OLD'}],libraryPicked:new Set(['OLD']),
   message:'',loadEpoch:0,loadController:null,loadedWorkspace:'ws-test',AbortController,encodeURIComponent,showWorkspaceLoading(){throw Error('Existing customer page must remain available on library failure');},
   get:async url=>{if(url.startsWith('/api/state'))return state;if(url.startsWith('/api/facebook'))return {};requests++;throw Error('Not connected');},
