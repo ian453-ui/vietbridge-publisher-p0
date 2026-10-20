@@ -1,0 +1,278 @@
+{
+  "snapshot_kind": "public sanitized reference derivative",
+  "source_release_id": "f6178fbcdec390e5eecccdfbdfa7616209793210",
+  "created_utc": "2026-10-20T15:06:02.335589+00:00",
+  "scope": "52 source files and a sanitized startup wrapper; excludes credentials, environment files, cookies, profiles, databases, customer content, and private runtime adapters",
+  "limits": [
+    "Sanitized derivatives are not byte-identical to production; exact original hashes remain local and are not published.",
+    "Account, client, and host-specific values are placeholders.",
+    "Startup wrapper references private runtime adapters that are intentionally excluded; this snapshot is not a runnable production release."
+  ],
+  "files": [
+    {
+      "path": "src/asset-response.ts",
+      "sha256": "6b266ddd1404d7744d8b2c123dc6a47e600526f5bdcf21918543bde914259801",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/batch-bundle-importer.ts",
+      "sha256": "db72ceec119662f95fd001df1cf820a65262d24e1a2fd21ff7807d1812037d15",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/channels-upload-observer.ts",
+      "sha256": "f8e43eddd06b40133b37f5450eb4182b7e4d1155118b07e23b8abce07fcf821c",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/cli.ts",
+      "sha256": "c78a6e31de3a130de4b61d96f653fe5a284da8f740951bd13a2d520a9e7d7202",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/content-library.ts",
+      "sha256": "dde533d105792a6fa49f13ed1ddba56007bccde9d1be17c90d567bcbefd9d58b",
+      "kind": "sanitized_derivative"
+    },
+    {
+      "path": "src/content-snapshot.ts",
+      "sha256": "c908c3413ec2766e18e0c68f4991270be04f3c10bf0d790ff271c885fce2c1ef",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/database.ts",
+      "sha256": "7d50ffeb870041b67f1ddbde4cbdc523cec8f7dd6a2ea0cff66023b18ee42398",
+      "kind": "sanitized_derivative"
+    },
+    {
+      "path": "src/doc-inline-assets.ts",
+      "sha256": "627311ccf32a99b93a44812c059c167d5343ddcb641c45963ef64345e8656344",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/docx-content-ingestor.ts",
+      "sha256": "6e7d8f0321cf57292bf67c834996e5b1a0d174e7199caa33c26ce5f7dd0aaef6",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/execution-model.ts",
+      "sha256": "0f384e820ffed81a9fb03c290e22bef677e764ab3f65d9d66629f307b6397ba6",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/facebook-accounts.ts",
+      "sha256": "ea08ea5045a6063d9045716356a24fa6fae47b3594c47cc46a1f734eb48103b4",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/facebook-business-browser.ts",
+      "sha256": "343529df63512ff1d38ef041f1669a10c23ef6b889eba9ed1f235382b3b7028e",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/facebook-mcp-connector.ts",
+      "sha256": "909d5859077e385a7c77562db25085140317f23bea10efd2402578348b7012c0",
+      "kind": "sanitized_derivative"
+    },
+    {
+      "path": "src/facebook-video.ts",
+      "sha256": "1a2e291b63f4118813a1c286c05e82dcd471229041fb8452ac5d55c839964ba7",
+      "kind": "sanitized_derivative"
+    },
+    {
+      "path": "src/file-hash.ts",
+      "sha256": "e49b07d84c5481350452c1930a121c27593a4044c3c91b2b1f1f76a5cf6d6830",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/google-drive-canonical-sync.ts",
+      "sha256": "7ba20c2f14ea5def6870df6e9be82456724f243447c17a8cbfe911762a39730e",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/ingest-docx-cli.ts",
+      "sha256": "c2643ad26c74329817f00a9a86d2cb2392d090c18ab211ce830a2fe9151017af",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/jsonl-mirror.ts",
+      "sha256": "db44a8835c0035e9d57a4d8f7ff61a0e881c15ac07c86b8d7f797946a0770454",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/local-content-refresh.ts",
+      "sha256": "fe6fc3440fac3fa56bb8200bfb19b4d2642356ec6819b78f69c4a4f9959afeb3",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/manifest-drive-sync.ts",
+      "sha256": "967a5e363985dbba66863ed875480e89a1ca1a516985e4314623f66137d6f43a",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/multiplatform-planner.ts",
+      "sha256": "514a06a3c9aee308b95250cb15f3b93d0b8bf15699176a8e5ce26dfb8c84e357",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/package-integrity.ts",
+      "sha256": "d3a5a679a55bca9d6742bc89f58273106f8bc88e4212c07f39b00ff304d76cba",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/platform-asset-bindings.d.ts",
+      "sha256": "5892863ade181a89f4a18932e45cdee53363283d87bcb6d9f6e4eb09c3a9e512",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/platform-asset-bindings.js",
+      "sha256": "619a203d290bc2de71cf13147b5bb4d9a8daf3ee10acb51326ba07d52e847060",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/platform-contract.ts",
+      "sha256": "ef77e8dd063e2d37e0259252efce8704ce968eacdf79bbca9cf968d157eca4ad",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/platform-worker.client-bsk-20261014.ts",
+      "sha256": "0f93a38e4e41ffc208f356c0dc4014b5b30884ac0bbea0492387e1e0f3de0ec7",
+      "kind": "sanitized_derivative"
+    },
+    {
+      "path": "src/platform-worker.ts",
+      "sha256": "73b7a414fa65aade828ddd7e29e7616f84c0b02a920b0b463ed143b94b79db20",
+      "kind": "sanitized_derivative"
+    },
+    {
+      "path": "src/public-egress-ip.ts",
+      "sha256": "85dda6014eaa6fb8c88934c4dcb8664f98273060e1e00b135b57bcd33c045c78",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/publication-control.ts",
+      "sha256": "4d3a0b48160bab595364c81ab146f850d38c32d77b5d8a7e2ff530820380727c",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/publication-ledger.ts",
+      "sha256": "46809146d80c31ed90a25e67f7e0f216b15c94e7abcbefba58d7e9f811e22bcf",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/publisher-store.ts",
+      "sha256": "4e27cf79d4ee8fe17f74ccf30afa7a6343e21e227fc9b887c02d606a5b2569dd",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/resource-monitor.ts",
+      "sha256": "2227f89c7faf4815c5cc7f058754645c45d07797cc2cb8d70576030eb77ec2f2",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/runtime-policy.ts",
+      "sha256": "569043e9a66b805bed56ee8960afed7f87d5b061bb51a0166b43d590055d7140",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/states.ts",
+      "sha256": "731c1c1b756875c8b7eac11c7b8845773b7ad90fff2daae417ebe792ebfa2aa7",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/task-service.ts",
+      "sha256": "86930c37b3148304f044e3e30a2e5bb2e001a0907f9cf91fd27d23aa86a55c73",
+      "kind": "sanitized_derivative"
+    },
+    {
+      "path": "src/util.ts",
+      "sha256": "44e54c0ba476cbee3b210fde1d97f6b15b77b691a0937985d738d2faae83596c",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/web-server.client-context-20261014.ts",
+      "sha256": "0b5aac574a475c88598a152a94aebb42478c7f6a72e28cf744cd98f8e5eb006d",
+      "kind": "sanitized_derivative"
+    },
+    {
+      "path": "src/web-server.ts",
+      "sha256": "25072685088f0aea36b2db06c5445100544ef3a51bb492af20701e5c427d3bd8",
+      "kind": "sanitized_derivative"
+    },
+    {
+      "path": "src/web-ui.ts",
+      "sha256": "592ebe522345bfaac446178915fc2274651c5f861d9534950dca3a2b9ee7798b",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/wechat-channels-contract.ts",
+      "sha256": "09c2b3451e93df6e93fa2b2f9d296fd01749e738ec14fd35c189c73273f6a7f1",
+      "kind": "sanitized_derivative"
+    },
+    {
+      "path": "src/wechat-channels-driver.ts",
+      "sha256": "699d6a7334128c5986ab5356848e2623e877d5d230362ef799682c8c72552369",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/wechat-draft-reader.ts",
+      "sha256": "030543489a0ef4ce4bc935cf6723821cad34e62592e236e6fca5f47d1051b5b7",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/wechat-existing-draft.ts",
+      "sha256": "d0e14d3fe02ea52172757d60d288f58c5e9ef81bb798e67e6c6cb3cdee676ca9",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/wechat-heading-structure.ts",
+      "sha256": "cfe2f30f8d5712f5fda32719ea430c517bef1aa5f1eb3adbd24235ce2f8d6559",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/wechat-media.ts",
+      "sha256": "9aad3b543816ad612a6d686880771200b9e1506d9aa02579523f8daa453260be",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/wechat-official-browser.ts",
+      "sha256": "77c22dbdec77591abc22856167e48fe0302d5d9bfe4238ceda958ec92eba2abf",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/wechat-preview.d.ts",
+      "sha256": "437ee5f55ae645c48bdc8327bf8f3dda7b786d1c584d35274facfbf99996823d",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/wechat-preview.js",
+      "sha256": "008d6fc9cb9ef1174cb97d9780ea251a550b71214f8cc739c73068d4fce19a3e",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/wenyan-mcp-connector.ts",
+      "sha256": "ce81f0157227f131de0553a2dcca787964cb4f2f0579dc2eae3d627615b3988b",
+      "kind": "sanitized_derivative"
+    },
+    {
+      "path": "src/xhs-submit-result.ts",
+      "sha256": "2532478f4a78412ad90873de1a5b150920c982b77ec9a2e8000c89c2cce2c7a3",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/xiaohongshu-driver.ts",
+      "sha256": "d4fe6bf8e534b21cee7c5e9fcdf395f85bdc41c5494b14f5210f93f3acdcd274",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "src/xiaohongshu-mcp-connector.ts",
+      "sha256": "17bd1b61db3d3e8a11dbaf50812964d6e784cb033cdc1418f9f2a977caa9f3f6",
+      "kind": "byte_identical_source"
+    },
+    {
+      "path": "startup/v1-start.mjs",
+      "sha256": "66b2d01c365c60aabf1d153435ba53c6719ca60e07801e4a9d5aa355f3cf5747",
+      "kind": "sanitized_derivative"
+    }
+  ]
+}
