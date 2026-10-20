@@ -95,3 +95,9 @@ local implementation, external transport requirements and unverified live capabi
 [MetricObservation](handoff/metric-observation.md) validates explicitly supplied
 source evidence, preserves unavailable values and as-of snapshots, and refuses
 incompatible aggregation. It does not collect platform data or write a database.
+
+### Account/action capability evidence
+
+`node scripts/check-account-capability.mjs --help` describes the local read-only
+[capability facts diagnostic](handoff/account-capability-facts.md). It separates
+platform/app/account/code/runtime/live-test/policy evidence and never grants execution.

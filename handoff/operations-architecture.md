@@ -63,3 +63,11 @@ for exact identity/source/hash, availability, reporting windows, snapshot histor
 and conservative count aggregation. It is not a platform collector or a migrated
 production ledger. The matrix's live analytics limitations still apply; real
 account statistics were not copied into fixtures or Git.
+
+### P0-D capability evidence slice
+
+[Account/action facts](account-capability-facts.md) reuse the platform registry while
+separating official support, app approval, account permission, implementation,
+runtime, live acceptance and policy. Missing/stale evidence blocks the diagnosis;
+even complete evidence returns no execution authority. No platform facts have been
+hardcoded as approved, and no external capability probe or driver was added.
