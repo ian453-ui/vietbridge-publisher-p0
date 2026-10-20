@@ -81,3 +81,11 @@ Chinese explanations of missing/expired evidence and next checks; omit `--text`
 for JSON. Mac offline does not automatically block independent cloud work.
 See [input examples, diagnostic meanings and limits](handoff/continuation-readiness.md).
 This checker neither executes steps nor authorizes publishing.
+
+### GPT content request/result contracts
+
+Use `node scripts/gpt-content-contract.mjs --help` for the local metadata adapter.
+It correlates an existing task/thread with exact input and output revisions, without
+sending or claiming work. [Contract and test evidence](handoff/gpt-content-contract.md)
+and [operations capability inventory](handoff/operations-architecture.md) distinguish
+local implementation, external transport requirements and unverified live capability.
