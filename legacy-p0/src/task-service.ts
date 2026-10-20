@@ -1,3 +1,4 @@
+import { completedFailure } from './task-visibility.ts';
 import { readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import type { Db } from "./database.ts";
@@ -276,11 +277,33 @@ export class TaskService {
   }
 
   clearHistory(): {hidden:number} {
-    const r=this.db.prepare("INSERT OR IGNORE INTO hidden_history(job_id,hidden_at) SELECT j.job_id,? FROM jobs j LEFT JOIN publication_batches b ON b.batch_id=j.batch_id WHERE j.state IN ('PUBLISHED','DRAFT_API_WRITTEN_NOT_PUBLISHED') OR b.control_state='TERMINATED'").run(now());
-    return {hidden:Number(r.changes)};
+    return transaction(this.db, () => {
+      const jobs = this.db.prepare(`SELECT j.job_id,j.batch_id,j.state,j.submit_safety_domain,b.control_state
+        FROM jobs j LEFT JOIN publication_batches b ON b.batch_id=j.batch_id`).all();
+      const insert = this.db.prepare('INSERT OR IGNORE INTO hidden_history(job_id,hidden_at) VALUES(?,?)');
+      let hidden = 0;
+      for (const job of jobs) {
+        if (this.statusBatchAllowed && !this.statusBatchAllowed(String(job.batch_id))) continue;
+        const endedFailure = completedFailure({control_state:String(job.control_state)},
+          {state:String(job.state),submit_safety_domain:String(job.submit_safety_domain)});
+        if (['PUBLISHED','DRAFT_API_WRITTEN_NOT_PUBLISHED'].includes(String(job.state)) ||
+            job.control_state === 'TERMINATED' || endedFailure) {
+          hidden += Number(insert.run(job.job_id,now()).changes);
+        }
+      }
+      return {hidden};
+    });
   }
 
-  restoreHistory(): void { this.db.prepare('DELETE FROM hidden_history').run(); }
+  restoreHistory(): void {
+    // Restore only display markers owned by this binding; never mutate jobs.
+    if (!this.statusBatchAllowed) { this.db.prepare('DELETE FROM hidden_history').run(); return; }
+    transaction(this.db, () => {
+      const hidden = this.db.prepare('SELECT h.job_id,j.batch_id FROM hidden_history h JOIN jobs j ON j.job_id=h.job_id').all();
+      const remove = this.db.prepare('DELETE FROM hidden_history WHERE job_id=?');
+      for (const job of hidden) if (this.statusBatchAllowed!(String(job.batch_id))) remove.run(job.job_id);
+    });
+  }
 
   confirmWechatDraftDeleted(jobId: string): Record<string, unknown> {
     const job=this.store.getJob(jobId);

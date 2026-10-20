@@ -1,13 +1,9 @@
+import { completedFailure } from './task-visibility.ts';
+export { completedFailure } from './task-visibility.ts';
 import { renderWechatPreviewArticle } from "./wechat-preview.js";
 
 export function effectiveRepublish(requested: boolean, publishedPlatforms: string[], selectedPlatforms: string[]): boolean {
   return requested && selectedPlatforms.length > 0 && selectedPlatforms.every(platform => publishedPlatforms.includes(platform));
-}
-
-// Display only: never infer a completed failure from an uncertain submission.
-export function completedFailure(batch: { control_state: string }, job: { state: string; submit_safety_domain?: string }): boolean {
-  return batch.control_state === 'COMPLETED' && job.submit_safety_domain !== 'MAY_HAVE_SUBMITTED' &&
-    ['FAILED', 'FAILED_PREFLIGHT', 'BLOCKED_CAPABILITY'].includes(job.state);
 }
 
 export function renderDashboard(): string {

@@ -257,3 +257,38 @@ test('owned UNKNOWN history remains visible but cannot be replaced by staging a 
   assert.equal((await request(server,'/publisher/api/jobs'+query,{headers:f.auth})).json().jobs[0].state,'UNKNOWN');assert.equal(f.db.prepare('SELECT COUNT(*) n FROM jobs').get().n,1);
  }finally{server?.emit('close');await new Promise(r=>setImmediate(r));f.db.close();rmSync(f.root,{recursive:true,force:true});}
 });
+
+test('history clear and restore use real scoped routes without hiding uncertain or active failures',async()=>{
+ const f=await historyFixture();let server;
+ try{
+  for(const [id,owner] of [['ended',0],['active',0],['foreign',1],['unregistered',undefined]])f.batch(id,owner);
+  f.db.prepare("UPDATE publication_batches SET control_state='COMPLETED' WHERE batch_id!='active'").run();
+  for(const state of ['FAILED','FAILED_PREFLIGHT','BLOCKED_CAPABILITY'])f.job('ended-'+state,'ended',state);
+  for(const state of ['UNKNOWN','SUBMITTED_PENDING_CONFIRMATION','RECONCILE_PENDING','PUBLISHED_ID_PENDING','JOB_WAITING_HUMAN'])f.job('pending-'+state,'ended',state);
+  f.job('ambiguous-failure','ended','FAILED');f.db.prepare("UPDATE jobs SET submit_safety_domain='MAY_HAVE_SUBMITTED' WHERE job_id='ambiguous-failure'").run();
+  f.job('active-failure','active','FAILED');f.job('foreign-failure','foreign','FAILED');f.job('unregistered-failure','unregistered','FAILED');
+  const before={jobs:f.db.prepare('SELECT * FROM jobs ORDER BY job_id').all(),batches:f.db.prepare('SELECT * FROM publication_batches ORDER BY batch_id').all(),transitions:f.db.prepare('SELECT * FROM state_transitions').all()};
+  server=createApp(f.operatorDb,{cloud:f.cloud,publisher:f.publisher});
+  const state=(await request(server,'/api/state?workspace=ws-vietbridge',{headers:f.auth})).json(),headers={...f.auth,origin:f.cloud.origin,'content-type':'application/json','x-local-token':state.token};
+  const post=async(action,account='a')=>request(server,'/publisher/api/history/'+action+query.replace('accountId=a','accountId='+account),{method:'POST',headers,body:{}});
+  const hidden=()=>f.db.prepare('SELECT job_id FROM hidden_history ORDER BY job_id').all().map(x=>x.job_id);
+  assert.equal((await request(server,'/publisher/api/history/clear'+query,{method:'POST',headers:f.auth,body:{}})).status,403);
+  assert.deepEqual(hidden(),[]);
+  let result=await post('clear');assert.equal(result.status,200,result.text);assert.equal(result.json().hidden,3);
+  assert.deepEqual(hidden(),['ended-BLOCKED_CAPABILITY','ended-FAILED','ended-FAILED_PREFLIGHT']);
+  assert.equal((await post('clear')).json().hidden,0,'clearing twice is idempotent');
+  const batches=(await request(server,'/publisher/api/batches'+query,{headers:f.auth})).json().batches;
+  const ended=batches.find(b=>b.batch_id==='ended');
+  assert.ok(ended.jobs.filter(j=>j.job_id.startsWith('ended-')).every(j=>j.history_hidden));
+  assert.ok(ended.jobs.filter(j=>!j.job_id.startsWith('ended-')).every(j=>!j.history_hidden));
+  result=await post('restore','b');assert.equal(result.status,200);assert.equal(hidden().length,3,'another account cannot restore our markers');
+  result=await post('clear','b');assert.equal(result.status,200);assert.equal(result.json().hidden,1);
+  result=await post('restore');assert.equal(result.status,200);assert.deepEqual(hidden(),['foreign-failure']);
+  const restored=(await request(server,'/publisher/api/batches'+query,{headers:f.auth})).json().batches;
+  assert.ok(restored.flatMap(b=>b.jobs).every(j=>!j.history_hidden));
+  assert.equal((await post('restore','b')).status,200);assert.deepEqual(hidden(),[]);
+  assert.deepEqual(f.db.prepare('SELECT * FROM jobs ORDER BY job_id').all(),before.jobs);
+  assert.deepEqual(f.db.prepare('SELECT * FROM publication_batches ORDER BY batch_id').all(),before.batches);
+  assert.deepEqual(f.db.prepare('SELECT * FROM state_transitions').all(),before.transitions);
+ }finally{server?.emit('close');await new Promise(r=>setImmediate(r));f.db.close();rmSync(f.root,{recursive:true,force:true});}
+});

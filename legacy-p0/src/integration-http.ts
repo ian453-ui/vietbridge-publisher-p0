@@ -36,6 +36,8 @@ export async function integratedRequest(req:IncomingMessage,res:ServerResponse,d
    const platforms=context.platforms as any;const result=tasks.candidates(platforms,url.searchParams.get('includePublished')==='1',url.searchParams.get('includeIncomplete')==='1');
    if(result.status==='CANDIDATES')result.candidates=result.candidates.filter(item=>allowed(item.packageRoot));return send(200,result);
   }
+  if(req.method==='POST'&&url.pathname==='/api/history/clear')return send(200,tasks.clearHistory());
+  if(req.method==='POST'&&url.pathname==='/api/history/restore'){tasks.restoreHistory();return send(200,{restored:true});}
   if(req.method==='POST'&&url.pathname==='/api/tasks/execute') {
    if(!String(req.headers['content-type']||'').startsWith('application/json'))return send(400,{error:'application/json required'});
    let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>1_000_000)return send(413,{error:'request too large'});}const input=JSON.parse(raw||'{}');
