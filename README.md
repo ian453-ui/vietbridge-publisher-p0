@@ -89,3 +89,9 @@ It correlates an existing task/thread with exact input and output revisions, wit
 sending or claiming work. [Contract and test evidence](handoff/gpt-content-contract.md)
 and [operations capability inventory](handoff/operations-architecture.md) distinguish
 local implementation, external transport requirements and unverified live capability.
+
+### Local metric evidence validation
+
+[MetricObservation](handoff/metric-observation.md) validates explicitly supplied
+source evidence, preserves unavailable values and as-of snapshots, and refuses
+incompatible aggregation. It does not collect platform data or write a database.

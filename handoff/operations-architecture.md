@@ -55,3 +55,11 @@ poller. ScanScheduler continues discovery only.
 
 No step is marked live merely because synthetic tests pass. This roadmap does
 not request credentials, purchase services, create hosting or change posting cadence.
+
+### P0-C local metric evidence slice
+
+[MetricObservation v1](metric-observation.md) now supplies a pure in-memory contract
+for exact identity/source/hash, availability, reporting windows, snapshot history
+and conservative count aggregation. It is not a platform collector or a migrated
+production ledger. The matrix's live analytics limitations still apply; real
+account statistics were not copied into fixtures or Git.
