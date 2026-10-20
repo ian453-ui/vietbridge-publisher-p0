@@ -202,3 +202,8 @@ reported as passed, nor as failures of the synthetic release suite. Existing
 container DNS limitations and the validated offline build path remain documented
 above. User confirmation and original execution permissions still apply to any
 future production actions.
+
+Before a later Mac handoff, use the [read-only continuation checklist](continuation-readiness.md)
+via `npm run check:continuation -- --text /absolute/path/to/evidence.json`.
+It separates cloud-independent work from Mac dependencies without granting any
+execution or synchronization authority.

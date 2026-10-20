@@ -82,3 +82,26 @@ test('repository identity accepts exact HTTPS and SSH transports, not lookalikes
   null, {},
  ])assert.ok(check(fixture(),{...source,repository}).steps.cloudReviewBuildTest.reasons.includes('SOURCE_IDENTITY_MISMATCH'),String(repository));
 });
+
+import {continuationReport} from '../src/continuation-report.js';
+test('report explains absent, expired, future and invalid evidence without blocking independent cloud checks',()=>{
+ for(const [mac,status,label] of [
+  [undefined,'MISSING','缺失'],
+  [{...fixture().mac,validUntil:'2026-10-20T09:00:00Z'},'EXPIRED','已过期'],
+  [{...fixture().mac,observedAt:'2026-10-20T09:00:30Z'},'FUTURE_OBSERVATION','观察时间在未来'],
+  [{...fixture().mac,validUntil:'2026-10-20T08:58:00Z'},'INVALID_TIME_RANGE','期限倒置'],
+ ]){
+  const f=fixture();f.mac=mac;const r=check(f);assert.equal(r.evidence.mac,status);assert.equal(r.steps.cloudReviewBuildTest.status,'CHECKABLE');
+  const text=continuationReport(r);assert.ok(text.includes(label));assert.ok(text.includes('不代表已执行'));assert.ok(text.includes('永不授予发布许可'));
+ }
+});
+test('CLI help and actionable errors are discoverable without leaking supplied values',()=>{
+ const cli=new URL('../scripts/check-continuation.mjs',import.meta.url).pathname;
+ const help=spawnSync(process.execPath,[cli,'--help'],{cwd:tmpdir(),encoding:'utf8'});assert.equal(help.status,0);assert.match(help.stdout,/check:continuation/);
+ const missing=spawnSync(process.execPath,[cli,'/nonexistent/synthetic-sensitive-name'],{encoding:'utf8'});assert.equal(missing.status,1);assert.match(missing.stderr,/无法读取输入文件/);assert.ok(!missing.stderr.includes('synthetic-sensitive-name'));
+ const root=mkdtempSync(join(tmpdir(),'continuation-text-')),file=join(root,'input.json');
+ try{
+  writeFileSync(file,JSON.stringify(fixture()));const r=spawnSync(process.execPath,[cli,'--text',file],{encoding:'utf8'});assert.equal(r.status,0);assert.match(r.stdout,/Mac 手工同步/);assert.match(r.stdout,/发布：受阻/);
+  writeFileSync(file,'bad-secret-fixture');const invalid=spawnSync(process.execPath,[cli,file],{encoding:'utf8'});assert.equal(invalid.status,1);assert.match(invalid.stderr,/JSON 格式无效/);assert.ok(!invalid.stderr.includes('bad-secret-fixture'));
+ }finally{rmSync(root,{recursive:true,force:true});}
+});

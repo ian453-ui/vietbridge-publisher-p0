@@ -72,3 +72,12 @@ cloud mode without a connected Mac. It retains authentication and disables all
 execution, sync and scheduler capabilities. The existing Mac `npm start` is unchanged.
 See [cloud startup, container packaging and Mac handoff](handoff/unified-cloud-deployment.md)
 for required existing access configuration, targeted tests and hosting limitations.
+
+### Cloud / Mac continuation checklist
+
+Run `npm run check:continuation -- --help` for the read-only handoff checker.
+Use `npm run check:continuation -- --text /absolute/path/to/evidence.json` for
+Chinese explanations of missing/expired evidence and next checks; omit `--text`
+for JSON. Mac offline does not automatically block independent cloud work.
+See [input examples, diagnostic meanings and limits](handoff/continuation-readiness.md).
+This checker neither executes steps nor authorizes publishing.

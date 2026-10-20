@@ -13,7 +13,8 @@
     "test:unified": "node --test test/unified-*.test.js test/group-selection.test.js",
     "start:legacy": "node src/server.js",
     "admin:password": "node scripts/set-admin-password.mjs",
-    "start:cloud": "node src/unified-cloud-server.js"
+    "start:cloud": "node src/unified-cloud-server.js",
+    "check:continuation": "node scripts/check-continuation.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

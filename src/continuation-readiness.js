@@ -6,7 +6,14 @@ const repositoryMatches=value=>typeof value==='string' &&
   /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)ian453-ui\/vietbridge-publisher-p0(?:\.git)?$/.test(value);
 const sha=value=>typeof value==='string'&&/^[a-f0-9]{40}$/.test(value);
 const id=value=>typeof value==='string'&&value.trim().length>0;
-const fresh=(e,now)=>e&&Number.isFinite(Date.parse(e.observedAt))&&Number.isFinite(Date.parse(e.validUntil))&&Date.parse(e.observedAt)<=now&&now<Date.parse(e.validUntil);
+const evidenceStatus=(e,now)=>{
+  if(!e)return 'MISSING';
+  const observed=Date.parse(e.observedAt),expires=Date.parse(e.validUntil);
+  if(!Number.isFinite(observed)||!Number.isFinite(expires)||expires<=observed)return 'INVALID_TIME_RANGE';
+  if(observed>now)return 'FUTURE_OBSERVATION';
+  return now>=expires?'EXPIRED':'FRESH';
+};
+const fresh=(e,now)=>evidenceStatus(e,now)==='FRESH';
 const result=reasons=>({status:reasons.length?'BLOCKED':'CHECKABLE',reasons});
 
 /** Advisory only: caller evidence is not authority, a lease, or a publishing permit. */
@@ -36,7 +43,7 @@ export function continuationReadiness(input,source,{now=Date.now()}={}) {
     if(job.submitSafetyDomain==='MAY_HAVE_SUBMITTED'||job.preparationEffectsMayRemain===true||[...guardedStates,'RECONCILE_PENDING','SUBMITTED_PENDING_CONFIRMATION','DRAFT_API_WRITTEN_NOT_PUBLISHED'].includes(job.state))publication.push('EXISTING_OR_UNCERTAIN_RESULT_NO_REPLAY');
     else if(!['DRAFT','READY','BLOCKED','CANCELLED','FAILED','FAILED_PREFLIGHT','BLOCKED_CAPABILITY'].includes(job.state))publication.push('UNRECOGNIZED_HISTORY_STATE');
   }
-  return {version:1,advisoryOnly:true,ownerChanged:false,originalOwner:id(input.originalOwner)?input.originalOwner:null,targetCommit:sha(input.targetCommit)?input.targetCommit:null,
+  return {version:1,evidence:{mac:evidenceStatus(input.mac,now),history:evidenceStatus(input.history,now)},advisoryOnly:true,ownerChanged:false,originalOwner:id(input.originalOwner)?input.originalOwner:null,targetCommit:sha(input.targetCommit)?input.targetCommit:null,
     steps:{cloudReviewBuildTest:result(code),macManualSync:result(mac),macLocalVerification:result(verify),publication:{status:'BLOCKED',reasons:[...new Set(publication)]}},
     note:'CHECKABLE means dependencies permit review only; it grants no execution, deployment, owner transfer or publication authority.'};
 }
