@@ -101,3 +101,10 @@ incompatible aggregation. It does not collect platform data or write a database.
 `node scripts/check-account-capability.mjs --help` describes the local read-only
 [capability facts diagnostic](handoff/account-capability-facts.md). It separates
 platform/app/account/code/runtime/live-test/policy evidence and never grants execution.
+
+### Content production entry (local)
+
+Run `npm run content:workbench -- --help` to export a request from a plain brief,
+package supplied output and generate a read-only QA preview using the existing
+inbox. Start with the [one-command synthetic demo](handoff/content-workbench.md).
+No model call, dispatch, approval or publication is performed.

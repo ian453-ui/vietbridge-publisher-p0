@@ -183,3 +183,10 @@ above (13 new contract/CLI tests plus existing revision/permit tests). New regre
 cases cover reordered same-thread reference, actual thread change, top-level and
 nested duplicates, escaped-key duplicates, valid strings/arrays/primitives, nesting
 limit and CLI non-echo. MetricObservation is unchanged by this correction.
+
+## Local workflow integration
+
+The [content workbench](content-workbench.md) now provides plain brief input,
+request export, explicit result packaging and a synthetic end-to-end QA preview.
+It reuses the existing inbox/model binding locally; the authenticated bridge
+transport and server-side intake/approval boundaries above remain deferred.

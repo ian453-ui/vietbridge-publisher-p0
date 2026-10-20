@@ -14,7 +14,8 @@
     "start:legacy": "node src/server.js",
     "admin:password": "node scripts/set-admin-password.mjs",
     "start:cloud": "node src/unified-cloud-server.js",
-    "check:continuation": "node scripts/check-continuation.mjs"
+    "check:continuation": "node scripts/check-continuation.mjs",
+    "content:workbench": "node scripts/content-workbench.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
