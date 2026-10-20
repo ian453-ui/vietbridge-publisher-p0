@@ -315,3 +315,26 @@ test('terminated batches cannot hide uncertain submissions or active jobs throug
   assert.deepEqual(f.db.prepare('SELECT * FROM jobs ORDER BY job_id').all(),before);
  }finally{server?.emit('close');await new Promise(r=>setImmediate(r));f.db.close();rmSync(f.root,{recursive:true,force:true});}
 });
+
+test('batch reads ignore obsolete hidden markers for unresolved jobs without changing stored history',async()=>{
+ const f=await historyFixture();let server;
+ try{
+  f.batch('stopped',0);f.batch('other',1);
+  f.db.prepare("UPDATE publication_batches SET control_state='TERMINATED'").run();
+  for(const state of ['UNKNOWN','RECONCILE_PENDING','SUBMITTED_PENDING_CONFIRMATION','PUBLISHED_ID_PENDING','FORM_FILLING','FAILED','PUBLISHED'])f.job(state,'stopped',state);
+  f.job('ambiguous','stopped','FAILED');f.db.prepare("UPDATE jobs SET submit_safety_domain='MAY_HAVE_SUBMITTED' WHERE job_id='ambiguous'").run();
+  f.job('foreign','other','UNKNOWN');
+  f.db.prepare("INSERT INTO hidden_history(job_id,hidden_at) SELECT job_id,'2026-10-01' FROM jobs").run();
+  const markers=f.db.prepare('SELECT * FROM hidden_history ORDER BY job_id').all(),jobs=f.db.prepare('SELECT * FROM jobs ORDER BY job_id').all();
+  server=createApp(f.operatorDb,{cloud:f.cloud,publisher:f.publisher});
+  const result=await request(server,'/publisher/api/batches'+query,{headers:f.auth});assert.equal(result.status,200);
+  const visible=result.json().batches.flatMap(b=>b.jobs);
+  assert.equal(visible.length,8);assert.ok(!visible.some(j=>j.job_id==='foreign'));
+  for(const job of visible)assert.equal(job.history_hidden,['FAILED','PUBLISHED'].includes(job.job_id),job.job_id);
+  const {TaskService}=await import('../legacy-p0/src/task-service.ts');
+  const service=new TaskService(f.db,{roots:[f.content],stagingRoot:f.publisher.stagingRoot});
+  for(const job of service.getBatch('stopped').jobs)assert.equal(job.history_hidden,['FAILED','PUBLISHED'].includes(job.job_id),job.job_id);
+  assert.deepEqual(f.db.prepare('SELECT * FROM hidden_history ORDER BY job_id').all(),markers);
+  assert.deepEqual(f.db.prepare('SELECT * FROM jobs ORDER BY job_id').all(),jobs);
+ }finally{server?.emit('close');await new Promise(r=>setImmediate(r));f.db.close();rmSync(f.root,{recursive:true,force:true});}
+});

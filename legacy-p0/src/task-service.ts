@@ -409,7 +409,12 @@ export class TaskService {
         : /fetch failed/i.test(code) ? '网络或 VPN 在提交后中断；程序只会自动回读，不会自动重发。'
         : /locator\./.test(code) ? '平台页面控件未就绪，请查看详情中的具体步骤。' : '';
       const hasProblem=['FAILED_PREFLIGHT','FAILED','BLOCKED_CAPABILITY','RECONCILE_PENDING','UNKNOWN','JOB_WAITING_HUMAN','SESSION_EXPIRED'].includes(String(job.state));
-      return {...job, history_hidden:Boolean(job.history_hidden), failure_reason: hasProblem ? (explanations[code] || friendly || code || job.attention_code || '') : '', failure_code:code,
+      // Old markers remain recoverable in storage, but cannot conceal a job that
+      // no longer qualifies for hiding (including markers written by older releases).
+      const historyHidden = Boolean(job.history_hidden) && canHideHistory(
+        {control_state:String(batch.control_state)},
+        {state:String(job.state),submit_safety_domain:String(job.submit_safety_domain)});
+      return {...job, history_hidden:historyHidden, failure_reason: hasProblem ? (explanations[code] || friendly || code || job.attention_code || '') : '', failure_code:code,
         can_retry:['FAILED_PREFLIGHT','FAILED','BLOCKED_CAPABILITY'].includes(String(job.state)) && job.submit_safety_domain !== 'MAY_HAVE_SUBMITTED' && !['VISUAL_LAYOUT_FAIL','DUPLICATE_OR_UNRESOLVED_JOB'].includes(code),
         can_resume_stopped:job.submit_safety_domain==='BEFORE_EXTERNAL_SUBMIT'&&['FAILED_PREFLIGHT','FAILED','BLOCKED_CAPABILITY','PLATFORM_PREFLIGHT','READY_FOR_USER_APPROVAL'].includes(String(job.state))&&!['VISUAL_LAYOUT_FAIL','DUPLICATE_OR_UNRESOLVED_JOB'].includes(code),
         history: history.map(row=>({state:row.to_state,time:row.created_at,evidence:row.evidence_json}))};
