@@ -5,7 +5,7 @@ import {validateMetricObservation,inspectMetricEvidence,aggregateMetricEvidence}
 const now=Date.parse('2026-10-20T12:00:00.000Z');
 function fixture(object='post-fixture-1',value=100,observed='2026-10-20T11:00:00.000Z'){
  const evidenceBytes=Buffer.from(JSON.stringify({synthetic:true,object,value,observed})),reference='fixture://'+object+'/'+observed;
- const binding={workspace:'workspace-fixture',account_id:'account-fixture',platform:'facebook',object_id:object,source_reference:reference,source_transport:'BROWSER_READBACK',operator_actor_id:'actor-fixture',business_asset_id:'asset-fixture',source_account_id:'profile-fixture',source_object_id:object};
+ const binding={workspace:'workspace-fixture',account_id:'account-fixture',platform:'facebook',object_id:object,content_revision:'r1',publication_job_id:'job-'+object,source_reference:reference,source_transport:'BROWSER_READBACK',operator_actor_id:'actor-fixture',business_asset_id:'asset-fixture',source_account_id:'profile-fixture',source_object_id:object};
  const observation={schema_version:1,workspace:binding.workspace,account_id:binding.account_id,platform:binding.platform,object_id:object,content_revision:'r1',publication_job_id:'job-'+object,observed_at:observed,
   source:{transport:binding.source_transport,reference,sha256:createHash('sha256').update(evidenceBytes).digest('hex')},
   window:{kind:'BOUNDED',start:'2026-10-19T00:00:00.000Z',end:'2026-10-20T00:00:00.000Z',timezone:'UTC'},
@@ -54,7 +54,7 @@ test('only comparable complete occurrence counts aggregate; audience, definition
  const first=fixture(),second=fixture('post-fixture-2',20);assert.equal(aggregateMetricEvidence([first,second],{now}).value,120);
  for(const change of [x=>x.observation.metric.name='impressions',x=>x.observation.metric.definition_version='v2',x=>x.observation.metric.definition_text='Different meaning',x=>x.observation.window.start='2026-10-18T00:00:00.000Z',x=>x.observation.coverage.completeness='PARTIAL']){const x=fixture('post-fixture-2',20);change(x);assert.equal(aggregateMetricEvidence([first,x],{now}).value,null);}
  for(const name of ['viewers','reach']){const x=fixture();x.observation.metric.name=name;assert.ok(aggregateMetricEvidence([x],{now}).reasons.includes('NON_ADDITIVE_AUDIENCE'));}
- const revised=fixture();revised.observation.content_revision='r2';assert.ok(aggregateMetricEvidence([first,revised],{now}).reasons.includes('OVERLAPPING_OBJECT_REVISIONS'));
+ const revised=fixture();revised.observation.content_revision='r2';revised.binding.content_revision='r2';assert.ok(aggregateMetricEvidence([first,revised],{now}).reasons.includes('OVERLAPPING_OBJECT_REVISIONS'));
 });
 
 test('available zero is distinct from missing; invalid counts and aggregate overflow reject',()=>{
@@ -67,4 +67,23 @@ test('cross-account/platform observations and unavailable newer snapshots cannot
  for(const field of ['workspace','account_id','platform']){const second=fixture('other-post',20);second.binding[field]='other';second.observation[field]='other';assert.equal(aggregateMetricEvidence([first,second],{now}).value,null);}
  const later=fixture('post-fixture-1',0,'2026-10-20T11:30:00.000Z');later.observation.metric.availability='UNAVAILABLE';later.observation.metric.value=null;
  const r=aggregateMetricEvidence([first,later],{now});assert.equal(r.value,null);assert.equal(r.report.snapshots[0].metric.availability,'UNAVAILABLE');assert.equal(r.report.observations.length,2);
+});
+
+
+test('same local account cannot aggregate distinct real target identities; snapshots remain separate',()=>{
+ const first=fixture('post-1',7),second=fixture('post-2',5);
+ for(const key of ['source_account_id','business_asset_id']){
+  const other=fixture('post-2',5);other.binding[key]='other-'+key;other.observation.identity_evidence[key]=other.binding[key];
+  const r=aggregateMetricEvidence([first,other],{now});assert.equal(r.value,null);assert.equal(r.report.observations.length,2);assert.equal(r.report.snapshots.length,2);
+ }
+ second.binding.operator_actor_id='other-operator';second.observation.identity_evidence.operator_actor_id='other-operator';
+ assert.equal(aggregateMetricEvidence([first,second],{now}).value,12,'operator may differ while the exact target remains the same');
+ const sameObject=fixture('post-1',5);sameObject.binding.source_account_id='other-source';sameObject.observation.identity_evidence.source_account_id='other-source';
+ assert.equal(inspectMetricEvidence([first,sameObject],{now}).snapshots.length,2);
+});
+test('publication job and content revision require exact independently supplied expected mapping',()=>{
+ for(const key of ['content_revision','publication_job_id']){
+  const x=fixture();x.observation[key]='invented';assert.throws(()=>validate(x),/OBSERVATION_SCOPE_MISMATCH/);
+  const y=fixture();delete y.binding[key];assert.throws(()=>validate(y),/INVALID_EXPECTED_BINDING/);
+ }
 });

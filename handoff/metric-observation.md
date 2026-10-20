@@ -24,7 +24,7 @@ aggregateMetricEvidence([{observation, binding, evidenceBytes}], {now, asOf});
 
 `evidenceBytes` is a nonempty Buffer, at most 5 MiB, whose SHA256 must match source.
 Every import revalidates its entries. The caller supplies the exact expected
-workspace/account/platform/object, source reference/transport and separate
+workspace/account/platform/object, content_revision/publication_job_id, source reference/transport and separate
 operator actor, business asset, source account and source object identifiers.
 Reported profile and business-asset IDs are never substituted or required equal.
 If a required identity or publication mapping is unknown, this first version
@@ -79,7 +79,7 @@ status requires **null**. A UI unavailable field must never become a numeric zer
 - Distinct later observations remain in history. As-of chooses the latest record
   at/before the requested timestamp per series, even when its value is lower or
   newly unavailable. It does not take max, sum snapshots or fall back to old values.
-- Aggregation requires same workspace/account/platform, **exact name and definition**,
+- Aggregation requires same workspace/account/platform and real source-account/business-asset target, **exact name and definition**,
   unit and exact window including timezone. Unknown window/timezone, incomplete
   coverage or any unavailable value gives NOT_AGGREGATED and null.
 - Viewers/reach are conservatively non-additive across objects; no audience total
@@ -111,3 +111,24 @@ certification, publishing or deployment was run. The separate content-contract
 review remains independent. Next integration requires an authorized collector
 and exact trusted binding, then an existing durable ledger transaction design;
 this slice does not create either automatically.
+
+
+## Independent-review identity corrections
+
+Two synthetic counterexamples exposed gaps in the initial pure contract: local
+account equality alone could sum two distinct platform targets, and job/revision
+strings were not compared to an expected mapping. Both are now fail-closed.
+
+`binding` must include exact `content_revision` and `publication_job_id`; an absent
+mapping or differing value rejects rather than claiming attributed metrics. The
+caller still must establish that mapping independently; this validator does not
+query or authenticate a ledger. Both snapshot series and aggregate compatibility
+include `source_account_id` and `business_asset_id`. Operator actor remains a
+separate audit identity, may differ between observations and is not equated to
+the target asset. Original distinct observations remain retained.
+
+After correction: **22/22 related tests pass**, including 12 metric tests. New
+counterexamples cover same-local-account/different-platform-target sums, separate
+same-object target snapshots, valid same-target/different-operator counts and
+arbitrary/missing publication mapping rejection. Production analytics is still
+not integrated or certified.

@@ -15,8 +15,8 @@ export function validateMetricObservation(record,{binding,evidenceBytes,now=Date
  exact(record,recordKeys,'INVALID_OBSERVATION_SHAPE');
  if(record.schema_version!==1||!Number.isFinite(now)||!timestamp(record.observed_at)||Date.parse(record.observed_at)>now)fail('INVALID_OBSERVATION_TIME_OR_VERSION');
  for(const k of ['workspace','account_id','platform','object_id','content_revision','publication_job_id'])if(!text(record[k]))fail('INVALID_OBSERVATION_BINDING');
- exact(binding,['workspace','account_id','platform','object_id','source_reference','source_transport',...identityKeys],'INVALID_EXPECTED_BINDING');
- for(const k of ['workspace','account_id','platform','object_id'])if(binding[k]!==record[k])fail('OBSERVATION_SCOPE_MISMATCH');
+ exact(binding,['workspace','account_id','platform','object_id','content_revision','publication_job_id','source_reference','source_transport',...identityKeys],'INVALID_EXPECTED_BINDING');
+ for(const k of ['workspace','account_id','platform','object_id','content_revision','publication_job_id'])if(binding[k]!==record[k])fail('OBSERVATION_SCOPE_MISMATCH');
  exact(record.identity_evidence,[...identityKeys,'verified_at','method','reference'],'INVALID_IDENTITY_EVIDENCE');
  for(const k of identityKeys)if(!text(binding[k])||record.identity_evidence[k]!==binding[k])fail('IDENTITY_MISMATCH');
  if(binding.source_object_id!==record.object_id||!timestamp(record.identity_evidence.verified_at)||Date.parse(record.identity_evidence.verified_at)>Date.parse(record.observed_at)||!['AUTHENTICATED_UI','AUTHENTICATED_API','MANUAL_REVIEW'].includes(record.identity_evidence.method)||!text(record.identity_evidence.reference))fail('INVALID_IDENTITY_EVIDENCE');
@@ -47,7 +47,8 @@ export function validateMetricObservation(record,{binding,evidenceBytes,now=Date
  return {...observation,observation_id:digest(observation)};
 }
 const definition=o=>[o.metric.name,o.metric.definition_id,o.metric.definition_version,o.metric.definition_text,o.metric.unit];
-const series=o=>JSON.stringify([o.workspace,o.account_id,o.platform,o.object_id,o.content_revision,o.publication_job_id,definition(o),o.window]);
+const target=o=>[o.identity_evidence.source_account_id,o.identity_evidence.business_asset_id];
+const series=o=>JSON.stringify([o.workspace,o.account_id,o.platform,target(o),o.object_id,o.content_revision,o.publication_job_id,definition(o),o.window]);
 
 /** Revalidates supplied entries; preserves every distinct observation and selects latest as-of. */
 export function inspectMetricEvidence(entries,{now=Date.now(),asOf=new Date(now).toISOString()}={}){
@@ -70,8 +71,8 @@ export function inspectMetricEvidence(entries,{now=Date.now(),asOf=new Date(now)
 export function aggregateMetricEvidence(entries,options={}){
  const report=inspectMetricEvidence(entries,options),rows=report.snapshots,reasons=[];
  if(!rows.length)return {status:'NOT_AGGREGATED',value:null,reasons:['NO_OBSERVATIONS_AS_OF'],report};
- const first=rows[0],group=o=>JSON.stringify([o.workspace,o.account_id,o.platform,definition(o),o.window]);
- if(rows.some(o=>group(o)!==group(first)))reasons.push('INCOMPATIBLE_DEFINITION_OR_WINDOW_OR_SCOPE');
+ const first=rows[0],group=o=>JSON.stringify([o.workspace,o.account_id,o.platform,target(o),definition(o),o.window]);
+ if(rows.some(o=>group(o)!==group(first)))reasons.push('INCOMPATIBLE_DEFINITION_OR_WINDOW_OR_SCOPE_OR_TARGET');
  if(rows.some(o=>o.window.kind==='UNKNOWN'||o.window.timezone===null))reasons.push('WINDOW_OR_TIMEZONE_UNKNOWN');
  if(rows.some(o=>o.metric.availability!=='AVAILABLE'))reasons.push('UNAVAILABLE_VALUES');
  if(rows.some(o=>o.coverage.completeness!=='COMPLETE'))reasons.push('INCOMPLETE_COVERAGE');
