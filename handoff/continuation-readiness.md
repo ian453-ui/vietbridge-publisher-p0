@@ -176,3 +176,42 @@ human-readable evidence explanations, help outside a repository, missing files,
 malformed JSON, text-mode invocation and secret non-echo. Synthetic inputs only;
 no live accounts, media, databases or deployment. Prior image acceptance and
 unrelated full-suite results were not rerun or relabeled as this extension's tests.
+
+## Final aggregate verification — 2026-10-20
+
+Exact tested source: `5d776401979d6b088a4c1db4c05b46ca12a5b82b` on
+`publisher-unified`, matching the remote with a clean worktree at test start.
+Only the active worker appeared in this task's agent inventory; this is not a
+claim about every external machine. Final push uses normal non-force semantics.
+
+- **Full suite: 865/865 passed**, 0 failed/cancelled/skipped/todo, 63.469 seconds.
+  This includes all 10 continuation tests plus the existing 855-test suite;
+  the older 855 result is not reused as validation for these additions.
+- **Syntax: 277/277 passed** for all tracked JS/MJS/TS excluding `.d.ts`.
+- Compose YAML and five disabled execution flags, loopback host mapping, original
+  Mac npm start and the new continuation npm entry contracts passed.
+- `git diff --check` passed. No product fix was required; the follow-up verification
+  commit updates documentation only.
+
+Reproduce using Node24, installed lockfile dependencies and the existing commands:
+
+```sh
+PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium \
+PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg npm test -- --test-concurrency=4
+```
+
+The all-file syntax and Compose contract commands remain in
+[the release-wide quality checklist](unified-cloud-deployment.md#release-wide-quality-checkpoint--2026-10-20).
+The continuation npm contract is `check:continuation = node scripts/check-continuation.mjs`;
+the Mac startup contract remains `start = node src/unified-server.js`.
+
+Local evidence (not committed raw logs):
+- `/tmp/publisher-continuation-full-final.log`, SHA256 `0ffeb2e91faa96f21190b701b9e01e33cfa7376d26d2f6d6e630c273ec29d9d4`.
+- `/tmp/publisher-continuation-static-final.log`, SHA256 `1992b0bca47f0043c9e1bd90975be3d3ebead44b0275750898ec0c8694e4bced`.
+
+Not run: independent type checker/linter (none configured), already-accepted
+container build/runtime (unrelated to continuation additions), real Mac integration,
+old independent V1 release, real platform calls, production data and deployment.
+No credentials, customer records or raw runtime logs were added to Git. These
+checks use synthetic evidence and do not certify input authenticity or grant
+execution authority. The lack of a permanent hosting URL remains unchanged.

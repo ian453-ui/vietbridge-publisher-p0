@@ -207,3 +207,12 @@ Before a later Mac handoff, use the [read-only continuation checklist](continuat
 via `npm run check:continuation -- --text /absolute/path/to/evidence.json`.
 It separates cloud-independent work from Mac dependencies without granting any
 execution or synchronization authority.
+
+### Continuation additions: final aggregate checkpoint
+
+The subsequent continuation changes through `5d776401979d6b088a4c1db4c05b46ca12a5b82b`
+were independently revalidated: **865/865 full tests**, **277/277 syntax checks**,
+Compose safe defaults and npm entry contracts passed on 2026-10-20. The previous
+855-test checkpoint above applies only to its stated baseline. See
+[final continuation evidence and exclusions](continuation-readiness.md#final-aggregate-verification--2026-10-20).
+No product fixes were needed; the image was not rebuilt for these unrelated additions.
