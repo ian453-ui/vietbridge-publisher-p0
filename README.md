@@ -64,3 +64,11 @@ The API option applies to the existing Facebook Page API operations. Joined-grou
 Proactive scans support stable `posts` and `permalink` links and numeric, ISO, Chinese, Vietnamese and English relative publication times. Unknown dates are counted and remain excluded from writes; unreadable/empty feeds report a blocker rather than a successful empty scan. Fact-sensitive posts expose a human source-verification form. Action records show pending reconciliation separately from independently confirmed actions; unknown actions cannot be retried through the ordinary execution path.
 
 Validation in the isolated Cloud Codex workspace: 59 dependency-compatible regression tests passed. Full server/DOM-composer tests could not run because locked npm dependencies were unavailable and network installation was blocked. Real Mac Chrome / Facebook scanning and interaction readback remain pending. No live interaction or publication was performed by Cloud Codex.
+
+### Standalone unified cloud control plane
+
+`npm run start:cloud -- /absolute/authorized-data/publisher-unified.sqlite` uses
+cloud mode without a connected Mac. It retains authentication and disables all
+execution, sync and scheduler capabilities. The existing Mac `npm start` is unchanged.
+See [cloud startup, container packaging and Mac handoff](handoff/unified-cloud-deployment.md)
+for required existing access configuration, targeted tests and hosting limitations.

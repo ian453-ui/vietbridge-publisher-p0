@@ -1,0 +1,22 @@
+# Requires an already authorized host, authenticated HTTPS proxy and existing access configuration.
+services:
+  publisher:
+    build:
+      context: .
+      dockerfile: Dockerfile.unified-cloud
+    restart: unless-stopped
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set the approved HTTPS origin}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Supply existing authorized access configuration}
+      PUBLISHER_ENABLE_EXECUTION: '0'
+      PUBLISHER_ENABLE_PAGE_EXECUTION: '0'
+      PUBLISHER_ENABLE_GROUP_INTERACTION: '0'
+      PUBLISHER_ENABLE_SCAN_SCHEDULER: '0'
+      PUBLISHER_ENABLE_CONTENT_SYNC: '0'
+    ports:
+      - '127.0.0.1:18082:8080'
+    volumes:
+      - publisher-unified-data:/data
+volumes:
+  publisher-unified-data:
