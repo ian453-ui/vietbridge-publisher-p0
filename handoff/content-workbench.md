@@ -169,3 +169,10 @@ navigation to that preview's `file://` URL with `ERR_BLOCKED_BY_ADMINISTRATOR`.
 The browser was closed; no policy was changed and no alternate serving path was
 used. HTML generation, escaping, CSP and image embedding have automated test
 coverage, but rendered browser/visual acceptance is not claimed.
+
+## Multi-item non-publishing production
+
+The [schema-v2 production mode](production-artifacts.md) adds knowledge articles,
+scripts, subtitles, videos, covers and separately referenced platform payloads.
+It stays outside v1 inbox/import/approval and does not reduce enterprise guards.
+The single-image path documented above remains unchanged.

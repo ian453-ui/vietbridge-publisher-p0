@@ -108,3 +108,8 @@ Run `npm run content:workbench -- --help` to export a request from a plain brief
 package supplied output and generate a read-only QA preview using the existing
 inbox. Start with the [one-command synthetic demo](handoff/content-workbench.md).
 No model call, dispatch, approval or publication is performed.
+
+For multi-item knowledge articles, scripts, subtitles, videos, covers and separate
+platform copy, use the [non-publishing production mode](handoff/production-artifacts.md):
+`npm run content:workbench -- production-demo --out /tmp/new-production-demo`.
+Video playback and real task/account mapping remain separately unverified.

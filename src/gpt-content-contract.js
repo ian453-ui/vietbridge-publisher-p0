@@ -14,11 +14,15 @@ const hash=value=>typeof value==='string'&&value.length===64&&/^[a-f0-9]{64}$/.t
 const time=value=>typeof value==='string'&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString()===value;
 const requestKeys=['schema_version','task_id','request_revision','current_owner','producer','workspace','account_id','source_id','content_revision','visual_revision','previous_revision','created_at','deadline_at','bridge_ref','input'];
 const bridgeOwners=new Set(['GPT','MAC_CODEX','MAC_CLAUDE','MAC_WORKBUDDY','WINDOWS_CODEX','WINDOWS_CLAUDE','WINDOWS_WORKBUDDY','dot']);
+export function validateGptTaskIdentity(value){
+ if(!id(value.task_id)||!id(value.current_owner)||value.producer!=='GPT')fail('INVALID_REQUEST_BINDING');
+ exact(value.bridge_ref,['marker','protocol_version','transport','slack_channel_id','thread_ts'],'INVALID_BRIDGE_REFERENCE');
+ if(!bridgeOwners.has(value.current_owner)||value.bridge_ref.marker!=='bridge-task:v1'||value.bridge_ref.protocol_version!=='2.0'||value.bridge_ref.transport!=='SLACK_FIRST'||value.bridge_ref.slack_channel_id!=='C0C6PRGNGLQ'||!/^\d{10,}\.\d{6}$/.test(value.bridge_ref.thread_ts))fail('INVALID_BRIDGE_REFERENCE');
+}
 function requestPayload(value){
  exact(value,requestKeys,'INVALID_REQUEST_SHAPE');
  if(value.schema_version!==1||!['task_id','current_owner','workspace','account_id'].every(k=>id(value[k]))||value.producer!=='GPT')fail('INVALID_REQUEST_BINDING');
- exact(value.bridge_ref,['marker','protocol_version','transport','slack_channel_id','thread_ts'],'INVALID_BRIDGE_REFERENCE');
- if(!bridgeOwners.has(value.current_owner)||value.bridge_ref.marker!=='bridge-task:v1'||value.bridge_ref.protocol_version!=='2.0'||value.bridge_ref.transport!=='SLACK_FIRST'||value.bridge_ref.slack_channel_id!=='C0C6PRGNGLQ'||!/^\d{10,}\.\d{6}$/.test(value.bridge_ref.thread_ts))fail('INVALID_BRIDGE_REFERENCE');
+ validateGptTaskIdentity(value);
  if(!text(value.source_id,81)||!/^[A-Z][A-Z0-9-]{3,80}$/.test(value.source_id)||!['request_revision','content_revision','visual_revision'].every(k=>positive(value[k]))||value.previous_revision!==null&&!hash(value.previous_revision))fail('INVALID_REQUEST_VERSION');
  if(!time(value.created_at)||!time(value.deadline_at)||value.deadline_at<=value.created_at)fail('INVALID_REQUEST_DEADLINE');
  exact(value.input,['kind','platform','brief','language','source_refs'],'INVALID_INPUT_SHAPE');

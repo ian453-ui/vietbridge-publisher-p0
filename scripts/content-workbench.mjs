@@ -4,6 +4,8 @@ import {makeBriefRequest,readLocalJson,readLocalText,reviewLocalContent,renderLo
 import {inspectGptContentResult} from '../src/gpt-content-contract.js';
 import {readGptDriveInbox} from '../src/gpt-drive-inbox.js';
 import {validateImage} from '../src/image-validation.js';
+import {createProductionRequest,packageProductionResult,inspectProductionResult} from '../src/production-artifact-contract.js';
+import {productionDemo} from './production-artifact-demo.mjs';
 const help=`本地内容制作工作台（不派送、不调用模型、不批准、不发布）
 request --task ID --owner ORIGINAL_OWNER --workspace ID --account ID --source CONTENT-ID --thread TS --language zh-CN --brief-file brief.txt --out request.json
   可选 --ttl-minutes 60 --source-file reference.txt --source-revision r1
@@ -14,6 +16,12 @@ review --request request.json [--result result.json --root LOCAL_CLIENT_ROOT --o
   root 使用原 publisher-manifest.json / GPT-INBOX 结构；只读。未传 result 会显示缺少结果。
 demo --out NEW_DIRECTORY
   一键合成请求→结果→原 inbox 更新差异→REVIEW_REQUIRED；另附过期与旧 revision 失败案例。
+production-request --plan plan.json [--prior previous-request.json] --out request.json
+production-package --request request.json --selections selections.json --root ARTIFACT_ROOT --out result.json
+production-review --request request.json --result result.json --root ARTIFACT_ROOT [--receipt receipt.json]
+production-demo --out NEW_DIRECTORY
+  非发布多产物：两篇独立知识稿/配图/平台文案＋脚本/字幕/视频；输出可复用 plan 与 selections 示例。
+  视频仅文件/哈希校验，不证明可播放；此模式不导入原 inbox。详见 handoff/production-artifacts.md。
 所有输出路径必须不存在，避免覆盖。文档：handoff/content-workbench.md`;
 function options(args,allowed){const out={};for(let i=0;i<args.length;i+=2){const key=args[i]?.slice(2);if(!args[i]?.startsWith('--')||!allowed.includes(key)||Object.hasOwn(out,key)||args[i+1]===undefined||args[i+1].startsWith('--'))throw Error('INVALID_ARGUMENTS');out[key]=args[i+1];}return out;}
 const save=(path,data)=>writeFileSync(path,data,{flag:'wx'});
@@ -57,6 +65,13 @@ try{
   const o=options(args,['request','result','root','out']);output=reviewLocalContent(readLocalJson(o.request),o.result?readLocalJson(o.result):null,o.root);
   if(o.out)save(o.out,renderLocalQa(output));
  }else if(command==='demo'){const o=options(args,['out']);output=demo(o.out);}
+ else if(command==='production-request'){
+  const o=options(args,['plan','prior','out']);const request=createProductionRequest(readLocalJson(o.plan),{priorRequest:o.prior?readLocalJson(o.prior):null});save(o.out,json(request));output={status:'REQUEST_EXPORTED',sent:false,publish_allowed:false,import_allowed:false};
+ }else if(command==='production-package'){
+  const o=options(args,['request','selections','root','out']);const result=packageProductionResult(readLocalJson(o.request),readLocalJson(o.selections),{root:o.root});save(o.out,json(result));output={status:'RESULT_PACKAGED',producer_authenticated:false,publish_allowed:false,import_allowed:false};
+ }else if(command==='production-review'){
+  const o=options(args,['request','result','root','receipt']);output=inspectProductionResult(readLocalJson(o.request),readLocalJson(o.result),{root:o.root,priorReceipt:o.receipt?readLocalJson(o.receipt):null});
+ }else if(command==='production-demo'){const o=options(args,['out']);output=productionDemo(o.out);}
  else throw Error('INVALID_ARGUMENTS');
  if(output)console.log(json(output));
 }catch(error){const code=/^[A-Z_]{3,80}$/.test(error.message)?error.message:error.code==='EEXIST'?'OUTPUT_ALREADY_EXISTS':error.code==='ENOENT'?'LOCAL_FILE_MISSING':'INVALID_LOCAL_INPUT';
