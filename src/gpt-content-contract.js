@@ -34,9 +34,9 @@ export function createGptContentRequest(input,{priorRequest=null}={}){
  const payload=requestPayload(input);
  const request={...payload,request_fingerprint:digest(payload),assignment_mode:'STICKY',handoff_policy:'USER_EXPLICIT_ONLY'};
  if(priorRequest!==null){
-  verifiedRequest(priorRequest);
+  const priorPayload=verifiedRequest(priorRequest);
   for(const key of ['task_id','current_owner','producer','workspace','account_id','source_id'])if(request[key]!==priorRequest[key])fail('REQUEST_IDENTITY_CHANGE');
-  if(digest(request.bridge_ref)!==digest(priorRequest.bridge_ref))fail('REQUEST_THREAD_CHANGE');
+  if(digest(request.bridge_ref)!==digest(priorPayload.bridge_ref))fail('REQUEST_THREAD_CHANGE');
   if(request.request_revision<priorRequest.request_revision)fail('STALE_REQUEST');
   if(request.request_revision===priorRequest.request_revision&&request.request_fingerprint!==priorRequest.request_fingerprint)fail('REQUEST_REVISION_CONFLICT');
  }

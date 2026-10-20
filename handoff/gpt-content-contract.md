@@ -163,3 +163,23 @@ approval. No live client files or accounts were read; fixture images only.
 
 This is a code-level local content contract, not a changed agent harness, platform
 certification, autonomous content producer, real dispatch or deployed service.
+
+## Independent review corrections
+
+The first implementation compared the prior bridge reference in its incoming JSON
+property order while the new request used normalized order. Independent review
+identified that equivalent reordered fields incorrectly raised REQUEST_THREAD_CHANGE.
+Prior references now use the same verified normalized payload before comparison.
+Real owner/thread changes still fail closed; no transport or authority is added.
+
+The CLI now rejects duplicate **decoded** JSON object keys at any depth, including
+Unicode-escaped aliases. This matches the bridge validator's ambiguity policy
+instead of native JSON.parse's last-value-wins behavior. Native JSON syntax checking
+remains in use, with a bounded second key scan (maximum depth128). Error output
+contains a symbolic code, never the duplicated key or input contents.
+
+Final targeted run after these corrections: **45/45 passed** using the command
+above (13 new contract/CLI tests plus existing revision/permit tests). New regression
+cases cover reordered same-thread reference, actual thread change, top-level and
+nested duplicates, escaped-key duplicates, valid strings/arrays/primitives, nesting
+limit and CLI non-echo. MetricObservation is unchanged by this correction.

@@ -94,3 +94,27 @@ test('CLI exports and inspects local manifests only, with sanitized failures',()
   writeFileSync(resultFile,'synthetic-sensitive-invalid-json');const invalid=run('inspect',requestFile,resultFile);assert.equal(invalid.status,1);assert.ok(!invalid.stderr.includes('synthetic-sensitive'));assert.match(invalid.stderr,/INVALID_FILE_OR_JSON/);
  }finally{rmSync(root,{recursive:true,force:true});}
 });
+
+test('prior bridge JSON property order is equivalent, actual thread changes still reject',()=>{
+ const x=input(),prior=createGptContentRequest(x);
+ prior.bridge_ref=Object.fromEntries(Object.entries(prior.bridge_ref).reverse());
+ assert.deepEqual(createGptContentRequest(x,{priorRequest:prior}),createGptContentRequest(x));
+ const next=structuredClone(x);next.request_revision++;assert.equal(createGptContentRequest(next,{priorRequest:prior}).request_revision,2);
+ next.bridge_ref.thread_ts='1792490400.000002';assert.throws(()=>createGptContentRequest(next,{priorRequest:prior}),/REQUEST_THREAD_CHANGE/);
+});
+
+import {parseStrictJson} from '../src/strict-json.js';
+test('strict JSON rejects repeated decoded keys at every nesting level, preserves valid JSON',()=>{
+ for(const text of ['{"owner":"GPT","owner":"MAC_CODEX"}','{"input":{"brief":"a","brief":"a"}}','[{"a":1,"\\u0061":2}]'])assert.throws(()=>parseStrictJson(text),/DUPLICATE_JSON_KEY/);
+ for(const text of ['{"a":[1,true,null,{"b":"escaped \\\" key"}],"c":-1.2e3}','[{"same":1},{"same":2}]','"text"','null','42'])assert.deepEqual(parseStrictJson(text),JSON.parse(text));
+ assert.throws(()=>parseStrictJson('{bad'));
+ assert.throws(()=>parseStrictJson('['.repeat(130)+'0'+']'.repeat(130)),/JSON_NESTING_LIMIT/);
+});
+test('CLI rejects duplicate JSON keys instead of selecting the last owner or input',()=>{
+ const root=mkdtempSync(join(tmpdir(),'gpt-duplicate-json-')),file=join(root,'input.json');
+ try{
+  const raw=JSON.stringify(input()).replace('"current_owner":"MAC_CODEX"','"current_owner":"GPT","current_owner":"MAC_CODEX"');writeFileSync(file,raw);
+  const result=spawnSync(process.execPath,[new URL('../scripts/gpt-content-contract.mjs',import.meta.url).pathname,'request',file],{encoding:'utf8'});
+  assert.equal(result.status,1);assert.match(result.stderr,/DUPLICATE_JSON_KEY/);assert.equal(result.stdout,'');assert.ok(!result.stderr.includes('MAC_CODEX'));
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
