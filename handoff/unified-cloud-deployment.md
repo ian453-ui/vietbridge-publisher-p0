@@ -216,3 +216,107 @@ Compose safe defaults and npm entry contracts passed on 2026-10-20. The previous
 855-test checkpoint above applies only to its stated baseline. See
 [final continuation evidence and exclusions](continuation-readiness.md#final-aggregate-verification--2026-10-20).
 No product fixes were needed; the image was not rebuilt for these unrelated additions.
+
+## Mac-offline cloud acceptance — 2026-10-20 follow-up
+
+Baseline `672dd9745e475c9f0b2a28700f53bf2fa1595699` was clean when this environment
+actually reached READY. The checked-out branch remains publisher-unified. No Mac,
+real Facebook browser session, cookie, token, production DB or platform operation
+was accessed. This follow-up addresses deployment packaging and isolated evidence,
+not a claim of three-to-four-day hosting availability.
+
+### Packaging correction
+
+The previous unified Dockerfile omitted `scripts/`, so its advertised npm
+workbench entry could not run in the image. It now copies those scripts and the
+one explicitly synthetic demo image (the rest of test/ stays excluded). The full
+image also declares Python/Pillow for existing image validation and ffmpeg for the
+synthetic video demo. No browser executor is added. The startup and five disabled
+execution/sync/scheduler flags are unchanged.
+
+The **full image build was attempted and failed**: the Docker build could not
+resolve deb.debian.org; apt repositories were unavailable and installation exited
+100. No DNS, proxy, credentials or permission settings were changed to bypass it.
+The full workbench image is therefore not accepted or deployed yet. The normal
+authorized build host needs access to its existing Debian/npm dependency sources
+(or a separately verified preprovisioned image/cache); do not label a partial
+image as complete.
+
+An isolated **control-plane-only** acceptance image was successfully built with
+network disabled from the already cached validation image and current source:
+`sha256:3284e41acf157c1fcd583e9ef2ea546314cdfa41fde5a02d003c14a90196aaad`.
+That cache path does not install the new Python/Pillow/ffmpeg dependencies and
+must not be represented as a successful full workbench Docker build. Native cloud
+Node/Python/Pillow/ffmpeg were already available and ran both workbench demos.
+
+### What was actually run
+
+```sh
+node --test test/unified-cloud-entry.test.js test/cloud.test.js test/gpt-revision-approval.test.js test/unified-executor.test.js test/production-artifact-contract.test.js test/content-workbench.test.js
+```
+
+**61/61 passed**, including a new real-process cloud-entry persistence test:
+
+1. Generate a synthetic request/result and QA preview through the actual CLI.
+2. Read the existing v1 inbox, approve only the isolated synthetic item, and verify
+   repeated acceptance is already_applied without duplicate manifest changes.
+3. Import that source through the existing UnifiedPublisher core; repeated source
+   revision maps to one content record. Create one synthetic frozen DRAFT, no permit.
+4. Start the actual cloud CLI twice against the same nonempty database; authenticate
+   HTTP readback and verify the exact draft ID/body/snapshot remains stable.
+5. Reopen storage, verify one source ledger row and one draft, zero attempts, and
+   unchanged approved manifest. Local library HTTP remains blocked with 409;
+   execution-capability remains false. No gate was opened for the test.
+
+Existing executor regression uses **mocked drivers** to verify result recovery,
+UNKNOWN handling and submit/receipt idempotence. This is separate from actual
+platform operation. Production-v2 receipts remain unsigned caller-held correlation
+records, not a durable ingestion ledger. The new v2 mode still never imports.
+
+A separate real Docker exercise used a new synthetic named volume and two
+successive containers. After stopping/removing the first container, the second
+read the same single DRAFT and snapshot from that volume. Both returned 401
+without auth, 409 for local library, and false execution capability. All temporary
+containers and the test volume were removed. This proves **container recreation**
+persistence only, not host/environment restart, backup recovery or an uptime SLA.
+
+Native synthetic artifacts were retained outside Git at:
+`/workspace/shared/publisher-cloud-acceptance-20261020/content-demo/` and
+`/workspace/shared/publisher-cloud-acceptance-20261020/production-demo/`.
+The former contains preview.html; the latter contains report.json and synthetic
+knowledge/script/subtitle/video files. They are not real task evidence. Workspace
+snapshot retention is not a continuously running server or a three-day guarantee.
+No screenshot retry was attempted after the prior administrator-policy rejection.
+
+### Current hosting evidence and minimum missing target
+
+- No running Docker service or volume existed at inspection time. No recognized
+  Publisher deployment configuration names were set (values/secrets not read).
+- No Publisher hosting manifest or persistent target descriptor was found in the
+  checked workspace. Sites lookup returned only an unrelated OpenSky site. Sites
+  is Worker-based; it is not a drop-in host for this Node/SQLite/Python process.
+  No new site, repository, credentials or access grant was created.
+- Personal-context lookup was unavailable. This is not proof no external host
+  exists; the specific already-authorized host is not identified in this task.
+- An unauthenticated read of `https://publisher.vietbridge.one/api/health` was
+  **denied by the outbound proxy: CONNECT 403**, before any application response.
+  No alternate route or authentication attempt followed. The hostname is an
+  existing Mac-tunnel reference, not a verified independent cloud URL.
+
+To complete real hosting, the original cloud operator must identify the existing
+Node24/container service or VM, its durable storage binding, and the already
+configured HTTPS/authentication deployment control. Do not ask the user to copy
+Mac cookies or invent new credentials. Reuse that authorized target and existing
+access configuration; do not replace the independently running Facebook service.
+The dependency build path must also work. If those already exist elsewhere, a
+read-only target identification/readback is the next step, not new provisioning.
+
+**Current permanent Publisher URL: none verified.** The localhost endpoints used
+in acceptance have been stopped. Public HTTPS deployment, host restart persistence,
+production data import and live platform execution remain unperformed.
+
+Evidence retained locally (no raw logs, credentials or customer data committed):
+- `/tmp/publisher-cloud-offline-acceptance.log`: 61/61 native/module regression.
+- `/tmp/publisher-cloud-current-build.log`: full image build failure.
+- `/tmp/publisher-cached-control-build.log`: cached control-plane image build.
+- `/tmp/publisher-volume-acceptance.json`: two-container volume readback results.

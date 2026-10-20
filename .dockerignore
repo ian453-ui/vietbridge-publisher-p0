@@ -4,3 +4,7 @@ node_modules
 *.sqlite*
 *.env
 test
+!test/
+test/**
+!test/fixtures/
+!test/fixtures/gpt-primary.png

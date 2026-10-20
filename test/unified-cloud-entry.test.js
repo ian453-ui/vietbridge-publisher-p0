@@ -43,3 +43,41 @@ test('cloud entry rejects execution capability flags and incompatible database',
   const run=launch(root);const result=await run.exited;assert.notEqual(result.code,0);assert.match(result.output,/不能复用旧运行数据库/);
  }finally{rmSync(root,{recursive:true,force:true});}
 });
+
+import {readFileSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
+import {Store} from '../src/store.js';
+import {UnifiedPublisher} from '../src/unified-publisher.js';
+import {readGptDriveInbox,approveGptDriveItem} from '../src/gpt-drive-inbox.js';
+import {reviewLocalContent} from '../src/content-workbench.js';
+test('isolated cloud restart preserves reviewed source import, frozen draft and idempotent source ledger',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'cloud-persistence-')),demo=join(root,'demo'),dbPath=join(root,'publisher-unified.sqlite');let running,store;
+ try{
+  const made=spawnSync(process.execPath,[new URL('../scripts/content-workbench.mjs',import.meta.url).pathname,'demo','--out',demo],{encoding:'utf8'});assert.equal(made.status,0,made.stderr);
+  const client=join(demo,'synthetic-client'),manifestPath=join(client,'publisher-manifest.json'),manifest=JSON.parse(readFileSync(manifestPath));
+  const request=JSON.parse(readFileSync(join(demo,'request.json'))),result=JSON.parse(readFileSync(join(demo,'result.json')));
+  assert.equal(reviewLocalContent(request,result,client).status,'REVIEW_REQUIRED');
+  const candidate=readGptDriveInbox(client,manifest)[0];approveGptDriveItem(client,candidate);
+  assert.equal(approveGptDriveItem(client,candidate).already_applied,true);
+  const approvedBytes=readFileSync(manifestPath);
+  store=new Store(dbPath,{seedDemo:false});let publisher=new UnifiedPublisher(store);
+  const ws=store.saveWorkspace({name:'Synthetic cloud persistence'}),profile=store.saveProfile(ws.id,{name:'Unused fixture profile',cdp_port:19331,user_data_dir:join(root,'unused-profile')});
+  const account=publisher.saveAccount(ws.id,{display_name:'Synthetic Page',identity_type:'PAGE',external_id:'10001',operator_actor_id:'10001',target_page_id:'20001',profile_id:profile.id});
+  const input={source_id:candidate.articleId,revision:candidate.revision,title:candidate.title,body:candidate.body,media:[candidate.assets[0].path]};
+  const content=publisher.importContent(ws.id,input);assert.equal(publisher.importContent(ws.id,input).id,content.id);
+  const job=publisher.createPageJob(ws.id,{account_id:account.id,content_id:content.id});assert.equal(job.state,'DRAFT');store.close();store=null;
+  for(let attempt=0;attempt<2;attempt++){
+   running=launch(root);const info=await running.ready;
+   assert.equal((await call(info.port,'/api/state',false)).status,401);
+   const jobs=JSON.parse((await call(info.port,`/api/unified/workspaces/${ws.id}/jobs?accountId=${account.id}`)).body).jobs;
+   assert.equal(jobs.length,1);assert.equal(jobs[0].id,job.id);assert.equal(jobs[0].state,'DRAFT');assert.equal(jobs[0].snapshot_hash,job.snapshot_hash);assert.equal(jobs[0].snapshot.body,input.body);
+   assert.equal((await call(info.port,'/api/group-library')).status,409);
+   const capability=JSON.parse((await call(info.port,`/api/unified/workspaces/${ws.id}/jobs/${job.id}/execution-capability`)).body);assert.equal(capability.canExecute,false);
+   running.child.kill('SIGTERM');assert.equal((await running.exited).code,0);running=null;
+  }
+  store=new Store(dbPath,{seedDemo:false});publisher=new UnifiedPublisher(store);assert.equal(publisher.importContent(ws.id,input).id,content.id);
+  assert.equal(store.db.prepare('SELECT COUNT(*) n FROM publisher_content_sources').get().n,1);assert.equal(store.db.prepare('SELECT COUNT(*) n FROM publisher_jobs').get().n,1);
+  assert.equal(store.db.prepare('SELECT COUNT(*) n FROM attempts').get().n,0);
+  assert.deepEqual(readFileSync(manifestPath),approvedBytes);assert.equal(approveGptDriveItem(client,candidate).already_applied,true);
+ }finally{running?.child.kill();store?.close();rmSync(root,{recursive:true,force:true});}
+});
