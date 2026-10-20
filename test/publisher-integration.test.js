@@ -292,3 +292,26 @@ test('history clear and restore use real scoped routes without hiding uncertain 
   assert.deepEqual(f.db.prepare('SELECT * FROM state_transitions').all(),before.transitions);
  }finally{server?.emit('close');await new Promise(r=>setImmediate(r));f.db.close();rmSync(f.root,{recursive:true,force:true});}
 });
+
+test('terminated batches cannot hide uncertain submissions or active jobs through clear history',async()=>{
+ const f=await historyFixture();let server;
+ try{
+  f.batch('terminated',0);f.batch('foreign',1);
+  f.db.prepare("UPDATE publication_batches SET control_state='TERMINATED'").run();
+  const protectedStates=['UNKNOWN','RECONCILE_PENDING','SUBMITTED_PENDING_CONFIRMATION','PUBLISHED_ID_PENDING','JOB_WAITING_HUMAN','FORM_FILLING','READY_FOR_USER_APPROVAL'];
+  for(const state of protectedStates)f.job(state,'terminated',state);
+  f.job('ambiguous-failure','terminated','FAILED');
+  f.db.prepare("UPDATE jobs SET submit_safety_domain='MAY_HAVE_SUBMITTED' WHERE job_id='ambiguous-failure'").run();
+  f.job('safe-failure','terminated','FAILED');f.job('safe-published','terminated','PUBLISHED');f.job('foreign-failure','foreign','FAILED');
+  const before=f.db.prepare('SELECT * FROM jobs ORDER BY job_id').all();
+  server=createApp(f.operatorDb,{cloud:f.cloud,publisher:f.publisher});
+  const state=(await request(server,'/api/state?workspace=ws-vietbridge',{headers:f.auth})).json(),headers={...f.auth,origin:f.cloud.origin,'content-type':'application/json','x-local-token':state.token};
+  const result=await request(server,'/publisher/api/history/clear'+query,{method:'POST',headers,body:{}});
+  assert.equal(result.status,200,result.text);
+  assert.deepEqual(f.db.prepare('SELECT job_id FROM hidden_history ORDER BY job_id').all().map(j=>j.job_id),['safe-failure','safe-published']);
+  assert.equal(result.json().hidden,2);
+  const restored=await request(server,'/publisher/api/history/restore'+query,{method:'POST',headers,body:{}});
+  assert.equal(restored.status,200);assert.equal(f.db.prepare('SELECT COUNT(*) n FROM hidden_history').get().n,0);
+  assert.deepEqual(f.db.prepare('SELECT * FROM jobs ORDER BY job_id').all(),before);
+ }finally{server?.emit('close');await new Promise(r=>setImmediate(r));f.db.close();rmSync(f.root,{recursive:true,force:true});}
+});

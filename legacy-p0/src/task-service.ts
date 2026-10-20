@@ -1,4 +1,4 @@
-import { completedFailure } from './task-visibility.ts';
+import { canHideHistory } from './task-visibility.ts';
 import { readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import type { Db } from "./database.ts";
@@ -284,10 +284,9 @@ export class TaskService {
       let hidden = 0;
       for (const job of jobs) {
         if (this.statusBatchAllowed && !this.statusBatchAllowed(String(job.batch_id))) continue;
-        const endedFailure = completedFailure({control_state:String(job.control_state)},
+        const hide = canHideHistory({control_state:String(job.control_state)},
           {state:String(job.state),submit_safety_domain:String(job.submit_safety_domain)});
-        if (['PUBLISHED','DRAFT_API_WRITTEN_NOT_PUBLISHED'].includes(String(job.state)) ||
-            job.control_state === 'TERMINATED' || endedFailure) {
+        if (hide) {
           hidden += Number(insert.run(job.job_id,now()).changes);
         }
       }

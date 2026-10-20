@@ -64,3 +64,14 @@ test('successful and stopped history keep their prior labels',async()=>{
   assert.match(nodes['#results'].innerHTML,/data-republish-article="published"/);
   assert.doesNotMatch(nodes['#results'].innerHTML,/历史已结束/);
 });
+
+// Exhaust the declared state vocabulary so newly active/uncertain states fail closed.
+import {canHideHistory} from '../legacy-p0/src/task-visibility.ts';
+import {JOB_STATES} from '../legacy-p0/src/states.ts';
+test('history hiding rejects active and uncertain states even in terminated batches',()=>{
+  const safe=new Set(['PUBLISHED','DRAFT_API_WRITTEN_NOT_PUBLISHED','PLATFORM_DELETED','FAILED','FAILED_PREFLIGHT','BLOCKED_CAPABILITY']);
+  for(const state of JOB_STATES){
+    assert.equal(canHideHistory({control_state:'TERMINATED'},{state}),safe.has(state),state);
+    assert.equal(canHideHistory({control_state:'TERMINATED'},{state,submit_safety_domain:'MAY_HAVE_SUBMITTED'}),false,state);
+  }
+});
