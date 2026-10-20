@@ -61,12 +61,47 @@ exported, installed (109 locked packages), and started with unified cloud option
 on loopback; eight smoke assertions and ten existing targeted tests passed. This
 package makes that startup reproducible through a committed CLI. Its targeted
 suite passed 12/12 on Node 24.19.0, including the two new real-process tests.
-The new Docker build pulled the Node24 base and reached its `npm ci` step, but
-produced no further output for roughly a minute and was explicitly cancelled
-(exit 130). An initial attempt had failed on the read-only default Docker build
-cache; a temporary Docker config directory allowed the subsequent attempt.
-No finished image/container acceptance is claimed; complete it on the approved
-host. This observation does not establish the cause of the npm delay.
+Container follow-up completed on 2026-10-20. The earlier cancellation was clean
+(no surviving npm/build container). A default-network registry probe returned
+`EAI_AGAIN: getaddrinfo EAI_AGAIN registry.npmjs.org`; the online build was stopped
+rather than treating silence as proof of failure. No DNS/network settings changed.
+An offline build using the already installed lockfile dependency cache succeeded.
+Its first runtime check exposed root-owned source files unreadable by the `node`
+user; `COPY --chown=node:node` fixes image ownership without changing host modes
+or running the service as root.
+
+Validated image: `sha256:e8f441c67bbedf89c16f4aecf3e091d12b892bde29f173eb46fceda326f2a77b`
+(Node 24.22.0 base; image User=node). With a synthetic tmpfs database and a host
+loopback port, actual container HTTP checks passed: unauthenticated 401, wrong
+Host 409, authenticated unified state/UI/client asset 200, healthy unified mode,
+execution/page-execution/scheduler false, and local group-library blocked (409).
+A separate container with `PUBLISHER_ENABLE_EXECUTION=1` exited nonzero with
+`CLOUD_EXECUTION_DISABLED`. Both containers and their temporary data were removed.
+No persistent deployment or public URL was created.
+
+For environments where the normal registry route fails, a complete existing npm
+cache can be used without changing the lockfile or network configuration. This
+only changes the installation step of a temporary Dockerfile; cache contents are
+mounted for the build and not copied into the final image. Missing cache entries
+fail closed under `--offline`. Do not use a cache containing private material.
+
+```sh
+# First obtain the lockfile packages through the normal authorized install path.
+npm ci --ignore-scripts --no-audit --no-fund --cache /tmp/vietbridge-npm-cache
+python3 - <<'PYCODE'
+from pathlib import Path
+source = Path('Dockerfile.unified-cloud').read_text()
+source = source.replace(
+    'RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund',
+    'RUN --mount=type=bind,from=npm_cache,target=/npm-cache,rw npm ci --offline --cache=/npm-cache --omit=dev --ignore-scripts --no-audit --no-fund')
+Path('/tmp/Dockerfile.publisher-offline').write_text(source)
+PYCODE
+mkdir -p /tmp/publisher-docker-build-config
+docker --config /tmp/publisher-docker-build-config build --progress=plain \
+  --build-context npm_cache=/tmp/vietbridge-npm-cache \
+  -f /tmp/Dockerfile.publisher-offline -t publisher-unified-cloud:reviewed .
+```
+
 The application health field `persistent:true` is metadata, not a hosting guarantee.
 
 No Publisher hosting descriptor exists in this checkout. The reviewed environment
