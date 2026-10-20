@@ -101,15 +101,21 @@ item_fingerprint and artifacts. Each artifact carries artifact_id, root-relative
 path, actual SHA256 and references with `{artifact_id,sha256}`. The inspector
 matches reference hashes to the sibling artifacts and independently hashes each
 file. Missing/extra/duplicate items or artifacts, cross-item references, mismatched
-versions, owner/thread changes, modified files and reused canonical file paths
-reject. Distinct files may legitimately have identical bytes/hashes.
+versions, owner/thread changes, modified files and reused file identities
+reject. Distinct files may legitimately have identical bytes/hashes. File identity
+uses device + inode from the same open descriptor used to read bytes, across the
+whole result. Different hardlink or symlink names do not make independent files.
+Shared assets are not implicitly supported: this version has no explicit shared
+artifact reference contract. Matching hashes alone are not file-identity evidence.
 
 Selections for packaging are arrays of `{source_id,files:[{artifact_id,path}]}`.
 The packager fills envelope, item fingerprints, file hashes and reference hashes;
 it does not author or transform artifacts, authenticate the actor or mark approval.
 
 Paths must be relative without traversal; realpath containment rejects symlink
-escapes. Every file must be regular, nonempty and size-bounded: text/SRT 1 MiB,
+escapes using actual parent-directory segments (`..` or `../`), not any name
+beginning with two dots. A root-local `..notes.md` is legal.
+Every file must be regular, nonempty and size-bounded: text/SRT 1 MiB,
 cover 20,000,000 bytes, video 100 MiB. JSON input uses the existing strict parser
 and 1 MiB CLI cap, including duplicate decoded-key rejection. Output creation is
 exclusive. No source file or original manifest is written by inspection.
@@ -192,3 +198,40 @@ Local evidence, not committed raw logs or runtime artifacts:
 No image rebuild, browser screenshot retry, actual Study production, external
 dispatch, model call, new credential or deployment was performed. The existing
 enterprise approval guard and production database were not changed.
+
+### Independent review: path segments and physical file identity
+
+Review of `b79bd9ad363440f98cb28fcc899e0e40e439d21b` reproduced two defects:
+a legitimate root-local `..notes.md` was rejected by an overly broad
+`startsWith('..')` check, while two hardlinks to one inode were accepted as
+independent artifacts because only canonical path strings were compared.
+Two regression cases failed on that baseline before the fix.
+
+Containment now checks actual parent-directory segments and still resolves
+symlinks before checking the root boundary. Within one result, all artifacts
+must have distinct `(device,inode)` identities, captured with bigint `fstat`
+from the same descriptor used for reading their bytes; descriptors close on
+success and failure. Internal filesystem identity is not exported in receipts
+or reports. Hardlinks and symlink aliases reject as ARTIFACT_FILE_REUSED.
+Independent files with equal bytes remain valid. This does not establish
+editorial uniqueness or add an implicit shared-asset mode.
+Opening uses O_NONBLOCK before fstat so a FIFO cannot hang while waiting for a
+writer; non-regular files still reject before any byte read.
+
+Synthetic positive/negative cases cover the double-dot filename, outside-root
+symlink, independent equal-byte covers, same-inode hardlinks across two items,
+root-contained symlink alias, and rejection during both packaging and inspection.
+An additional bounded subprocess test verifies FIFO rejection without a writer.
+No publish/import gate, original inbox, enterprise guard or real artifact changed.
+
+Final correction validation (2026-10-20): relevant regression **68/68 passed**;
+full suite **915/915 passed**, no failures/cancellations/skips, 64.524 seconds.
+Both changed JS files passed syntax checks; diff check passed. The full suite was
+run on the final O_NONBLOCK version, not reused from the earlier correction run.
+Commands are the same relevant/full commands above, including the expanded tests.
+
+Local evidence:
+- Reproduction before repair: `/tmp/publisher-artifact-path-before.log` (both
+  reviewer cases failed as expected).
+- `/tmp/publisher-artifact-path-regression.log`, SHA256 `990c1dbcd03c8d1bb68ce3f4f72f912a3a463dc29e9b4988a5d72e35889dd11b`.
+- `/tmp/publisher-artifact-path-full.log`, SHA256 `194ce87ddb93892b81f7e213918859132627320883f8f7dae1d5edfd8fc9ffe8`.

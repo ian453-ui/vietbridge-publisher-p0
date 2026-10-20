@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
-import {readFileSync,realpathSync,statSync} from 'node:fs';
-import {resolve,relative,isAbsolute,extname} from 'node:path';
+import {readFileSync,realpathSync,statSync,openSync,fstatSync,closeSync,constants} from 'node:fs';
+import {resolve,relative,isAbsolute,extname,sep} from 'node:path';
 import {validateGptTaskIdentity} from './gpt-content-contract.js';
 import {validateImage} from './image-validation.js';
 
@@ -66,10 +66,15 @@ export const productionItemFingerprint=item=>digest(item);
 function localArtifact(root,path,kind){
  if(!text(path,500)||isAbsolute(path)||path.includes('\\')||path.split('/').some(x=>!x||x==='.'||x==='..'))fail('INVALID_ARTIFACT_PATH');
  const base=realpathSync(root),file=realpathSync(resolve(base,path)),rel=relative(base,file);
- if(!rel||rel.startsWith('..')||isAbsolute(rel)||!statSync(base).isDirectory())fail('ARTIFACT_PATH_ESCAPE');
- const stat=statSync(file),max=kind==='video'?100*1024*1024:['cover'].includes(kind)?20000000:1024*1024;
- if(!stat.isFile()||stat.size<1||stat.size>max)fail('INVALID_ARTIFACT_SIZE');
- const bytes=readFileSync(file);if(bytes.length<1||bytes.length>max)fail('INVALID_ARTIFACT_SIZE');
+ if(!rel||rel==='..'||rel.startsWith('..'+sep)||isAbsolute(rel)||!statSync(base).isDirectory())fail('ARTIFACT_PATH_ESCAPE');
+ const max=kind==='video'?100*1024*1024:['cover'].includes(kind)?20000000:1024*1024;
+ const fd=openSync(file,constants.O_RDONLY|constants.O_NONBLOCK);let stat,bytes;
+ try{
+  stat=fstatSync(fd,{bigint:true});
+  if(!stat.isFile()||stat.size<1||stat.size>max)fail('INVALID_ARTIFACT_SIZE');
+  bytes=readFileSync(fd);
+ }finally{closeSync(fd);}
+ if(bytes.length<1||bytes.length>max)fail('INVALID_ARTIFACT_SIZE');
  const ext=extname(file).toLowerCase();let validation;
  if(kind==='cover'){validation={level:'IMAGE_DECODED',...validateImage(bytes,ext)};}
  else if(kind==='video'){if(!['.mp4','.mov','.webm'].includes(ext))fail('INVALID_VIDEO_EXTENSION');validation={level:'BYTES_HASH_ONLY',decoded:false,playback_verified:false,duration_verified:false};}
@@ -88,7 +93,7 @@ function localArtifact(root,path,kind){
    validation={level:'SRT_SYNTAX_VALIDATED',cue_count:blocks.length,video_alignment_verified:false};
   }else validation={level:'UTF8_TEXT_VALIDATED',facts_verified:false};
  }
- return {sha256:bytesHash(bytes),bytes:bytes.length,validation};
+ return {sha256:bytesHash(bytes),bytes:bytes.length,validation,fileIdentity:`${stat.dev}:${stat.ino}`};
 }
 const flags={publish_allowed:false,import_allowed:false,owner_changed:false,producer_authenticated:false};
 export function inspectProductionResult(request,result,{root,now=Date.now(),priorReceipt=null}={}){
@@ -98,7 +103,7 @@ export function inspectProductionResult(request,result,{root,now=Date.now(),prio
  if(digest(result.bridge_ref)!==digest(request.bridge_ref))fail('RESULT_THREAD_MISMATCH');
  if(!time(result.completed_at)||Date.parse(result.completed_at)<Date.parse(request.created_at)||Date.parse(result.completed_at)>now)fail('INVALID_RESULT_TIME');
  if(!Array.isArray(result.items)||result.items.length!==request.items.length)fail('RESULT_ITEMS_MISSING_OR_EXTRA');
- const seen=new Set(),paths=new Set(),checked=[];
+ const seen=new Set(),fileIdentities=new Set(),checked=[];
  for(const row of result.items){exact(row,[...bindingKeys,'artifacts']);const item=request.items.find(x=>x.source_id===row.source_id);
   if(!item||seen.has(row.source_id))fail('RESULT_ITEM_IDENTITY_MISMATCH');seen.add(row.source_id);
   for(const k of ['content_revision','visual_revision','previous_revision'])if(row[k]!==item[k])fail('RESULT_ITEM_VERSION_MISMATCH');
@@ -109,8 +114,8 @@ export function inspectProductionResult(request,result,{root,now=Date.now(),prio
    if(!spec||artifactIds.has(artifact.artifact_id)||!hash(artifact.sha256))fail('INVALID_RESULT_ARTIFACT');artifactIds.add(artifact.artifact_id);
    if(!Array.isArray(artifact.references)||artifact.references.length!==spec.references.length)fail('RESULT_REFERENCE_MISMATCH');
    const refs=new Set();for(const ref of artifact.references){exact(ref,refKeys);const target=row.artifacts.find(x=>x.artifact_id===ref.artifact_id);if(!spec.references.includes(ref.artifact_id)||refs.has(ref.artifact_id)||!target||ref.sha256!==target.sha256)fail('RESULT_REFERENCE_MISMATCH');refs.add(ref.artifact_id);}
-   const actual=localArtifact(root,artifact.path,spec.kind),real=realpathSync(resolve(root,artifact.path));
-   if(paths.has(real))fail('ARTIFACT_FILE_REUSED');paths.add(real);
+   const {fileIdentity,...actual}=localArtifact(root,artifact.path,spec.kind);
+   if(fileIdentities.has(fileIdentity))fail('ARTIFACT_FILE_REUSED');fileIdentities.add(fileIdentity);
    if(actual.sha256!==artifact.sha256)fail('ARTIFACT_HASH_MISMATCH');
    artifacts.push({artifact_id:spec.artifact_id,kind:spec.kind,platform:spec.platform,...actual});
   }

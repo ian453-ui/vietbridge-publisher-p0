@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,symlinkSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,symlinkSync,linkSync,renameSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {spawnSync} from 'node:child_process';
@@ -64,4 +64,29 @@ test('CLI production modes reuse strict JSON and refuse overwrites',()=>fixture(
  for(const args of [['production-request','--plan',plan,'--out',req],['production-package','--request',req,'--selections',sel,'--root',f.root,'--out',result],['production-review','--request',req,'--result',result,'--root',f.root]]){const r=run(...args);assert.equal(r.status,0,r.stderr);assert.equal(JSON.parse(r.stdout).publish_allowed,false);}
  assert.match(run('production-request','--plan',plan,'--out',req).stderr,/OUTPUT_ALREADY_EXISTS/);
  writeFileSync(plan,'{"items":[],"items":[],"secret":"not-for-echo"}');const bad=run('production-request','--plan',plan,'--out',join(f.root,'bad.json'));assert.equal(bad.status,1);assert.match(bad.stderr,/DUPLICATE_JSON_KEY/);assert.ok(!bad.stderr.includes('not-for-echo'));
+}));
+
+test('root-local ..notes.md is legal, while a symlink to a parent directory remains blocked',()=>fixture(f=>{
+ const original=f.selections[0].files[0].path;renameSync(join(f.root,original),join(f.root,'..notes.md'));f.selections[0].files[0].path='..notes.md';
+ const result=packageProductionResult(f.request,f.selections,{root:f.root,now});assert.equal(inspect({...f,result}).status,'REVIEW_REQUIRED');
+ symlinkSync(tmpdir(),join(f.root,'outside-directory'));result.items[0].artifacts[0].path='outside-directory';assert.throws(()=>inspect({...f,result}),/ARTIFACT_PATH_ESCAPE/);
+}));
+test('independent same-byte files pass, but hardlinks across items are not independent artifacts',()=>fixture(f=>{
+ assert.equal(inspect(f).status,'REVIEW_REQUIRED');
+ const first=join(f.root,f.result.items[0].artifacts[1].path),second=join(f.root,f.result.items[1].artifacts[1].path);
+ symlinkSync(first,join(f.root,'alias.png'));
+ const aliased=structuredClone(f.result);aliased.items[1].artifacts[1].path='alias.png';
+ assert.throws(()=>inspect({...f,result:aliased}),/ARTIFACT_FILE_REUSED/);
+ rmSync(second);linkSync(first,second);
+ assert.throws(()=>inspect(f),/ARTIFACT_FILE_REUSED/);
+ assert.throws(()=>packageProductionResult(f.request,f.selections,{root:f.root,now}),/ARTIFACT_FILE_REUSED/);
+}));
+test('descriptor identity checks reject a FIFO without waiting for a writer',()=>fixture(f=>{
+ const pipe=join(f.root,'pipe.md');const made=spawnSync('mkfifo',[pipe],{encoding:'utf8'});assert.equal(made.status,0,made.stderr);
+ const cli=new URL('../scripts/content-workbench.mjs',import.meta.url).pathname;
+ const at=Date.now();f.plan.created_at=new Date(at-1000).toISOString();f.plan.deadline_at=new Date(at+60000).toISOString();
+ const request=createProductionRequest(f.plan);f.selections[0].files[0].path='pipe.md';
+ writeFileSync(join(f.root,'request.json'),JSON.stringify(request));writeFileSync(join(f.root,'files.json'),JSON.stringify(f.selections));
+ const r=spawnSync(process.execPath,[cli,'production-package','--request',join(f.root,'request.json'),'--selections',join(f.root,'files.json'),'--root',f.root,'--out',join(f.root,'out.json')],{encoding:'utf8',timeout:5000});
+ assert.equal(r.error,undefined);assert.equal(r.status,1);assert.match(r.stderr,/INVALID_ARTIFACT_SIZE/);
 }));
