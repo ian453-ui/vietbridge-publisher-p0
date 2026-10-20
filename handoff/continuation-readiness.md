@@ -24,7 +24,11 @@ Run from the existing Publisher checkout:
 node scripts/check-continuation.mjs /absolute/path/to/continuation-evidence.json
 ```
 
-The CLI observes only local Git origin, branch, HEAD and clean/dirty status. It does
+The CLI observes only local Git origin, branch, HEAD and clean/dirty status. Repository identity accepts the exact `ian453-ui/vietbridge-publisher-p0`
+path at `github.com` via HTTPS, `git@github.com:owner/repo` or
+`ssh://git@github.com/owner/repo`, with an optional `.git` suffix. Host aliases,
+other owners/repositories, URL credentials, ports, queries and extra paths are
+rejected. This transport normalization grants no additional authority. It does
 not fetch, pull, switch branches, contact Mac, read databases or open a browser.
 Place the evidence JSON outside the working tree; do not include secrets or
 customer content. Example shape (replace placeholders with known evidence):

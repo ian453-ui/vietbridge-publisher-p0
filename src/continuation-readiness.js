@@ -1,6 +1,9 @@
 import {guardedStates} from './publisher-platforms.js';
 
-const repository='https://github.com/ian453-ui/vietbridge-publisher-p0';
+// Normalize only the standard transport spellings of this exact repository.
+// Reject credentials, host aliases, ports, query strings and extra path segments.
+const repositoryMatches=value=>typeof value==='string' &&
+  /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)ian453-ui\/vietbridge-publisher-p0(?:\.git)?$/.test(value);
 const sha=value=>typeof value==='string'&&/^[a-f0-9]{40}$/.test(value);
 const id=value=>typeof value==='string'&&value.trim().length>0;
 const fresh=(e,now)=>e&&Number.isFinite(Date.parse(e.observedAt))&&Number.isFinite(Date.parse(e.validUntil))&&Date.parse(e.observedAt)<=now&&now<Date.parse(e.validUntil);
@@ -13,7 +16,7 @@ export function continuationReadiness(input,source,{now=Date.now()}={}) {
   if(!id(input.originalOwner)||!id(input.currentOwner))owner.push('OWNER_EVIDENCE_MISSING');
   else if(input.originalOwner!==input.currentOwner)owner.push('OWNER_CHANGE_NOT_ALLOWED');
   const code=[...owner];
-  if(source?.repository?.replace(/\.git$/,'')!==repository||source?.branch!=='publisher-unified')code.push('SOURCE_IDENTITY_MISMATCH');
+  if(!repositoryMatches(source?.repository)||source?.branch!=='publisher-unified')code.push('SOURCE_IDENTITY_MISMATCH');
   if(!sha(input.targetCommit)||source?.commit!==input.targetCommit)code.push('EXACT_COMMIT_REQUIRED');
   if(source?.clean!==true)code.push('WORKTREE_NOT_CLEAN');
   const mac=[...code];

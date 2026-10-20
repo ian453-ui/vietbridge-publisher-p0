@@ -51,3 +51,34 @@ test('CLI observes real checkout without mutation and never echoes input secrets
   writeFileSync(path,'invalid synthetic-do-not-echo');const failed=spawnSync(process.execPath,['scripts/check-continuation.mjs',path],{encoding:'utf8'});assert.equal(failed.status,1);assert.ok(!failed.stderr.includes('synthetic-do-not-echo'));
  }finally{rmSync(root,{recursive:true,force:true});}
 });
+
+
+test('repository identity accepts exact HTTPS and SSH transports, not lookalikes',()=>{
+ for(const repository of [
+  'https://github.com/ian453-ui/vietbridge-publisher-p0',
+  'https://github.com/ian453-ui/vietbridge-publisher-p0.git',
+  'git@github.com:ian453-ui/vietbridge-publisher-p0.git',
+  'git@github.com:ian453-ui/vietbridge-publisher-p0',
+  'ssh://git@github.com/ian453-ui/vietbridge-publisher-p0.git',
+  'ssh://git@github.com/ian453-ui/vietbridge-publisher-p0',
+ ])assert.equal(check(fixture(),{...source,repository}).steps.cloudReviewBuildTest.status,'CHECKABLE',repository);
+ for(const repository of [
+  'https://github.com/other/vietbridge-publisher-p0.git',
+  'git@github.com:other/vietbridge-publisher-p0.git',
+  'ssh://git@github.com/other/vietbridge-publisher-p0.git',
+  'https://github.com/ian453-ui/other.git',
+  'git@github.com:ian453-ui/other.git',
+  'ssh://git@github.com/ian453-ui/other.git',
+  'https://github.com.evil.invalid/ian453-ui/vietbridge-publisher-p0.git',
+  'git@evil.invalid:ian453-ui/vietbridge-publisher-p0.git',
+  'ssh://git@evil.invalid/ian453-ui/vietbridge-publisher-p0.git',
+  'https://github.com@evil.invalid/ian453-ui/vietbridge-publisher-p0.git',
+  'https://user@github.com/ian453-ui/vietbridge-publisher-p0.git',
+  'ssh://root@github.com/ian453-ui/vietbridge-publisher-p0.git',
+  'ssh://git@github.com:2222/ian453-ui/vietbridge-publisher-p0.git',
+  'http://github.com/ian453-ui/vietbridge-publisher-p0.git',
+  'https://github.com/ian453-ui/vietbridge-publisher-p0.git?x=1',
+  'git@github.com:ian453-ui/vietbridge-publisher-p0.git/extra',
+  null, {},
+ ])assert.ok(check(fixture(),{...source,repository}).steps.cloudReviewBuildTest.reasons.includes('SOURCE_IDENTITY_MISMATCH'),String(repository));
+});
