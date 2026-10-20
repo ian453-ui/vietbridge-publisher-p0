@@ -134,3 +134,71 @@ isolated cloud checks.
    `9f84bde371e9071284552753b6e6e99e3fa61ffe`, not a claim about Mac's live version.
 
 This handoff does not authorize production restart, real publication or interaction.
+
+## Release-wide quality checkpoint — 2026-10-20
+
+Tested source: `a5844c9ec6616e17581435bccc201b38be199b96` on
+`publisher-unified`. The follow-up commit adding this section changes documentation
+only. Node 24.19.0, npm 11.9.0, `/usr/bin/chromium`, `/usr/bin/ffmpeg`.
+No applicable AGENTS.md or .agents skill instructions were present in this checkout
+or its workspace ancestors; the repository's browser-action skill is not needed
+for synthetic test execution. No independent CI workflow, lint command or
+TypeScript type-check configuration is defined in the repository.
+
+| Check | Result | Scope / limits |
+| --- | --- | --- |
+| Full npm test suite | **855/855 pass**, 0 fail/cancel/skip/todo; 65.852s | Includes browser fixtures and targeted tests below; synthetic data only |
+| Node parser checks | **273/273 pass** | All tracked .js/.mjs/.ts except declaration files; syntax, not type checking |
+| Compose contract | Pass | YAML parses, host-loopback port, all five execution/sync/scheduler flags are `0` |
+| Whitespace check | Pass | `git diff --check` |
+| Mac entry source compatibility | No diff | `src/unified-server.js` unchanged from `9f84bde` through the tested commit |
+| Container acceptance | Already passed; not repeated | See image digest and runtime checks above |
+
+Full-suite coverage includes registered account/batch ownership, UNKNOWN and
+RECONCILE_PENDING protections, safe history hiding, synthetic old hidden markers,
+unchanged stored job/history records, cloud CLI auth/Host guards, disabled execution,
+rejected capability flags, database identity checks, process restart and existing
+Mac-tunnel authentication/CSRF and read-only maintenance contracts. No new or old
+failures appeared in this run; no production-code changes were needed.
+
+Reproduce from the exact checkout (do not run against a live database):
+
+```sh
+npm ci --ignore-scripts --no-audit --no-fund --cache /tmp/vietbridge-npm-cache
+PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium \
+PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg npm test -- --test-concurrency=4
+python3 - <<'PYCODE'
+import pathlib, subprocess
+paths = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+files = [p for p in paths if pathlib.Path(p).suffix in {'.js', '.mjs', '.ts'}
+         and not p.endswith('.d.ts')]
+for path in files:
+    subprocess.run(['node', '--check', path], check=True)
+print(f'{len(files)} syntax checks passed')
+PYCODE
+node --input-type=module - <<'JSCODE'
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+import YAML from 'yaml';
+const service = YAML.parse(readFileSync('compose.unified-cloud.yaml','utf8')).services.publisher;
+assert.deepEqual(service.ports, ['127.0.0.1:18082:8080']);
+for (const key of ['PUBLISHER_ENABLE_EXECUTION','PUBLISHER_ENABLE_PAGE_EXECUTION',
+  'PUBLISHER_ENABLE_GROUP_INTERACTION','PUBLISHER_ENABLE_SCAN_SCHEDULER',
+  'PUBLISHER_ENABLE_CONTENT_SYNC']) assert.equal(service.environment[key], '0');
+console.log('Compose contract passed');
+JSCODE
+git diff --check
+```
+
+Evidence retained in the execution environment (raw logs are not committed):
+- `/tmp/publisher-release-full.log`, SHA256 `7f8a3f90ee3cfc89c5fb167ba77086ecbf2e62a0101275995f7275fb131df560`.
+- `/tmp/publisher-release-static.log`, SHA256 `1e8c7bf3b67c1a68963553430d4752783b4728b1ba9f5036dcead9ffbd09ac93`.
+
+Remaining blind spots: no independent static type analysis (no configured checker),
+no real Mac launchd/service restart or live database/browser integration, no
+independent old V1 release validation, no actual platform publishing, no sustained
+load/endurance run, and no persistent HTTPS deployment target. These are not
+reported as passed, nor as failures of the synthetic release suite. Existing
+container DNS limitations and the validated offline build path remain documented
+above. User confirmation and original execution permissions still apply to any
+future production actions.
