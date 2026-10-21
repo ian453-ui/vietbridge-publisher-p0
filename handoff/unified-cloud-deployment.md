@@ -419,3 +419,44 @@ reads db.isTransaction directly. Here Node v24.19.0 reports false outside and tr
 inside BEGIN IMMEDIATE; the Mac Node/SQLite property behavior is not yet known.
 This is a concrete diagnostic hypothesis, not a confirmed root cause. Preserve
 atomic claim/permit consumption and UNKNOWN semantics in any compatibility fix.
+
+## Single-permit runtime compatibility follow-up (2026-10-21)
+
+The Mac 672 report is 888/915, with 27 failures across six suites. Eleven permit
+cases also failed on its older b298 baseline; the other sixteen remain unclassified.
+Cloud does not reproduce those failures with native transaction support. No Mac
+runtime version or SQLite version was supplied, so an absent isTransaction property
+is a hypothesis, not a confirmed diagnosis of that machine or all 27 failures.
+
+Previously consume() treated an absent property exactly like a false transaction
+state. Now unsupported/nonboolean/throwing transaction-state access produces
+SQLITE_TRANSACTION_STATE_UNAVAILABLE in the existing execution capability response
+and refuses both permit issuance and consumption. Read-only service remains usable.
+For supported runtimes, consumption requires both native isTransaction === true
+and the existing Store managed-transaction flag. No flag-only compatibility fallback,
+permit relaxation, UNKNOWN reset or automatic runtime installation is provided.
+
+Synthetic regression covers undefined/null/string/number and throwing getters,
+no permit issuance on unsupported runtimes, no consumption or driver invocation,
+READY preservation, unmanaged native transactions and a forged Store flag. Existing
+rollback/concurrent claim/consumed-permit/UNKNOWN recovery cases remain in the suite.
+The native SQLite property is nonconfigurable: an initial test tried to redefine
+it and failed before exercising the guard. Corrected tests inject a narrow database
+facade into the permit object while retaining real prepared SQL operations; this
+models an unavailable API, not an actual old Node runtime. No underlying harness
+was changed. Both installed Node 24.19.0 and 24.21.0 support the native API; the latter
+passes all 24 single-permit cases. The six affected suites pass 53/53 on 24.19.0.
+
+Minimum remaining Mac evidence, when that operator is next available: exact
+process.version, SQLite sqlite_version(), and isTransaction values before BEGIN,
+during BEGIN IMMEDIATE and after ROLLBACK using a fresh :memory: database. Do not
+probe production DB or ask to wake the Mac. If the API is absent, use a verified
+supported runtime through its ordinary approved maintenance process; this patch
+intentionally keeps execution disabled until then. No claim that the Mac failures
+are fixed or that an older runtime is supported is warranted.
+
+Final applicable acceptance on Node 24.19.0: full suite 923/923 passed, zero
+failures/skips, 58.66 seconds, with installed Chromium/ffmpeg explicitly selected.
+Evidence: /tmp/permit-full.log, /tmp/permit-targeted.log and
+/tmp/permit-node2421.log. These are synthetic/local regression results, not real
+platform execution. No public deployment, Mac update, credentials or DNS changes.

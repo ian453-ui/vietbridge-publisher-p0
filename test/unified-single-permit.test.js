@@ -153,3 +153,33 @@ test('explicit not-published decision closes unknown and preserves spent permit 
  assert.equal(f.submits,1);
  assert.throws(()=>f.executor.resolveNotPublished(f.workspace.id,f.job.id,decision),/用户明确/);
 });
+
+for(const value of [undefined,null,'true',1])test(`missing or invalid native transaction capability fails closed: ${String(value)}`,t=>{
+  const f=setup(t);f.grant();
+  f.executor.permits.db={prepare:f.store.db.prepare.bind(f.store.db),isTransaction:value};
+  assert.match(f.executor.executionCapability(f.workspace.id,f.job.id).reason,/SQLITE_TRANSACTION_STATE_UNAVAILABLE/);
+  assert.throws(()=>f.executor.claim(f.workspace.id,f.job.id),/SQLITE_TRANSACTION_STATE_UNAVAILABLE/);
+  assert.equal(f.executor.permits.record(f.job.id).status,'AVAILABLE');
+  assert.equal(f.publisher.job(f.workspace.id,f.job.id).state,'READY');
+  assert.equal(f.creates,0);assert.equal(f.submits,0);
+});
+test('native transaction alone is not a managed claim transaction',t=>{
+  const f=setup(t);f.grant();f.store.db.exec('BEGIN IMMEDIATE');
+  try {assert.throws(()=>f.executor.permits.consume(f.job,'outside-claim'),/同一事务/);}
+  finally {f.store.db.exec('ROLLBACK');}
+  assert.equal(f.executor.permits.record(f.job.id).status,'AVAILABLE');
+});
+test('managed flag cannot substitute for native transaction state',t=>{
+  const f=setup(t);f.grant();f.store.transactionActive=true;
+  try {assert.throws(()=>f.executor.permits.consume(f.job,'fake-claim'),/同一事务/);}
+  finally {f.store.transactionActive=false;}
+  assert.equal(f.executor.permits.record(f.job.id).status,'AVAILABLE');
+});
+
+test('unsupported runtime refuses issuance and throwing capability getter is diagnosed',t=>{
+  const f=setup(t);
+  f.executor.permits.db={prepare:f.store.db.prepare.bind(f.store.db),get isTransaction(){throw Error('unavailable');}};
+  assert.throws(f.grant,/SQLITE_TRANSACTION_STATE_UNAVAILABLE/);
+  assert.equal(f.executor.permits.record(f.job.id),undefined);
+  assert.equal(f.executor.executionCapability(f.workspace.id,f.job.id).canExecute,false);
+});

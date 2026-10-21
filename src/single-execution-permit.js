@@ -36,6 +36,8 @@ export class SingleExecutionPermits {
       if(this.db.prepare(`SELECT 1 FROM ${table} WHERE job_id=? LIMIT 1`).get(job.id))throw Error('任务已有执行痕迹，不能使用单次许可');
   }
   issue(workspace,id,scope,{expiresAt,authorization}={}) {
+    const transaction=this.transactionCapability();
+    if(!transaction.supported)throw Error(transaction.reason);
     return this.publisher.store.tx(()=>{
       const job=this.publisher.job(workspace,id);this.assertFresh(job);
       const expected=executionScope(job);
@@ -52,7 +54,15 @@ export class SingleExecutionPermits {
     });
   }
   audit(id,event,detail,now){this.db.prepare('INSERT INTO publisher_execution_permit_events(permit_id,event,detail_json,created_at) VALUES(?,?,?,?)').run(id,event,JSON.stringify(detail),now);}
+  transactionCapability() {
+    try {
+      if(typeof this.db.isTransaction==='boolean')return {supported:true};
+    } catch {}
+    return {supported:false,reason:'SQLITE_TRANSACTION_STATE_UNAVAILABLE: 当前 Node/SQLite 无可验证的事务状态；单次执行保持禁用，请使用经验证支持 DatabaseSync.isTransaction 的运行时'};
+  }
   capability(job) {
+    const transaction=this.transactionCapability();
+    if(!transaction.supported)return denied(transaction.reason);
     const row=this.record(job.id);if(!row)return denied('未签发此任务的单次执行许可');
     const metadata={permitId:row.id,permitStatus:row.status,expiresAt:new Date(row.expires_at).toISOString()};
     if(row.status!=='AVAILABLE')return {...denied(row.status==='CONSUMED'?'此任务的单次执行许可已消费，不能重试':'此任务的单次执行许可已撤销'),...metadata};
@@ -65,7 +75,9 @@ export class SingleExecutionPermits {
     }catch(error){return {...denied(error.message),...metadata};}
   }
   consume(job,attemptId) {
-    if(!this.db.isTransaction)throw Error('单次许可必须在任务 claim 的同一事务内消费');
+    const transaction=this.transactionCapability();
+    if(!transaction.supported)throw Error(transaction.reason);
+    if(this.db.isTransaction!==true||this.publisher.store.transactionActive!==true)throw Error('单次许可必须在任务 claim 的同一事务内消费');
     const capability=this.capability(job);if(!capability.canExecute)throw Error(capability.reason);
     const now=this.now();
     const update=this.db.prepare("UPDATE publisher_execution_permits SET status='CONSUMED',consumed_at=?,attempt_id=? WHERE id=? AND status='AVAILABLE' AND expires_at>?").run(now,attemptId,capability.permitId,now);
