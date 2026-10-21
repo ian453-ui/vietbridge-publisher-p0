@@ -93,3 +93,52 @@ Validation: five focused adapter tests pass. Full local regression uses the
 existing npm test command with installed Chromium and ffmpeg selected explicitly;
 logs are /tmp/sites-adapter-targeted.log and /tmp/sites-adapter-full.log. No new
 package dependency, local entry modification or underlying harness change.
+
+## Offline preparation: schema and membership contract
+
+`src/sites/migrations/0001_readonly_projection.sql` is a reviewed candidate SQL
+migration for a NEW isolated read-projection database. It contains four tables:
+the three original-named read projections plus sites_project_memberships. It does
+not reproduce the complete local schema or claim local constructors can run on it.
+No credentials, sessions, quota/permit tables or content/media blobs are copied.
+Original source revision and frozen-job unique keys and all original job states
+are retained. Composite foreign keys prevent a membership/job from pairing an
+account with another workspace. It has no seed/backfill, no IF NOT EXISTS masking
+schema collision, and must never be applied to the local production database.
+
+This SQL is NOT yet a Drizzle-generated, registered or deployed Sites migration.
+When official tooling becomes available, express the four-table projection in its
+schema, run the official generator, compare generated SQL constraints against this
+candidate, then register/apply via the supported workflow to isolated synthetic D1.
+Record applied migration identity; never replay or edit an applied migration.
+
+`createSitesScopeResolver` binds the existing read API to persisted READER membership
+for exact trusted user ID + workspace + account. The binding is dedicated to one
+Site/project; do not share membership data across Sites or infer identity equivalence
+from matching email. Its getTrustedIdentity callback
+must be implemented with the official server-only Sites identity helper behind
+verified dispatch, never direct browser input. Email is not an authorization key.
+A private Site does not automatically insert members, nor does its first visitor
+become owner. No registration/grant endpoint exists. Membership provisioning is
+pending operator-reviewed mapping after the actual Site identity is known; all
+current tests use synthetic identities only. Missing trusted integration refuses
+construction; missing user returns 401; absent/revoked membership, scope mismatch
+or membership-store failure returns 403. Storage details are not exposed.
+Membership is queried on every request, not cached; a revocation concurrent with
+an already authorized in-flight read is not claimed to cancel that response.
+
+Tests use an async D1-shaped facade over actual SQLite: cross-workspace/account
+reads, forged identity headers and member query parameters, revoked membership,
+foreign key and READER role checks, paging limits, denied writes, duplicate and
+conflicting source keys/job keys, and file-backed reopen preserving UNKNOWN and
+attempt ID. Native original-model duplicate-import idempotence remains covered by
+sites-readonly-api.test.js. SQL uniqueness rejecting a duplicate is not itself a
+D1 idempotent importer: no cloud importer or concurrent write protocol is enabled.
+No quota consumption or permit writes are possible through this slice. These tests
+do not validate real D1, Worker auth header injection, deployment or browser execution.
+
+Offline follow-up acceptance: focused Sites adapter/membership suite 10/10;
+full original local regression 933/933 with zero failures/skips. Evidence:
+/tmp/sites-membership-targeted.log and /tmp/sites-membership-full.log. No network
+download retry, Sites resource provisioning, production DB access, Mac changes,
+credentials or social publication occurred in this follow-up.
