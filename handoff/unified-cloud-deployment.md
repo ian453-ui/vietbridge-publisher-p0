@@ -320,3 +320,102 @@ Evidence retained locally (no raw logs, credentials or customer data committed):
 - `/tmp/publisher-cloud-current-build.log`: full image build failure.
 - `/tmp/publisher-cached-control-build.log`: cached control-plane image build.
 - `/tmp/publisher-volume-acceptance.json`: two-container volume readback results.
+
+
+## 2026-10-21 build classification and target handoff
+
+Baseline: d3a1e3b037f2b711de4d0c48ede9f8afbdd68fef; publisher-unified,
+with main unchanged. Default host lookup of deb.debian.org returned no address;
+default Docker bridge lookup returned EAI_AGAIN. This is dependency-source DNS
+failure before package download, not a missing Debian package or application test
+failure. No alternative DNS, mirror, host networking, proxy override or privilege
+change was attempted. The installed host tools do not constitute a compatible
+Debian package cache; apt archives contain no installable packages.
+
+The Dockerfile now uses APT::Update::Error-Mode=any so missing indexes fail at
+update itself instead of continuing to misleading “Unable to locate package”
+errors. This improves diagnosis; it does not repair the environment resolver.
+Reproduce using the unchanged default network and official sources:
+
+```sh
+docker build --progress=plain -f Dockerfile.unified-cloud -t publisher-unified-cloud:reviewed .
+```
+
+Do not proceed to deployment until this full build passes on the existing
+approved build host. Verify Python/Pillow and ffmpeg inside that exact image,
+then run both synthetic workbench demos in disposable storage. Record source
+SHA and immutable image ID, and retain the previous accepted image for rollback.
+The cached control-only image is not a substitute for this acceptance.
+
+### Resource inventory and minimum decision
+
+| Requirement | Current evidence | Required existing target information |
+| --- | --- | --- |
+| Always-on compute | Only this temporary development environment verified | Operator identifies authorized Linux VM/container host and deployment interface |
+| Persistent volume | Synthetic container recreation tested; test volume deleted | Exact dedicated volume/path, capacity, retention and backup destination |
+| HTTPS | Domain exists; historical endpoint was Mac Tunnel-to-17882 | Existing independent cloud reverse proxy and approved origin mapping |
+| Authentication | App supports existing access configuration; none provisioned here | Operator confirms existing mechanism already authorized for this service |
+| Dependency builds | Debian DNS fails on default route | Working normal build runner or verified complete dependency cache |
+
+Historical Mac Tunnel evidence: https://vietbridge.slack.com/archives/C0C6A5D7QAC/p1791195214706459?thread_ts=1791172648.041409&cid=C0C6A5D7QAC .
+Domain registration/Cloudflare DNS alone establish no compute resource. No repeat
+request to the previously CONNECT-403-denied publisher domain was made.
+
+If no existing target is found, the user decision is whether to authorize a
+specific persistent host and its ongoing cost/access scope. No purchase or new
+credential is authorized by this package. Suggested starting capacity for the
+control plane and small synthetic artifact workloads: Linux x86_64, 2 vCPU,
+4 GiB RAM, 20 GiB persistent SSD plus separately retained backups. This is an
+engineering starting estimate, not a measured production sizing guarantee;
+video retention and concurrent encoding need separate sizing. Browser publishing
+and the independently running Facebook session are outside this deployment.
+
+### Deployment and recovery sequence for the original operator
+
+1. Confirm exact host, independent volume, current backup, existing HTTPS/auth
+   mechanism, approved source SHA and accepted immutable image. Keep original
+   Compose project identity stable; changing it can silently select a new volume.
+2. Use compose.unified-cloud.yaml with its existing secret injection mechanism.
+   Review rendered configuration privately; do not print secret values into logs.
+   Keep host port loopback-only and all five execution flags at zero. Do not mount
+   Mac data, production sessions or another application's database.
+3. Start on the approved target only after those checks. Verify unauthenticated
+   401, authenticated UI/state, wrong Host rejection, local-only endpoints 409,
+   disabled execution, and synthetic request/result/preview acceptance. No real
+   publishing or task dispatch is part of acceptance.
+4. Stop the service gracefully before a file-level backup. Copy the entire data
+   directory including any SQLite WAL/SHM companions to the approved backup
+   destination; preserve ownership. Never copy only a live SQLite main file.
+   Record image/source SHA and a checksum manifest without exposing credentials.
+5. Restore a backup into a different empty isolated volume, using the matching
+   accepted image and existing authorized access mechanism. Check SQLite integrity
+   and expected synthetic ledger/job IDs before declaring recovery successful.
+   Test restart and eventual host reboot only on the identified authorized host;
+   container recreation here does not prove host restart or multi-day uptime.
+6. On failed upgrade, stop the new service; retain its volume for diagnosis and
+   restore the pre-upgrade backup into an isolated replacement volume with the
+   prior accepted image. Do not run an older binary against an upgraded database
+   without a compatibility check. Never use compose down -v on retained data.
+
+These are ready-to-execute operator steps, not a record of production deployment
+or completed backup restoration. No permanent Publisher URL is verified.
+
+
+Follow-up verification: the fail-fast full build exited 100 at apt update with
+explicit DNS errors (no package installation attempted). An initial Docker client
+attempt could not write its default read-only ~/.docker/buildx directory; using
+an empty disposable DOCKER_CONFIG under /tmp allowed the same default-network
+build without copying credentials or changing permissions. Evidence:
+/tmp/publisher-cloud-build-classified.log. Default Docker DNS lookup for
+registry.npmjs.org also returned EAI_AGAIN. The focused cloud entry/runtime suite
+passed 5/5, including isolated restart/import idempotence, in 7.89 seconds:
+/tmp/publisher-cloud-followup-tests.log. No full suite rerun was needed for this
+Dockerfile error-reporting/documentation change. No service or test volume remains.
+
+Mac follow-up is separately pending: the reported 27 failures are not a cloud
+regression result. Eleven permit cases were reproduced on the older Mac baseline;
+the other sixteen have no such baseline comparison. SingleExecutionPermits.consume
+reads db.isTransaction directly. Here Node v24.19.0 reports false outside and true
+inside BEGIN IMMEDIATE; the Mac Node/SQLite property behavior is not yet known.
+This is a concrete diagnostic hypothesis, not a confirmed root cause. Preserve
+atomic claim/permit consumption and UNKNOWN semantics in any compatibility fix.
