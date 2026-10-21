@@ -56,9 +56,10 @@ and disabling/hiding unsupported controls after the actual identity boundary exi
 Sites storage guidance requires one statement per prepare and batch for multiple
 statements, and schema migration outside handlers. A batch is not evidence that
 the current read/check/write JavaScript transaction can be ported without redesign.
-This package deliberately issues one SELECT per request and makes no transactional
-write claim. It also does not claim snapshot consistency across separate jobs and
-ledger requests. UNKNOWN and duplicate constraints remain original data, never
+With the membership resolver connected, a successful request issues two SELECTs:
+one membership check followed by one scoped data read. Rejected requests may issue
+fewer. Neither the pair nor separate jobs/ledger requests have a shared snapshot;
+this package makes no transactional write claim. UNKNOWN and duplicate constraints remain original data, never
 inferred safe to reset due to missing runtime support.
 
 Minimum next deployment decision belongs to parent: confirmed private Site identity,
@@ -142,3 +143,26 @@ full original local regression 933/933 with zero failures/skips. Evidence:
 /tmp/sites-membership-targeted.log and /tmp/sites-membership-full.log. No network
 download retry, Sites resource provisioning, production DB access, Mac changes,
 credentials or social publication occurred in this follow-up.
+
+
+### Bounded review corrections
+
+Both projection TEXT primary identifiers now explicitly require NOT NULL. Ordinary
+SQLite rowid tables otherwise permit NULL for non-integer primary keys. This is an
+edit to an unapplied candidate only, not a change to a deployed migration or local DB.
+The Sites read API permits offset 0–10000 inclusive and limit 1–200 inclusive;
+larger offsets return INVALID_PAGINATION (400). This bounds deep scans without
+changing the local API. OFFSET pages are not a snapshot: concurrent insertions or
+deletions can repeat or omit rows between requests despite deterministic ordering.
+Refresh from offset zero for a current view; do not use paginated responses as an
+exact audit export or a basis for retries/UNKNOWN resolution. Cursor pagination and
+snapshot exports remain outside this slice.
+
+Before deployment, still verify real Sites identity injection, server-side member
+mapping, a D1/membership binding dedicated to that single Site, generated migration
+registration and actual Worker/D1 behavior. None is certified by local SQLite tests.
+
+Review correction acceptance: both behavior defects reproduced before the fix;
+focused suite 11/11 and full local regression 934/934 pass, with no failures or
+skips. Logs: /tmp/sites-boundary-red.log, /tmp/sites-boundary-targeted.log,
+/tmp/sites-boundary-full.log. No denied download retry, deployment or Mac change.

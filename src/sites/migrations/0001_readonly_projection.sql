@@ -1,7 +1,7 @@
 -- Candidate schema for a NEW isolated Sites read projection only.
 -- Not a migration for the full local Publisher DB; no request-time DDL or seeds.
 CREATE TABLE facebook_accounts (
-  id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY NOT NULL,
   workspace TEXT NOT NULL,
   UNIQUE(workspace,id)
 );
@@ -14,7 +14,7 @@ CREATE TABLE publisher_content_sources (
   PRIMARY KEY(workspace,source_id,revision)
 );
 CREATE TABLE publisher_jobs (
-  id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY NOT NULL,
   workspace TEXT NOT NULL,
   account_id TEXT NOT NULL,
   content_id TEXT NOT NULL,

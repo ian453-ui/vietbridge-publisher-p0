@@ -39,8 +39,9 @@ test('membership is account and workspace scoped, including injection-shaped sel
 });
 test('pagination bounds and all writes remain denied after valid membership',async t=>{
  const f=setup(t);
- for(const q of ['limit=0','limit=201','limit=1.5','offset=-1','offset=9007199254740992','limit=NaN'])assert.equal((await f.api(new Request(f.url+'&'+q))).status,400);
+ for(const q of ['limit=0','limit=201','limit=1.5','offset=-1','offset=10001','offset=9007199254740991','offset=9007199254740992','limit=NaN'])assert.equal((await f.api(new Request(f.url+'&'+q))).status,400);
  assert.equal((await f.api(new Request(f.url+'&limit=200&offset=0'))).status,200);
+ assert.equal((await f.api(new Request(f.url+'&offset=10000'))).status,200);
  const empty=await (await f.api(new Request(f.url+'&offset=1'))).json();assert.deepEqual(empty.jobs,[]);
  const before=f.sql.prepare('SELECT total_changes() n').get().n;
  for(const method of ['POST','PUT','PATCH','DELETE'])assert.equal((await f.api(new Request(f.url,{method}))).status,405);
@@ -58,4 +59,10 @@ test('missing trusted integration refuses construction; membership storage failu
  assert.throws(()=>createSitesScopeResolver(),/IDENTITY_BINDING_REQUIRED/);
  const resolveScope=createSitesScopeResolver({db:{prepare(){throw Error('internal secret');}},getTrustedIdentity:async()=>({userId:'trusted-user'})});
  const f=setup(t),api=createSitesReadonlyApi({db:{prepare(){}},origin:'https://fixture.invalid',resolveScope});const r=await api(new Request(f.url));assert.equal(r.status,403);assert.doesNotMatch(await r.text(),/secret/);
+});
+
+test('projection primary identifiers explicitly reject NULL',t=>{
+ const f=setup(t);
+ assert.throws(()=>f.sql.prepare('INSERT INTO facebook_accounts(id,workspace) VALUES(NULL,?)').run('w1'),/NOT NULL/);
+ assert.throws(()=>f.sql.exec("INSERT INTO publisher_jobs SELECT NULL,workspace,account_id,content_id,'other-snapshot',state,attempt_id,created_at,updated_at FROM publisher_jobs WHERE id='a1'"),/NOT NULL/);
 });

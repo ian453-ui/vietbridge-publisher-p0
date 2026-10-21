@@ -22,7 +22,7 @@ export function createSitesReadonlyApi({db,origin,resolveScope}={}) {
     if(!account||workspace!==scope.workspace||!Array.isArray(scope.accountIds)||!scope.accountIds.includes(account))return response(403,{error:'SCOPE_DENIED'});
     const limit=url.searchParams.has('limit')?Number(url.searchParams.get('limit')):100;
     const offset=url.searchParams.has('offset')?Number(url.searchParams.get('offset')):0;
-    if(!Number.isSafeInteger(limit)||limit<1||limit>200||!Number.isSafeInteger(offset)||offset<0)return response(400,{error:'INVALID_PAGINATION'});
+    if(!Number.isSafeInteger(limit)||limit<1||limit>200||!Number.isSafeInteger(offset)||offset<0||offset>10000)return response(400,{error:'INVALID_PAGINATION'});
     try {
       // Same original tables, scope and deterministic ordering. Deliberately no
       // snapshot/evidence/credential blobs in this initial read-only projection.
