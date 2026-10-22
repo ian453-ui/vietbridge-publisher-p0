@@ -1,3 +1,4 @@
+import {productionBinding,assertProductionDraft,assertProductionJobCurrent,assertProductionExecution,assertNoProductionMediaClone,handoffHash} from './production-handoff-guard.js';
 import {libraryPlatformEligibility} from './platform-copy-provenance.js';
 import {publicationReference,assertPublicationReference,publicationMedia} from './browser-skill-publication.js';
 import {matchesRetainedFacebookPublication} from './facebook-preparation-duplicate.js';
@@ -131,8 +132,10 @@ export class UnifiedPublisher {
     return this.saveAccount(workspace,{...account,enabled:Boolean(account.enabled),publisher_transport:transport,config_url:configUrl||account.config_url});
   }
 
-  importContent(workspace, input) {
+  importContent(workspace, input, {productionPlanId}={}) {
     this.store.requireWorkspace(workspace);
+    if(productionPlanId){const row=this.db.prepare('SELECT * FROM production_upload_plans WHERE id=? AND workspace=?').get(productionPlanId,workspace);if(!row||handoffHash(row.manifest_json)!==row.manifest_hash)fail('PRODUCTION_PLAN_SCOPE_DENIED');const m=JSON.parse(row.manifest_json),expected={source_id:'production-review:'+productionPlanId,revision:'1',title:m.payload.title,body:m.payload.body,media:m.media.map(a=>a.path),platform_payloads:{[m.platform]:{...m.payload,media:m.media.map(a=>a.path)}}};if(handoffHash(input)!==handoffHash(expected))fail('PRODUCTION_APPROVED_PAYLOAD_CHANGED');}
+    else{if(String(input.source_id||'').startsWith('production-review:'))fail('PRODUCTION_PLAN_REQUIRED');assertNoProductionMediaClone(this.db,[...(input.media||[]),...Object.values(input.platform_payloads||{}).flatMap(p=>p.media||[])]);}
     const sourceId=required(input.source_id,'云端内容编号'), revision=required(input.revision,'云端版本');
     const body=required(input.body,'正文'), title=String(input.title || '').trim();
     if(!Array.isArray(input.media) || input.media.some(x => typeof x !== 'string' || !x.trim()))fail('媒体引用格式无效');
@@ -149,13 +152,13 @@ export class UnifiedPublisher {
         if(old.payload_hash!==payloadHash)fail('同一云端版本的内容发生变化，请使用新版本');
         return this.db.prepare('SELECT * FROM group_content WHERE id=? AND workspace=?').get(old.content_id,workspace);
       }
-      const content=this.store.createContent(workspace,{title,body,media});
+      const content=this.store.createContent(workspace,{title,body,media},{productionPlanId});
       for(const [platform,payload] of Object.entries(variants))this.db.prepare('INSERT INTO publisher_content_variants VALUES(?,?,?)').run(content.id,platform,JSON.stringify(payload));
       this.db.prepare('INSERT INTO publisher_content_sources VALUES(?,?,?,?,?)').run(workspace,sourceId,revision,content.id,payloadHash);
       return content;
     });
   }
-  platformEligibility(id,platform){return libraryPlatformEligibility(this.db,id,platform);}
+  platformEligibility(id,platform){const plan=productionBinding(this.db,id);if(plan&&plan.manifest.platform!==platform)return {allowed:false,blockedReason:'制作审核仅冻结了该账号对应的平台稿，不能沿用到其他平台'};return libraryPlatformEligibility(this.db,id,platform);}
   assertPlatformSource(id,platform){const result=this.platformEligibility(id,platform);if(!result.allowed)fail(result.blockedReason);}
   contentVariants(id){return Object.fromEntries(this.db.prepare('SELECT platform,payload_json FROM publisher_content_variants WHERE content_id=?').all(id).map(x=>[x.platform,JSON.parse(x.payload_json)]));}
 
@@ -196,6 +199,7 @@ export class UnifiedPublisher {
       Object.assign(snapshot,publicationReference(this.browserSkill,account));
       snapshot.assetMetadata=publicationMedia(media);
     }
+    const productionReview=assertProductionDraft(this.db,content.id,{workspace,accountId:account.id,platform,payload,media});if(productionReview)snapshot.productionReview=productionReview;
     const fingerprint=digest(snapshot), time=new Date().toISOString();
     return this.store.tx(()=>{
       const prior=this.db.prepare(`SELECT snapshot_json,state FROM publisher_jobs WHERE workspace=? AND account_id=? AND state IN ('PREPARING','SUBMITTING','UNKNOWN','PUBLISHED')`).all(workspace,account.id);
@@ -222,9 +226,10 @@ export class UnifiedPublisher {
       : this.db.prepare('SELECT * FROM publisher_jobs WHERE workspace=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?').all(workspace,limit,offset);
     return rows.map(row=>this.decode(row));
   }
-  approve(workspace,id,fingerprint) {
+  approve(workspace,id,fingerprint,{simulationFactory}={}) {
     return this.store.tx(()=>{
       const job=this.job(workspace,id);
+      assertProductionExecution(this.db,job,simulationFactory);
       if(job.snapshot_hash!==fingerprint || digest(job.snapshot)!==fingerprint)fail('任务预览已失效');
       this.assertCurrent(job);
       if(job.state!=='DRAFT')fail('只能批准待确认任务');
@@ -233,6 +238,7 @@ export class UnifiedPublisher {
     });
   }
   assertCurrent(job) {
+    assertProductionJobCurrent(this.db,job);
     if(job.evidence?.operatorFinished)fail('任务已结束处理，不可再次发布');
     const {account,profile}=this.context(job.workspace,job.account_id),s=job.snapshot;
     if(platformOf(s)!==account.platform||digest(s.options||{})!==digest(account.publisher_options||{}))fail('平台或账号配置已变化，请重新创建任务');
@@ -271,6 +277,7 @@ export class UnifiedPublisher {
     });
   }
   manualComplete(workspace,id,input={}) {
+    assertProductionExecution(this.db,this.job(workspace,id),null);
     return this.store.tx(()=>{
       const job=this.job(workspace,id);
       if(!['DRAFT','READY','BLOCKED','UNKNOWN'].includes(job.state))fail('当前状态不能人工确认完成');

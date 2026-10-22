@@ -1,5 +1,11 @@
 # Publisher V3 bounded development acceptance — 2026-10-22
 
+This records the first four slices. The subsequent [slice 05 business connection](v3-slice-05.md)
+implements approved synthetic Review/ZIP bytes → native content/platform/job/upload
+preparation and closed local simulated submission/readback. Its 1013-test regression
+and remaining real-source authorization boundary supersede the earlier
+“archive-to-uploader handoff not integrated” status below.
+
 This closes the four development slices and the final integration pass on
 `publisher-v3/cloud-slice-01`, based on `publisher-unified` commit
 `4455a4b1faf40fedcd7020636999e165fa4a1386`. It is a runnable development increment,

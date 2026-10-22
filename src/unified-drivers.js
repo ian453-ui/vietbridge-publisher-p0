@@ -98,6 +98,7 @@ export class BrowserDriver {
 
 export function unifiedDrivers(facebook) {
   return {create:async (snapshot,guards)=>{
+    if(snapshot.productionReview)throw Error('PRODUCTION_PREVIEW_ONLY_NO_PUBLISH_AUTHORITY');
     if(snapshot.transport==='BROWSER_SKILL')return new BrowserSkillPublicationDriver(snapshot,facebook.browserSkill,guards);
     if(snapshot.platform==='xiaohongshu')return new XiaohongshuPublishDriver(snapshot);
     if(snapshot.platform==='wechat_official_account')return new WechatDraftPublishDriver(snapshot);

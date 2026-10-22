@@ -166,6 +166,16 @@ part of cloud acceptance.
 executed desktop/mobile integration, complete regression, screenshots, local demo
 and remaining implementation gaps across the full business chain. The four slices
 are a development increment; direct messaging, full human handoff, authenticated
-producer transport, archive-to-uploader handoff, live metric adapters and automated
+producer transport, real source-to-publication authorization, live metric adapters and automated
 metric-to-production iteration are not completed by these slices. No new live
 authorization, merge or deployment follows from passing synthetic tests.
+
+## Approved content to native upload preparation
+
+[Slice 05](v3-slice-05.md) connects approved synthetic Review BLOBs (including ZIP
+media) to the original content variants, DRAFT jobs and freezeMedia uploader input.
+It reuses the original executor for a closed local simulation of one submit and
+readback, including UNKNOWN reconciliation in a fresh process. The application
+only prepares inspectable plans; real producer authentication, original source
+approval and separate per-account/task publication authority remain required and
+unavailable for this new source path. No new live execution permission is inferred.

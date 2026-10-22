@@ -1,3 +1,4 @@
+import {assertProductionJobCurrent,assertProductionExecution} from './production-handoff-guard.js';
 import {matchesRetainedFacebookPublication} from './facebook-preparation-duplicate.js';
 import {randomUUID,createHash} from 'node:crypto';
 import {operatingDay} from './operating-day.js';
@@ -25,7 +26,9 @@ export class UnifiedExecutor {
     this.permits=new SingleExecutionPermits(publisher);
   }
   freezeMedia(job) {
+    const productionPlan=assertProductionJobCurrent(this.db,job);
     const old=this.db.prepare('SELECT * FROM publisher_job_assets WHERE job_id=? ORDER BY ordinal').all(job.id);
+    if(productionPlan&&old.some((a,i)=>a.sha256!==productionPlan.manifest.media[i]?.sha256))throw Error('PRODUCTION_MEDIA_CHANGED');
     if(old.length) {
       if(old.length!==job.snapshot.media.length)throw Error('媒体快照不完整');
       for(const asset of old)if(hashFile(asset.path).sha256!==asset.sha256)throw Error('媒体快照已变化');
@@ -34,9 +37,10 @@ export class UnifiedExecutor {
     const assets=job.snapshot.media.map((value,ordinal)=>{
       const source=realpathSync(value);
       const roots=(typeof this.mediaRoots==='function'?this.mediaRoots(job):this.mediaRoots).filter(existsSync).map(path=>realpathSync(path));
+      if(productionPlan)roots.push(dirname(productionPlan.manifest.media[ordinal].path));
       if(!roots.some(root=>{const rel=relative(root,source);return rel&&!rel.startsWith('..')&&!rel.startsWith('/');}))throw Error('媒体不属于已配置客户内容目录');
       const ext=extname(source).toLowerCase();if(!['.png','.jpg','.jpeg','.webp','.mp4'].includes(ext))throw Error('媒体格式不支持');
-      const meta=hashFile(source),h=meta.header;
+      const meta=hashFile(source),h=meta.header;if(productionPlan&&meta.sha256!==productionPlan.manifest.media[ordinal].sha256)throw Error('PRODUCTION_MEDIA_CHANGED');
       const valid=ext==='.png'?h.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):['.jpg','.jpeg'].includes(ext)?h[0]===255&&h[1]===216&&h[2]===255:ext==='.webp'?h.toString('ascii',0,4)==='RIFF'&&h.toString('ascii',8,12)==='WEBP':h.toString('ascii',4,8)==='ftyp';
       if(!valid||!meta.sizeBytes)throw Error('媒体文件签名无效');
       const directory=join(this.snapshotRoot,job.id);mkdirSync(directory,{recursive:true,mode:0o700});
@@ -48,14 +52,14 @@ export class UnifiedExecutor {
     return assets.map(x=>x.path);
   }
   approve(workspace,id,hash) {
-    const job=this.publisher.job(workspace,id);if(job.state!=='DRAFT')throw Error('只能批准待确认任务');
+    const job=this.publisher.job(workspace,id);assertProductionExecution(this.db,job,this.drivers);if(job.state!=='DRAFT')throw Error('只能批准待确认任务');
     if(job.snapshot_hash!==hash)throw Error('预览版本已失效');
     this.publisher.assertCurrent(job);
     const scopedApproval=this.scopedOperations?.policy.approved_targets?.some(t=>t.subject_id==='PAGE:'+id);
     if(scopedApproval)this.scopedOperations.describeApproval(id);
     this.freezeMedia(job);
     if(scopedApproval)this.scopedOperations.describe('PAGE',id);
-    return this.publisher.approve(workspace,id,hash);
+    return this.publisher.approve(workspace,id,hash,{simulationFactory:this.drivers});
   }
   reopen(workspace,id){
     return this.publisher.store.tx(()=>{
@@ -131,7 +135,7 @@ export class UnifiedExecutor {
     }finally{try{await driver?.close();}finally{release?.();}}
   }
   executionCapability(workspace,id) {
-    const job=this.publisher.job(workspace,id);
+    const job=this.publisher.job(workspace,id);try{assertProductionExecution(this.db,job,this.drivers);}catch(error){return {canExecute:false,mode:'PRODUCTION_PREVIEW_ONLY',reason:error.message};}
     if(job.snapshot.transport==='BROWSER_SKILL'){
       try{if(!this.scopedOperations||this.permits.record(id))throw Error('BSK_ORIGINAL_SCOPED_CONFIRMATION_REQUIRED');this.assertClaimable(job);return this.scopedOperations.capability('PAGE',id);}catch(error){return {canExecute:false,mode:'TASK_CONFIRM',reason:error.message};}
     }
@@ -144,6 +148,7 @@ export class UnifiedExecutor {
     catch(error){return {canExecute:false,mode:'GLOBAL',reason:error.message};}
   }
   assertClaimable(job) {
+    assertProductionExecution(this.db,job,this.drivers);
     if(job.state!=='READY')throw Error('只有确认后的任务可执行；未知结果必须核对');
     this.publisher.assertCurrent(job);
     if(this.db.prepare('SELECT id,snapshot_json,evidence_json,state FROM publisher_jobs WHERE workspace=? AND id<>?').all(job.workspace,job.id).some(row=>matchesRetainedFacebookPublication(this.db,row,job.snapshot,job.id)))throw Error('相同实际正文与媒体仍有准备副作用待核对，不能重发');
@@ -167,6 +172,7 @@ export class UnifiedExecutor {
     });
   }
   async execute(workspace,id,input={}) {
+    assertProductionExecution(this.db,this.publisher.job(workspace,id),this.drivers);
     const initial=this.publisher.job(workspace,id),profile=this.executionKey(initial.snapshot);
     if(!this.enabled&&!this.permits.record(id)&&!this.scopedOperations&&!this.pageExecution)throw Error('验收模式未开启真实提交');
     if(this.active.has(profile))throw Error('该浏览器账号正在执行任务');
@@ -223,6 +229,7 @@ export class UnifiedExecutor {
       this.db.prepare('SELECT 1 FROM publisher_prepare_intents WHERE job_id=?').get(job.id)&&!this.db.prepare('SELECT 1 FROM publisher_submit_intents WHERE job_id=?').get(job.id)&&!this.db.prepare('SELECT 1 FROM publisher_submit_receipts WHERE job_id=?').get(job.id));
   }
   async resumePrepared(workspace,id,input={}){
+    assertProductionExecution(this.db,this.publisher.job(workspace,id),this.drivers);
     const job=this.publisher.job(workspace,id),s=job.snapshot,e=job.evidence,attempt=job.attempt_id;
     if(Object.keys(input).sort().join(',')!=='attempt_id,confirm,snapshot_hash'||input.confirm!==true||input.attempt_id!==attempt||input.snapshot_hash!==job.snapshot_hash)throw Error('原任务、attempt 与冻结版本必须逐项确认');
     if(!this.canResumePrepared(job))throw Error('原任务没有可恢复的确定准备阶段证据');
@@ -264,6 +271,7 @@ export class UnifiedExecutor {
     }finally{try{await driver?.close();}finally{try{release?.();}finally{this.active.delete(this.executionKey(s));}}}
   }
   complete(workspace,id,evidence) {
+    const productionJob=this.publisher.job(workspace,id);assertProductionExecution(this.db,productionJob,this.drivers,{reconcile:true});if(productionJob.snapshot.productionReview&&evidence?.syntheticOnly!==true)throw Error('PRODUCTION_SYNTHETIC_EVIDENCE_REQUIRED');
     const job=this.publisher.job(workspace,id);
     if(!['SUBMITTING','UNKNOWN'].includes(job.state))throw Error('任务不在可核对状态');
     const submitIntent=this.db.prepare('SELECT 1 FROM publisher_submit_intents WHERE job_id=?').get(id);
@@ -326,6 +334,7 @@ export class UnifiedExecutor {
     }finally{try{release();}finally{this.active.delete(this.executionKey(job.snapshot));}}
   }
   async reconcile(workspace,id,input={}) {
+    assertProductionExecution(this.db,this.publisher.job(workspace,id),this.drivers,{reconcile:true});
     const job=this.publisher.job(workspace,id);if(job.state!=='UNKNOWN')throw Error('任务当前不需要核对');
     if(this.active.has(this.executionKey(job.snapshot)))throw Error('该账号正在执行任务');
     this.active.add(this.executionKey(job.snapshot));let driver,release;
