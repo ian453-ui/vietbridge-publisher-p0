@@ -6,7 +6,7 @@ export async function bounded(promise,ms){let timer;try{return await Promise.rac
  * No deletes, listing sweep, TTL lease reclamation or cross-scope object access.
  */
 export class ScopedObjectStore extends AsyncStorage {
- constructor(db,bucket,{timeoutMs=5000}={}){super(db);if(!bucket?.put||!bucket?.get)fail('R2_BINDING_REQUIRED');if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>5000)fail('OBJECT_TIMEOUT_INVALID');this.bucket=bucket;this.timeoutMs=timeoutMs;}
+ constructor(db,bucket,{timeoutMs=5000,authorization=null}={}){super(db,{authorization});if(!bucket?.put||!bucket?.get)fail('R2_BINDING_REQUIRED');if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>5000)fail('OBJECT_TIMEOUT_INVALID');this.bucket=bucket;this.timeoutMs=timeoutMs;}
  async row(id,scope){await this.scope(scope.workspace,scope.accountId);const row=await this.one('SELECT * FROM sites_objects WHERE id=? AND workspace=? AND account_id=?',[id,scope.workspace,scope.accountId]);if(!row)fail('OBJECT_NOT_FOUND');return row;}
  async readBody(row,deadline){
   const left=()=>{const remaining=Math.floor(deadline-performance.now());if(remaining<1)fail('OBJECT_IO_TIMEOUT');return remaining;};

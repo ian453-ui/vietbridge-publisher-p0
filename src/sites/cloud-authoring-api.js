@@ -2,6 +2,7 @@ import {createSitesReadonlyApi} from './readonly-api.js';
 import {createSitesScopeResolver} from './membership.js';
 import {AsyncReviewStore} from './async-review-store.js';
 import {AsyncMetricStore} from './async-metric-store.js';
+import {authorizationGuard,authorizationChanged} from './async-storage.js';
 
 export const cloudPlatforms=Object.freeze(['facebook','xiaohongshu','wechat_official_account','wechat_channels']);
 const flags=Object.freeze({executionEnabled:false,publish_allowed:false,source_gate_satisfied:false,media_processing:'CLOUD_SERVICE_NOT_CONNECTED',producer_authenticated:false});
@@ -40,8 +41,8 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
   const entityId=crypto.randomUUID(),at=now(),condition={userId,commandId:input.command_id,hash};
   // Every dependent INSERT selects the winning command's entity ID. Another
   // isolate can win the command key; no second side effect uses our losing UUID.
-  const commands=[statement('INSERT INTO sites_authoring_commands(owner_user_id,command_id,kind,command_hash,entity_id,committed,created_at) VALUES(?,?,?,?,?,0,?) ON CONFLICT(owner_user_id,command_id) DO NOTHING',[userId,input.command_id,kind,hash,entityId,at]),...makeStatements(condition,at),statement('UPDATE sites_authoring_commands SET committed=1 WHERE owner_user_id=? AND command_id=? AND command_hash=? AND committed=0',[userId,input.command_id,hash])];
-  try{const results=await db.batch(commands);if(!Array.isArray(results)||results.length!==commands.length||results.some(x=>x.success===false))fail('STORAGE_OUTCOME_UNCONFIRMED',503);}catch(error){if(error.status)throw error;fail('STORAGE_WRITE_REJECTED',409);}
+  const commands=[statement('INSERT INTO sites_authoring_commands(owner_user_id,command_id,kind,command_hash,entity_id,committed,created_at) VALUES(?,?,?,?,?,0,?) ON CONFLICT(owner_user_id,command_id) DO NOTHING',[userId,input.command_id,kind,hash,entityId,at]),...makeStatements(condition,at),...(kind==='WORKSPACE'?[]:[authorizationGuard(db,{userId,workspace:input.workspace,accountId:kind==='ACCOUNT'?null:input.account_id})]),statement('UPDATE sites_authoring_commands SET committed=1 WHERE owner_user_id=? AND command_id=? AND command_hash=? AND committed=0',[userId,input.command_id,hash]),statement('DELETE FROM sites_authorization_assertions')];
+  try{const results=await db.batch(commands);if(!Array.isArray(results)||results.length!==commands.length||results.some(x=>x.success===false))fail('STORAGE_OUTCOME_UNCONFIRMED',503);}catch(error){if(error.status)throw error;if(authorizationChanged(error))fail('SCOPE_DENIED',403);fail('STORAGE_WRITE_REJECTED',409);}
   const receipt=await one('SELECT * FROM sites_authoring_commands WHERE owner_user_id=? AND command_id=?',[userId,input.command_id]);
   if(!receipt||receipt.command_hash!==hash||receipt.kind!==kind)fail('COMMAND_CONFLICT');if(receipt.committed!==1)fail('COMMAND_OUTCOME_UNKNOWN');return {id:receipt.entity_id,duplicate:receipt.entity_id!==entityId};
  }
@@ -57,8 +58,8 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
    const evidenceRoute=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/(reviews|metrics)(?:\/([a-f0-9]{64})(?:\/(history|assets\/([^/]+)\/([^/]+)))?)?$/);
    if(evidenceRoute){
     if(request.method!=='GET')fail('METHOD_NOT_ALLOWED',405);const [,workspace,resource,id,tail,source,artifact]=evidenceRoute,accountId=url.searchParams.get('accountId');await account(userId,workspace,accountId);
-    if(resource==='metrics'){const store=new AsyncMetricStore(db);if(tail&&tail!=='history')fail('OPERATION_UNAVAILABLE',404);return response(200,id?(tail==='history'?await store.history(id,{workspace,accountId,before:url.searchParams.get('cursor')||''}):await store.snapshot(id,{workspace,accountId,...(url.searchParams.has('asOf')?{asOf:url.searchParams.get('asOf')}:{})})):await store.list(workspace,accountId,{cursor:url.searchParams.get('cursor')||'',...(url.searchParams.has('asOf')?{asOf:url.searchParams.get('asOf')}:{})}));}
-    const store=new AsyncReviewStore(db,{bucket});if(tail==='history')fail('OPERATION_UNAVAILABLE',404);
+    const authorization={userId,workspace,accountId};if(resource==='metrics'){const store=new AsyncMetricStore(db,{authorization});if(tail&&tail!=='history')fail('OPERATION_UNAVAILABLE',404);return response(200,id?(tail==='history'?await store.history(id,{workspace,accountId,before:url.searchParams.get('cursor')||''}):await store.snapshot(id,{workspace,accountId,...(url.searchParams.has('asOf')?{asOf:url.searchParams.get('asOf')}:{})})):await store.list(workspace,accountId,{cursor:url.searchParams.get('cursor')||'',...(url.searchParams.has('asOf')?{asOf:url.searchParams.get('asOf')}:{})}));}
+    const store=new AsyncReviewStore(db,{bucket,authorization});if(tail==='history')fail('OPERATION_UNAVAILABLE',404);
     if(source){const asset=await store.asset(workspace,accountId,id,decodeURIComponent(source),decodeURIComponent(artifact));return new Response(asset.data,{headers:{'Content-Type':asset.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Length':String(asset.data.byteLength)}});}
     return response(200,id?await store.detail(workspace,accountId,id):await store.list(workspace,accountId,{cursor:url.searchParams.get('cursor')||''}));
    }

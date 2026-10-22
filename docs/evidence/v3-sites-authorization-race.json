@@ -1,0 +1,39 @@
+{
+  "base_commit": "9bbddd349a478640e55b83c257e4c7f1bfa565fb",
+  "reproduced": true,
+  "barrier": "After preflight authorization and before db.batch; second connection commits revocation",
+  "runs": [
+    {
+      "path": "/tmp/v3-sites-authorization-race-before.log",
+      "sha256": "6eff29c7af25e399a8fc27784542877cf5ab2b0d01d6a2729c7f8e6f31b731af",
+      "tests": 3,
+      "pass": 0,
+      "fail": 3,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 140.714974
+    },
+    {
+      "path": "/tmp/v3-sites-authorization-race-after.log",
+      "sha256": "fdbbbc9168b006d70bbbadae27776018f0a760846fb796f0ede258e0caa210ec",
+      "tests": 25,
+      "pass": 25,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 747.732236
+    },
+    {
+      "path": "/tmp/v3-sites-authorization-final.log",
+      "sha256": "627339767de1504452013f971eef892549094b04df7f59c81c0e71c09a483742",
+      "tests": 43,
+      "pass": 43,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 8655.393304
+    }
+  ],
+  "scope": "Synthetic file SQLite with D1 interface; hosted D1 unverified",
+  "real_social_operations": 0
+}

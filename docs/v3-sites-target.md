@@ -109,3 +109,8 @@ and unfinished integration code, not a Mac availability issue.
 The earlier denied real Study ZIP download and official overview Markdown executor
 request remain stopped. No retry, alternate route, sharing change or original
 media deletion was made as part of this migration.
+
+[The authorization-race repair](v3-sites-authorization-race.md) supersedes the
+earlier pre-batch-only write checks: current owner and exact active membership
+are now asserted in the same atomic authoring/evidence batch, with executed
+second-connection revocation regressions. Hosted identity/D1 remain unverified.

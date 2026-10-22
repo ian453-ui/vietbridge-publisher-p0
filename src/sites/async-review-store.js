@@ -11,7 +11,7 @@ export const CLOUD_REVIEW_LIMITS=Object.freeze({artifacts:32,bytes:32*1024*1024,
  * Readback is never approval/source authentication, and never re-runs ffmpeg here.
  */
 export class AsyncReviewStore extends AsyncStorage {
- constructor(db,{bucket,inspectionProvider=null,timeoutMs=5000}={}){super(db);this.objects=bucket?new ScopedObjectStore(db,bucket,{timeoutMs}):null;this.provider=inspectionProvider;}
+ constructor(db,{bucket,inspectionProvider=null,timeoutMs=5000,authorization=null}={}){super(db,{authorization});this.objects=bucket?new ScopedObjectStore(db,bucket,{timeoutMs,authorization}):null;this.provider=inspectionProvider;}
  async intake(reference){
   exact(reference,['workspace','accountId','task_id','request_revision']);if(!text(reference.task_id)||!Number.isSafeInteger(reference.request_revision)||reference.request_revision<1)fail('REVIEW_REFERENCE_INVALID');await this.scope(reference.workspace,reference.accountId);
   if(!this.provider?.readInspection)fail('CLOUD_INSPECTOR_UNAVAILABLE');if(!this.objects)fail('R2_BINDING_REQUIRED');const deadline=performance.now()+CLOUD_REVIEW_LIMITS.wallMs;
