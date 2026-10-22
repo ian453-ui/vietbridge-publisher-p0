@@ -10,6 +10,13 @@ handoff documents and their historical counts are evidence of prior work only.
 
 ## Product and release boundary
 
+**Formal delivery target (user direction 2026-10-22 02:17:41 UTC): ChatGPT Sites
+UI plus cloud services, independent of the Mac.** Native Node/SQLite/decoder tests
+are development evidence, not formal hosted delivery. Preserve the old Mac/V1/V2
+installations. [Sites target, current official evidence, missing code and workflow
+blocker](v3-sites-target.md) separates the portable API from native heavy processing.
+Do not port native transactions/ffmpeg by assumption or ship a static shell as V3.
+
 One workspace/account context, multiple tasks, existing Tabs, complete content
 reading/previews and per-platform publishing paths must survive. V3 incrementally
 extends the unified baseline; it does not replace V1/V2 with an empty dashboard.
@@ -33,6 +40,12 @@ not authenticated by the existing contract, so real-source approval remains
 disabled. No content decision satisfies original-library approval or publication
 authorization. Version/hash/account/target changes invalidate earlier decisions;
 see [implemented boundary and executed acceptance](v3-slice-04.md).
+
+Slice 06 adds server-injected source identity/request/result verification,
+append-only approval/revocation evidence and exact human-decision links. Only a
+test fixture implements a provider; real producer authentication stays disabled.
+Existing publication permit/scoped authority is observed independently, never
+issued by content approval. [Contracts and failure acceptance](v3-slice-06.md).
 
 ## Source-backed architecture and reuse decisions
 

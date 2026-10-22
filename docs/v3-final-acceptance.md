@@ -1,5 +1,13 @@
 # Publisher V3 bounded development acceptance — 2026-10-22
 
+**Current formal delivery target: ChatGPT Sites UI and cloud services, independent
+of Mac. This document's Node/browser demonstrations are development acceptance,
+not a hosted V3 delivery.** See [Sites runtime/migration status](v3-sites-target.md).
+Subsequent [slice 06](v3-slice-06.md) implements server-only source verification
+interfaces, exact source-decision audit bindings and independent existing-permit
+observation. Real trusted providers remain unconfigured. New execution evidence
+is recorded per slice; none of the earlier counts below is presented as a new run.
+
 This records the first four slices. The subsequent [slice 05 business connection](v3-slice-05.md)
 implements approved synthetic Review/ZIP bytes → native content/platform/job/upload
 preparation and closed local simulated submission/readback. Its 1013-test regression

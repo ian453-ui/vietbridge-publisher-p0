@@ -1,0 +1,162 @@
+{
+  "package": "V3 slice 06",
+  "base_commit": "4f3ff071bc5ced5a7867a5d377e7d2182b8589f6",
+  "branch": "publisher-v3/cloud-slice-01",
+  "recorded_at": "2026-10-22T02:30:50.475792+00:00",
+  "final_command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SOURCE_EVIDENCE_DIR=/tmp/v3-source-evidence node --test --test-concurrency=4 test/*.test.js",
+  "execution_environment": "new cloud workspace /workspace/publisher-v3; no Mac use",
+  "runs": [
+    {
+      "name": "unit_first",
+      "log_path": "/tmp/v3-source-unit-first.log",
+      "sha256": "1992eaf9596d96d153d519a567f17ac1f1d2b24a7be6372c08e610637d5cb1ed",
+      "note": "9/10; corrected test counter property submits, no guard change",
+      "tests": 10,
+      "pass": 9,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 16546.372873
+    },
+    {
+      "name": "targeted_first",
+      "log_path": "/tmp/v3-source-targeted-first.log",
+      "sha256": "c2b666df8298d1a31fb484215dae8c4fd3fb155c0761e906d981b65f3f682c66",
+      "note": "19/19 including original approval regressions",
+      "tests": 19,
+      "pass": 19,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 16898.298224
+    },
+    {
+      "name": "ui_integration_first",
+      "log_path": "/tmp/v3-source-ui-integration-first.log",
+      "sha256": "18f7262871d11291b4bb98756025c421b01f21487ad71f0c2cfc3853d8db7197",
+      "note": "15/17; reload returns to original default Tab, tests now select Review explicitly",
+      "tests": 17,
+      "pass": 15,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 26504.56644
+    },
+    {
+      "name": "targeted_final_before_full",
+      "log_path": "/tmp/v3-source-targeted-final.log",
+      "sha256": "303a8b8f246157572b9e8b754e3fec17bfedfc23f40309c25797cb40eb57bb64",
+      "note": "17/18; UNKNOWN execution throws by native contract; test corrected to assert rejection then persisted state",
+      "tests": 18,
+      "pass": 17,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 19918.288518
+    },
+    {
+      "name": "full_missing_ffmpeg_env",
+      "log_path": "/tmp/v3-source-full.log",
+      "sha256": "24e64fcf2ef7407964cb8f7ec2981a7a63a9a1c0e3a2daca2ddeaf340d6011a1",
+      "note": "1029/1031; two inherited fixtures default to /opt/homebrew/bin/ffmpeg; no production code change",
+      "tests": 1031,
+      "pass": 1029,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 97233.396539
+    },
+    {
+      "name": "full_before_read_fix",
+      "log_path": "/tmp/v3-source-full-accepted.log",
+      "sha256": "a04f06b57667d67c54509ecc3282f1fcd17bee1711847c8178ae97bdcb055394",
+      "note": "1031/1031 with explicit cloud ffmpeg path",
+      "tests": 1031,
+      "pass": 1031,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 100467.114486
+    },
+    {
+      "name": "corrupt_read_red",
+      "log_path": "/tmp/v3-source-view-red.log",
+      "sha256": "4767f9345e447cb320673268fd3731928d1b0ce73b53fdc245e3625e2f9cf7f5",
+      "note": "Reproduced new blocked-status read regression before fixing",
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 1786.408134
+    },
+    {
+      "name": "full_final",
+      "log_path": "/tmp/v3-source-full-final.log",
+      "sha256": "c63057c72873f32a4095fd8331799bd8db9c0ef9804d942bea4dc920511b5463",
+      "note": "Final source state; 1031/1031",
+      "tests": 1031,
+      "pass": 1031,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 101060.354674
+    }
+  ],
+  "syntax": {
+    "count": 11,
+    "files": [
+      "src/production-approval-store.js",
+      "src/production-publication-authority.js",
+      "src/production-source-evidence.js",
+      "src/production-source-state.js",
+      "src/production-upload-plan.js",
+      "src/server.js",
+      "src/unified-client.js",
+      "test/fixtures/trusted-production-source.js",
+      "test/production-publication-authority.test.js",
+      "test/production-source-evidence.test.js",
+      "test/production-source-http-ui.test.js"
+    ],
+    "result": "PASS"
+  },
+  "screenshots": [
+    {
+      "file": "docs/evidence/v3-slice-06-desktop.png",
+      "sha256": "c679dc09077c479966f063f627e97d6a253d724272705753432e6f96e10b1dee",
+      "content": "Synthetic original Review UI; source approval plus explicit human decision",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "docs/evidence/v3-slice-06-mobile.png",
+      "sha256": "ed378419fecfbfaf1fcd4e0bd37382c9719da9c6e6cc407c67829ed24d42bb79",
+      "content": "Synthetic original Review UI; source approval plus explicit human decision",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ],
+  "real_producer_provider": "UNCONFIGURED",
+  "real_media_sample": "UNVERIFIED; previous Drive materialization 403; no retry",
+  "sites": {
+    "formal_target": true,
+    "cloud_skill_catalog_count": 0,
+    "executor_skill_catalog_count": 0,
+    "skill_read": "skill package is not available",
+    "hosting_json_present": false,
+    "create_attempted": false,
+    "deploy_attempted": false,
+    "runtime_validation": "UNVERIFIED; existing portable read adapter only locally tested"
+  },
+  "notes": [
+    "No old 934/934 or slice05 1013/1013 count reused as current evidence.",
+    "All trusted source/provider identities are test fixtures only.",
+    "Static parent reviews did not execute these commands."
+  ],
+  "real_social_publication_or_interaction_operations": 0,
+  "real_producer_or_drive_reads": 0
+}

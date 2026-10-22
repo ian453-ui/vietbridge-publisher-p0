@@ -392,21 +392,23 @@ export async function mountProductionReview({workspace,accountId,token,fetcher=f
      return `<section><h4>${reviewEscape(a.artifact_id)} · ${reviewEscape(a.kind)}</h4><p>${reviewEscape(a.validation.level)} · SHA256 ${reviewEscape(a.sha256)}</p>${a.kind==='video'?'<p>已全流解码；浏览器播放、音画质量和字幕对齐待人工验收。</p>':''}${media}</section>`;
     }).join('')}</article>`).join('');
     for(const pre of target.querySelectorAll('[data-review-text]')){const response=await fetcher(pre.dataset.reviewText);if(!response.ok)throw Error('正文读取失败');const text=await response.text();if(pre.isConnected)pre.textContent=text;}
-    if(details.isConnected&&report.approval)mountProductionDecision(details,target,report.approval,{base,scope,token,fetcher,read,uploadChoices:report.upload_choices||[]});
+    if(details.isConnected&&report.approval)mountProductionDecision(details,target,report.approval,{base,scope,token,fetcher,read,uploadChoices:report.upload_choices||[],sourceVerification:report.source_verification});
     details.dataset.loaded='true';
    }catch(error){if(details.isConnected)target.textContent=error.message;}
   });
  }catch(error){if(node.isConnected)node.textContent=error.message;}
 }
 
-function mountProductionDecision(details,target,initial,{base,scope,token,fetcher,read,uploadChoices=[]}){
+function mountProductionDecision(details,target,initial,{base,scope,token,fetcher,read,uploadChoices=[],sourceVerification}){
  const section=document.createElement('section');section.dataset.productionApproval='';target.append(section);
  const labels={PENDING:'此版本待人工决定',CONTENT_APPROVED:'此版本内容已批准 · 不授权发布',CONTENT_REJECTED:'此版本内容已拒绝',REVOKED:'旧批准已撤销 · 需要重新审核',BLOCKED:'审批入口未开放'};
  const checks={CONTENT_FACTS:'已核对正文事实和来源',VISUAL_QA:'已检查图像文字、布局与正文的一致性',VIDEO_PLAYBACK_AND_SUBTITLE_ALIGNMENT:'已检查视频音画与字幕（如有）',ORIGINAL_SOURCE_REVIEW:'已核对原始资料；原资料库批准门禁仍需独立满足'};
  const path=base+'/'+details.dataset.productionReview+'?'+scope;
- async function refresh(){const report=await read(path);if(details.isConnected)render(report.approval);}
+ async function refresh(){const report=await read(path);if(details.isConnected){sourceVerification=report.source_verification;render(report.approval);}}
  function render(approval){
   section.innerHTML=`<h3>人工内容决定</h3><p data-approval-state="${reviewEscape(approval.state)}">${reviewEscape(labels[approval.state]||approval.state)}</p><p>${approval.provenance==='SYNTHETIC_FIXTURE'?'合成制作方流程验收；不是真实制作方认证。':'真实制作方认证不可用，批准保持禁用。'} 原内容审核与各账号发布授权仍独立保留。</p><p>目标平台：${reviewEscape(approval.target_platforms.join('、')||'未知')}${approval.blocked_reason?' · '+reviewEscape(approval.blocked_reason):''}</p><div data-approval-controls></div><button type="button" data-approval-refresh>刷新审批状态</button><p data-approval-notice role="status"></p><details><summary>审批审计（${approval.history.length}${approval.history_truncated?'+':''} 条）</summary>${approval.history.map(e=>`<p>${reviewEscape(e.created_at)} · ${reviewEscape(e.kind)} · ${reviewEscape(e.actor_id==='SYSTEM_VALIDATOR'?'系统失效检查':'已认证管理员')} · ${reviewEscape(e.reason)}</p>`).join('')||'<p>尚无审批事件。</p>'}</details>`;
+  const source=document.createElement('p');source.dataset.sourceVerification=sourceVerification?.status||'UNCONFIGURED';source.textContent='来源核验：'+(sourceVerification?.required?(sourceVerification.blocked||sourceVerification.status):'未配置可信提供方')+'；此证据不授予发布权限。';section.append(source);
+  if(sourceVerification?.can_verify&&token){const verify=document.createElement('button');verify.type='button';verify.textContent='读取来源审批证据';verify.dataset.verifySource='';section.append(verify);verify.onclick=async()=>{verify.disabled=true;try{const response=await fetcher(base+'/'+details.dataset.productionReview+'/verify-source?'+scope,{method:'POST',headers:{'Content-Type':'application/json','X-Local-Token':token},body:JSON.stringify({expected_subject:approval.subject_fingerprint})}),result=await response.json();if(!response.ok)throw Error(result.error||'来源核验失败');await refresh();}catch(error){if(source.isConnected)source.textContent=error.message+'；未自动重试。';}};}
   const notice=section.querySelector('[data-approval-notice]');section.querySelector('[data-approval-refresh]').onclick=()=>refresh().catch(error=>{if(section.isConnected)notice.textContent=error.message;});
   if(approval.can_decide&&token&&approval.state==='CONTENT_APPROVED'&&uploadChoices.length){
    const prepare=document.createElement('div');prepare.innerHTML='<label>已审平台稿<select data-production-upload-choice>'+uploadChoices.map((c,i)=>'<option value="'+i+'">'+reviewEscape(c.source_id+' · '+c.platform+' · '+c.payload_artifact_id)+'</option>').join('')+'</select></label><button type="button" data-production-upload>生成上传准备与预览（不发布）</button><p data-production-upload-status role="status"></p>';section.append(prepare);

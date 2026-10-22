@@ -1,3 +1,4 @@
+import {ProductionSourceEvidence} from './production-source-evidence.js';
 import {ProductionUploadPlans} from './production-upload-plan.js';
 import {productionBinding} from './production-handoff-guard.js';
 import {createServer} from 'node:http';
@@ -43,6 +44,7 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
  const access=cloud?new PublisherAccess(cloud):null;
  const unified=options.unified?new UnifiedPublisher(store):null;
  const productionReviews=unified?new ProductionReviewStore(store.db):null;
+ const productionSources=unified?new ProductionSourceEvidence(store.db,options.productionSourceEvidence):null;
  const metricObservations=unified?new MetricObservationStore(store.db):null;
  if(unified)unified.browserSkill=facebook.browserSkill;
  if(unified&&options.recoverStartup)unified.recoverAfterShutdown();
@@ -98,7 +100,8 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
   }
   const productionDecision=productionReviews&&url.pathname.match(/^\/api\/production-reviews\/([a-f0-9]{64})\/decision$/);
   const productionUpload=productionReviews&&url.pathname.match(/^\/api\/production-reviews\/([a-f0-9]{64})\/upload-plan$/);
-  if(productionReviews&&url.pathname.startsWith('/api/production-reviews')&&!(req.method==='POST'&&(productionDecision||productionUpload))){
+  const productionVerify=productionReviews&&url.pathname.match(/^\/api\/production-reviews\/([a-f0-9]{64})\/verify-source$/);
+  if(productionReviews&&url.pathname.startsWith('/api/production-reviews')&&!(req.method==='POST'&&(productionDecision||productionUpload||productionVerify))){
    if(req.method!=='GET')return send(res,405,{error:'REVIEW_READ_ONLY'});
    const workspace=url.searchParams.get('workspace'),account=url.searchParams.get('accountId');
    try{
@@ -106,7 +109,7 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
     if(url.pathname==='/api/production-reviews')return send(res,200,{reviews:productionReviews.list(workspace,account)});
     const match=url.pathname.match(/^\/api\/production-reviews\/([a-f0-9]{64})(\/asset)?$/);
     if(!match)return send(res,404,{error:'REVIEW_NOT_FOUND'});
-    if(!match[2])return send(res,200,{...productionReviews.detail(workspace,account,match[1]),approval:productionReviews.approvals.view(match[1],{workspace,accountId:account},{admin:principal?.type==='admin'}),upload_choices:productionUploads.choices(match[1],{workspace,accountId:account})});
+    if(!match[2])return send(res,200,{...productionReviews.detail(workspace,account,match[1]),approval:productionReviews.approvals.view(match[1],{workspace,accountId:account},{admin:principal?.type==='admin'}),source_verification:productionSources.view(match[1],{workspace,accountId:account}),upload_choices:productionUploads.choices(match[1],{workspace,accountId:account})});
     const asset=productionReviews.asset(workspace,account,match[1],url.searchParams.get('source'),url.searchParams.get('artifact'));
     res.setHeader('Content-Type',asset.mime);res.setHeader('Content-Length',asset.data.length);
     res.setHeader('Content-Security-Policy',"default-src 'none'; sandbox");return res.end(Buffer.from(asset.data));
@@ -163,11 +166,11 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
    if((principal?.type!=='app'&&(req.headers.origin!==origin||req.headers['x-local-token']!==token)||principal?.type==='app'&&req.headers.origin&&req.headers.origin!==origin)||!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(req.headers['content-type']||''))throw Error('本地请求验证失败，请刷新页面');
    const input=await readRequestJson(req);
    options.requestGuard?.({method:req.method,url,input,principal});
-   if(productionDecision||productionUpload){
+   if(productionDecision||productionUpload||productionVerify){
     if(principal?.type!=='admin')return send(res,403,{error:'APPROVAL_ADMIN_REQUIRED'});
     const authority={kind:'EXISTING_ADMIN',actor_id:'admin:'+createHash('sha256').update(access.data.user).digest('hex')};
     const scope={workspace:url.searchParams.get('workspace'),accountId:url.searchParams.get('accountId')};
-    return send(res,200,productionUpload?productionUploads.prepare(productionUpload[1],input,scope,{authority}):productionReviews.approvals.decide(productionDecision[1],input,scope,{authority}));
+    return send(res,200,productionVerify?await productionSources.verify(productionVerify[1],input,scope,{authority}):productionUpload?productionUploads.prepare(productionUpload[1],input,scope,{authority}):productionReviews.approvals.decide(productionDecision[1],input,scope,{authority}));
    }
    const scoped=executor?.scopedOperations||interactiveScoped;
    const groupCapability=url.pathname.match(/^\/api\/workspaces\/([^/]+)\/group-jobs\/([^/]+)\/execution-capability$/),interactionCapability=url.pathname.match(/^\/api\/workspaces\/([^/]+)\/proactive\/posts\/([^/]+)\/execution-capability$/);

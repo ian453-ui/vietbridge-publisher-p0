@@ -1,6 +1,7 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {verifyProductionRequest,productionResultFingerprint,PRODUCTION_BATCH_LIMITS} from './production-artifact-contract.js';
 import {publishingPlatforms} from './publisher-platforms.js';
+import {sourceEvidenceState,approvalSourceChanged,bindApprovalSource} from './production-source-state.js';
 
 const fail=code=>{throw Error(code);};
 const hash=x=>createHash('sha256').update(x).digest('hex');
@@ -42,7 +43,7 @@ export class ProductionApprovalStore {
  invalidateTask(taskId,currentId,now=Date.now()){
   for(const row of this.db.prepare('SELECT id FROM production_reviews WHERE task_id=? AND id<>?').all(taskId,currentId))this.revoke(row.id,'SUPERSEDED_REVIEW_VERSION',now);
  }
- subject(id,scope){
+ subject(id,scope,now=Date.now()){
   const row=this.row(id,scope),request=JSON.parse(row.request_json),report=JSON.parse(row.report_json),envelope=this.db.prepare('SELECT * FROM production_review_envelopes WHERE review_id=?').get(id);
   verifyProductionRequest(request);
   if(request.request_fingerprint!==id||request.task_id!==row.task_id||request.request_revision!==row.request_revision||request.workspace!==row.workspace||request.account_id!==row.account_id)fail('APPROVAL_STORAGE_CORRUPT');
@@ -66,17 +67,18 @@ export class ProductionApprovalStore {
   if(!account.enabled||!account.external_id||targets.some(p=>!publishingPlatforms[p]))blocked='TARGET_IDENTITY_UNKNOWN';
   if(this.db.prepare('SELECT max(request_revision) revision FROM production_reviews WHERE task_id=?').get(row.task_id).revision!==row.request_revision)blocked='STALE_REVIEW_VERSION';
   const fingerprint=digest({request_fingerprint:id,result_fingerprint:row.result_fingerprint,account_hash:accountHash,target_platforms:targets,artifacts:expected,source_refs:request.items.map(x=>({source_id:x.source_id,refs:x.source_refs}))});
-  return {fingerprint,blocked,target_platforms:targets,provenance:provenance?'SYNTHETIC_FIXTURE':'UNVERIFIED',task_id:row.task_id,request_revision:row.request_revision};
+  const source=sourceEvidenceState(this.db,id,fingerprint,now);if(!blocked&&source.blocked)blocked=source.blocked;
+  return {fingerprint,blocked,source_verification:source,target_platforms:targets,provenance:provenance?'SYNTHETIC_FIXTURE':'UNVERIFIED',task_id:row.task_id,request_revision:row.request_revision};
  }
  reconcile(id,scope,now=Date.now()){
   this.row(id,scope);let subject;
-  try{subject=this.subject(id,scope);}catch(error){if(!(error instanceof SyntaxError)&&!/^(APPROVAL_|REQUEST_|RESULT_|INVALID_)/.test(error.message))throw error;subject={fingerprint:null,blocked:error instanceof SyntaxError?'APPROVAL_STORAGE_CORRUPT':error.message,provenance:'UNKNOWN',target_platforms:[]};}
-  const latest=this.latest(id);if(latest?.kind==='CONTENT_APPROVED'&&(subject.blocked||latest.subject_fingerprint!==subject.fingerprint))this.revoke(id,subject.blocked||'APPROVAL_SUBJECT_CHANGED',now);
+  try{subject=this.subject(id,scope,now);}catch(error){if(!(error instanceof SyntaxError)&&!/^(APPROVAL_|REQUEST_|RESULT_|INVALID_)/.test(error.message))throw error;subject={fingerprint:null,blocked:error instanceof SyntaxError?'APPROVAL_STORAGE_CORRUPT':error.message,provenance:'UNKNOWN',target_platforms:[]};}
+  const latest=this.latest(id);if(latest?.kind==='CONTENT_APPROVED'&&(subject.blocked||latest.subject_fingerprint!==subject.fingerprint||approvalSourceChanged(this.db,latest.id,subject.source_verification)))this.revoke(id,subject.blocked||(latest.subject_fingerprint!==subject.fingerprint?'APPROVAL_SUBJECT_CHANGED':'APPROVAL_SOURCE_CHANGED'),now);
   return subject;
  }
  view(id,scope,{admin=false,now=Date.now()}={}){return this.tx(()=>{
   const subject=this.reconcile(id,scope,now),latest=this.latest(id),events=this.db.prepare('SELECT * FROM production_approval_events WHERE review_id=? ORDER BY sequence DESC LIMIT 101').all(id);
-  return {state:subject.blocked?(latest?.kind==='REVOKED'?'REVOKED':'BLOCKED'):(latest?.kind||'PENDING'),blocked_reason:subject.blocked,subject_fingerprint:subject.fingerprint,latest_event_id:latest?.id||null,target_platforms:subject.target_platforms,provenance:subject.provenance,can_decide:admin&&!subject.blocked,required_checks:productionReviewChecks,history:events.slice(0,100),history_truncated:events.length>100,...flags};
+  return {state:subject.blocked?(latest?.kind==='REVOKED'?'REVOKED':'BLOCKED'):(latest?.kind||'PENDING'),blocked_reason:subject.blocked,subject_fingerprint:subject.fingerprint,latest_event_id:latest?.id||null,target_platforms:subject.target_platforms,provenance:subject.provenance,source_verification:subject.source_verification,can_decide:admin&&!subject.blocked,required_checks:productionReviewChecks,history:events.slice(0,100),history_truncated:events.length>100,...flags};
  });}
  decide(id,input,scope,{authority,now=Date.now()}={}){
   if(authority?.kind!=='EXISTING_ADMIN'||!/^admin:[a-f0-9]{64}$/.test(authority.actor_id||''))fail('APPROVAL_ADMIN_REQUIRED');
@@ -92,6 +94,7 @@ export class ProductionApprovalStore {
    const same=latest&&latest.kind===kind&&latest.subject_fingerprint===subject.fingerprint&&latest.actor_id===authority.actor_id&&latest.reason===input.reason&&digest(JSON.parse(latest.checks_json))===digest(input.checks);
    if(!same&&(latest?.id||null)!==input.expected_event_id)fail('APPROVAL_STALE_DECISION');
    const event=same?latest:this.append(id,subject.fingerprint,kind,authority.actor_id,input.reason,input.checks,now);
+   if(!same&&kind==='CONTENT_APPROVED')bindApprovalSource(this.db,event.id,subject.source_verification);
    this.db.prepare('INSERT INTO production_approval_commands VALUES(?,?,?)').run(input.command_id,commandHash,event.id);
    return {status:same?'DUPLICATE':'RECORDED',event_id:event.id,approval:this.view(id,scope,{admin:true,now}),...flags};
   });if(outcome.denied)fail(outcome.denied);return outcome;

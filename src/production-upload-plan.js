@@ -1,3 +1,4 @@
+import {observePublicationAuthority} from './production-publication-authority.js';
 import {mkdirSync,mkdtempSync,lstatSync,writeFileSync,renameSync,rmSync,existsSync,realpathSync} from 'node:fs';
 import {join} from 'node:path';
 import {ProductionReviewStore} from './production-review-store.js';
@@ -25,7 +26,7 @@ export class ProductionUploadPlans {
   const link=this.db.prepare('SELECT b.content_id,j.job_id FROM production_upload_bindings b JOIN production_upload_jobs j ON j.plan_id=b.plan_id WHERE b.plan_id=?').get(planId);if(!link)fail('PRODUCTION_PLAN_NOT_FOUND');
   const plan=productionBinding(this.db,link.content_id);if(plan.workspace!==scope.workspace||plan.account_id!==scope.accountId)fail('PRODUCTION_PLAN_SCOPE_DENIED');assertProductionPlanCurrent(this.db,plan);
   const assets=this.db.prepare('SELECT * FROM publisher_job_assets WHERE job_id=? ORDER BY ordinal').all(link.job_id);if(assets.length!==plan.manifest.media.length)fail('PRODUCTION_FROZEN_MEDIA_MISSING');for(const [i,asset] of assets.entries()){if(asset.sha256!==plan.manifest.media[i].sha256)fail('PRODUCTION_MEDIA_CHANGED');readHandoffBytes({...asset,bytes:asset.size});}
-  return {id:plan.id,review_id:plan.review_id,source_id:plan.manifest.source_id,platform:plan.manifest.platform,...link,job_state:this.publisher.job(plan.workspace,link.job_id).state,status:'UPLOAD_PREVIEW_ONLY',payload_source_sha256:plan.manifest.payload_source_sha256,payload:plan.manifest.payload,media:plan.manifest.media.map(({path,...a})=>a),...flags};
+  return {id:plan.id,review_id:plan.review_id,source_id:plan.manifest.source_id,platform:plan.manifest.platform,...link,job_state:this.publisher.job(plan.workspace,link.job_id).state,status:'UPLOAD_PREVIEW_ONLY',publication_authority:observePublicationAuthority(this.executor,plan.workspace,plan.account_id,link.job_id),payload_source_sha256:plan.manifest.payload_source_sha256,payload:plan.manifest.payload,media:plan.manifest.media.map(({path,...a})=>a),...flags};
  }
  prepare(reviewId,input,scope,{authority}={}){
   if(authority?.kind!=='EXISTING_ADMIN'||!/^admin:[a-f0-9]{64}$/.test(authority.actor_id||''))fail('APPROVAL_ADMIN_REQUIRED');
