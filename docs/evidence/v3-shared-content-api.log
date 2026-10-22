@@ -1,0 +1,30 @@
+✔ contents rechecks current owner/membership inside the write batch after a deterministic second-connection revocation (61.916869ms)
+✔ tasks rechecks current owner/membership inside the write batch after a deterministic second-connection revocation (25.595887ms)
+✔ accounts rechecks current owner/membership inside the write batch after a deterministic second-connection revocation (10.969554ms)
+✔ authorized async metric ingestion rechecks membership in its atomic raw/observation batch (29.782359ms)
+✔ object verification cannot commit READY after membership revocation during readback (12.512456ms)
+✔ shared catalogue lists the same full source for both accounts while legacy scoped reads remain isolated (70.231291ms)
+✔ explicit platform and target freeze a shared source without borrowing author approval or altering UNKNOWN (20.484016ms)
+✔ shared freeze atomically rejects source_revoked after preflight with no partial task or command (14.922678ms)
+✔ shared freeze atomically rejects target_revoked after preflight with no partial task or command (13.677085ms)
+✔ shared freeze atomically rejects target_platform after preflight with no partial task or command (9.660226ms)
+✔ shared freeze atomically rejects target_identity after preflight with no partial task or command (9.67624ms)
+✔ shared freeze atomically rejects source_bytes after preflight with no partial task or command (11.95232ms)
+✔ two connections reserve one shared frozen snapshot and a different target gets its own task (14.812185ms)
+✔ persisted cloud authoring uses original source/job projections, full content and independent platform payload; restart retains all records (12.178351ms)
+✔ stable user identity and exact customer/account scope reject forged headers, cross-user and same-customer account mixing (10.22495ms)
+✔ full ID + slug + version + payload preserve reused 074 across dates and reject conflicting same version (11.896806ms)
+✔ single atomic batch rolls back command, account and membership on a later insertion fault (9.614547ms)
+✔ two SQLite connections using asynchronous D1 shape converge on the same command and one frozen task (15.853765ms)
+✔ UNKNOWN and exact frozen revision never reset on duplicate create; every approval/publish/media/interaction path is unavailable (16.296273ms)
+✔ Origin, body bounds, exact fields and missing identity/runtime fail closed before business writes (6.290856ms)
+✔ platform copy is explicit; new content version preserves old frozen task without granting approval (12.635772ms)
+✔ approval and prepare HTTP routes require injected existing admin, exact commands and same origin (205.695063ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 372.485983

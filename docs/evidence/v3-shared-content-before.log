@@ -1,0 +1,46 @@
+✖ shared catalogue lists the same full source for both accounts while legacy scoped reads remain isolated (48.073631ms)
+✖ explicit platform and target freeze a shared source without borrowing author approval or altering UNKNOWN (12.197508ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 161.253648
+
+✖ failing tests:
+
+test at test/sites-cloud-authoring.test.js:12:1
+✖ shared catalogue lists the same full source for both accounts while legacy scoped reads remain isolated (48.073631ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  404 !== 200
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-cloud-authoring.test.js:14:86)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 404,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/sites-cloud-authoring.test.js:19:1
+✖ explicit platform and target freeze a shared source without borrowing author approval or altering UNKNOWN (12.197508ms)
+  AssertionError [ERR_ASSERTION]: {"error":"INVALID_COMMAND","executionEnabled":false,"publish_allowed":false,"source_gate_satisfied":false,"media_processing":"CLOUD_SERVICE_NOT_CONNECTED","producer_authenticated":false}
+
+  400 !== 200
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-cloud-authoring.test.js:21:184)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 400,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

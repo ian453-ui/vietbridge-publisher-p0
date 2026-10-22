@@ -1,0 +1,103 @@
+{
+  "date_utc": "2026-10-22T16:29:51.509767+00:00",
+  "base_commit": "c5acafc3e97933b678128c6c6003c70c3e0015e0",
+  "branch": "publisher-v3/cloud-slice-01",
+  "review_model": "gpt-6-astra",
+  "review_mode": "design and implementation read-only, no independent test rerun",
+  "baseline_reproduction": {
+    "command": "node --test --test-name-pattern='shared catalogue|explicit platform and target' test/sites-cloud-authoring.test.js",
+    "pass": 0,
+    "fail": 2,
+    "exit_code": 1,
+    "log": "docs/evidence/v3-shared-content-before.log",
+    "observed": [
+      "catalogue GET 404",
+      "explicit platform target POST 400 INVALID_COMMAND"
+    ]
+  },
+  "review_reproduction": {
+    "command": "node --test --test-name-pattern='shared catalogue' test/sites-cloud-authoring.test.js",
+    "pass": 0,
+    "fail": 1,
+    "exit_code": 1,
+    "log": "docs/evidence/v3-shared-content-authorization-before.log",
+    "observed": "revoked source plus wrong hash returned CONTENT_CHANGED; final code first denies SCOPE_DENIED"
+  },
+  "targeted_api": {
+    "command": "node --test test/sites-cloud-authoring.test.js test/sites-handoff-api.test.js test/sites-authorization-race.test.js",
+    "pass": 22,
+    "fail": 0,
+    "exit_code": 0,
+    "duration_ms": 372.485983,
+    "log": "docs/evidence/v3-shared-content-api.log",
+    "final_code": true
+  },
+  "targeted_ui": {
+    "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/tmp/v3-shared-evidence node --test test/sites-cloud-console-ui.test.js",
+    "pass": 20,
+    "fail": 0,
+    "exit_code": 0,
+    "duration_ms": 33323.730906,
+    "log": "docs/evidence/v3-shared-content-ui.log",
+    "note": "Captured before final source-authorization ordering repair. The same 20 UI cases also passed in the final full run on final code."
+  },
+  "full": {
+    "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+    "pass": 1200,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "exit_code": 0,
+    "duration_ms": 127102.629979,
+    "log_local": "/tmp/v3-shared-full-final.log",
+    "log_sha256": "28feab694ed1c0a645e4f57ee71fee10201a4bb8e13c207850ad398c5aae2cda",
+    "summary": "docs/evidence/v3-shared-content-full-summary.log",
+    "final_code": true
+  },
+  "earlier_full": {
+    "pass": 1200,
+    "fail": 0,
+    "log_local": "/tmp/v3-shared-full.log",
+    "not_final_evidence": "Reran after source authorization ordering changed"
+  },
+  "logs_format": "Line-end whitespace removed in committed focused logs; full log retained locally with hash",
+  "changed_executable_sha256": {
+    "src/sites/cloud-authoring-api.js": "857df4db5098d64170f61d6e16c49c17690a5441e12b8cba51bdfc6869598cd7",
+    "src/sites/cloud-console.js": "7580de2344413727da55dee72bb9f3cb66ba4cdbf05b7ae746f86c3480eed517",
+    "src/sites/cloud-console.html": "e491a55c0bc85f0ea32faaef0460e41c0b4d7c8eaae681b93a7603b3c0bbb711",
+    "test/sites-cloud-authoring.test.js": "e90ec757e5f9aa490b44bc2e4a525517a858beedd6be1021f96b0fbf8baf38ce",
+    "test/sites-cloud-console-ui.test.js": "8118fb9fa513bbb25abbc5d893a28aad96bd05a4551f582f0066fd3ee7edd1f4",
+    "test/sites-handoff-api.test.js": "6b91ae0da89c6bb359be5c2ef6dff2fc7e7c83406f7365c88f50e15a70cd50b0"
+  },
+  "screenshots": [
+    {
+      "path": "/workspace/sites/publisher-v3/shared-content-evidence-20261022/desktop-shared-target.png",
+      "sha256": "2782912cf0e28f96e908da65d2cc2a16c3d660fb85537a7a7131e8376553da5d",
+      "synthetic": true,
+      "visually_inspected": true
+    },
+    {
+      "path": "/workspace/sites/publisher-v3/shared-content-evidence-20261022/mobile-shared-target.png",
+      "sha256": "6eca2511c2649ac3e9f330f56bac66c71403a64a3a994abb402c2e4ac7324963",
+      "synthetic": true,
+      "visually_inspected": true
+    }
+  ],
+  "site_project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+  "deployed": false,
+  "site_build_or_deploy_attempted": false,
+  "denied_download_retried": false,
+  "real_platform_operations": 0,
+  "credentials_or_passwords_read_or_created": 0,
+  "network_or_sharing_changes": 0,
+  "schema_changes": 0,
+  "scope": "Shared existing sources and explicit variants; target-bound unreviewed DRAFT. Review-prepared media is source-account preview only.",
+  "limitations": [
+    "No multi-variant UI editing",
+    "No new-target media review handoff",
+    "No bulk/file replacement workflow",
+    "200 catalogue rows without next-page navigation",
+    "No hosted identity/D1/R2 acceptance",
+    "No real provider, upload, submit, interaction or metric acceptance"
+  ]
+}

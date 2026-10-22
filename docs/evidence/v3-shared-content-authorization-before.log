@@ -1,0 +1,30 @@
+✖ shared catalogue lists the same full source for both accounts while legacy scoped reads remain isolated (70.401146ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 180.99733
+
+✖ failing tests:
+
+test at test/sites-cloud-authoring.test.js:12:1
+✖ shared catalogue lists the same full source for both accounts while legacy scoped reads remain isolated (70.401146ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + 'CONTENT_CHANGED'
+  - 'SCOPE_DENIED'
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-cloud-authoring.test.js:17:220)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'CONTENT_CHANGED',
+    expected: 'SCOPE_DENIED',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

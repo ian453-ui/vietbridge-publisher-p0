@@ -1,0 +1,28 @@
+✔ desktop cloud console persists customer/account/content/platform/task with full preview and reload (1817.961284ms)
+✔ mobile cloud console persists customer/account/content/platform/task with full preview and reload (1830.046523ms)
+✔ desktop shared client source previews independent platforms and freezes only the explicitly selected account (1573.574546ms)
+✔ mobile shared client source previews independent platforms and freezes only the explicitly selected account (1665.093449ms)
+✔ desktop unsaved content drafts stay with exact customer and account (1396.900791ms)
+✔ mobile unsaved content drafts stay with exact customer and account (1192.642855ms)
+✔ late committed content response cannot reset another account draft or its submit state (1322.590934ms)
+✔ late same-account Review response cannot replace newer metric preview (1582.230139ms)
+✔ refresh closes and clears the current preview (1386.216011ms)
+✔ button closes pending approval readback without reopening the review (1841.014949ms)
+✔ Escape closes pending approval readback without reopening the review (1792.29741ms)
+✔ lost content save acknowledgement keeps original scoped command and explicit retry is idempotent (1354.394776ms)
+✔ definite invalid content input can be corrected without stranding the scoped draft (976.769087ms)
+✔ desktop cloud Review plays decoded snapshot and reads durable null metric without publication (1817.99355ms)
+✔ mobile cloud Review plays decoded snapshot and reads durable null metric without publication (1830.855877ms)
+✔ delayed old account and old customer responses cannot replace current cloud console data (1032.576574ms)
+✔ desktop Review human approval -> media preparation -> original content/task preview -> revoke -> reload (2892.123108ms)
+✔ mobile Review human approval -> media preparation -> original content/task preview -> revoke -> reload (2894.780385ms)
+✔ desktop canonical imported source shows exact identity and latest QA withdraws old approval on reload (1408.92043ms)
+✔ mobile canonical imported source shows exact identity and latest QA withdraws old approval on reload (1308.981022ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33323.730906

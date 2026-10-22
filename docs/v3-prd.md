@@ -1,6 +1,12 @@
 # Publisher V3 — PRD / architecture / acceptance plan
 
-Current update: [slice 13](v3-slice-13.md) adds the portable read-only Facebook
+Current update: [shared source handoff](v3-shared-content-handoff.md) restores
+same-client source browsing, independent preview of existing platform variants
+and explicit account-bound DRAFT creation. Review/permits do not move with a shared
+source. The [three-round inheritance review](v3-inheritance-review-20261022.md)
+and current acceptance matrix distinguish repaired inheritance from missing work.
+
+Previous update: [slice 13](v3-slice-13.md) adds the portable read-only Facebook
 video receipt adapter to the existing API-driver seam. Controlled HTTP and original
 UNKNOWN restart/readback are exercised; no real credential provider is configured.
 
@@ -8,7 +14,7 @@ Previous correction: [dispatch withdrawal repair](v3-dispatch-approval-repair.md
 closes the reproduced rejection/source-QA race between intent and actual dispatch;
 readback of already committed results remains available.
 
-Latest package: [slice 12](v3-slice-12.md) adds the original PAGE permit/limit
+Earlier package: [slice 12](v3-slice-12.md) adds the original PAGE permit/limit
 contract to the asynchronous claim, UNKNOWN occupancy and readback settlement
 transactions. Real authority/provider custody remains disabled and unverified.
 [Slice 11](v3-slice-11.md) repairs committed-outcome acknowledgement
