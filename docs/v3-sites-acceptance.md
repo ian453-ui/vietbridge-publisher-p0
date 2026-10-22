@@ -1,12 +1,12 @@
 # Publisher V3 current user-visible acceptance matrix
 
-2026-10-22, slice 12 (following execution recovery and canonical import). Formal target: owner-private ChatGPT Sites UI with cloud
+2026-10-22, slice 13 (portable read-only video receipt adapter). Formal target: owner-private ChatGPT Sites UI with cloud
 services. Existing project `appgprj_6ad97a034fd08191a8399eeda10f048c` is registered,
 not deployed. The [dispatch withdrawal repair](v3-dispatch-approval-repair.md)
 reproduced and closes content rejection/source-QA changes after intent: dispatch
 now rechecks them atomically while prior committed results remain reconcilable.
 The table below supersedes earlier slices' *current* status without
-rewriting their historical evidence. [Slice 12 evidence](v3-slice-12.md) identifies
+rewriting their historical evidence. [Slice 13 evidence](v3-slice-13.md) identifies
 this run; [original matrix](v3-final-acceptance.md) retains V1/V2 module references.
 
 “Executed synthetic” means this cloud workspace ran code with generated inputs and
@@ -27,8 +27,8 @@ for any external operation. A UI Tab is never business-function completion.
 | Review and human decisions | Native shared-admin approve/reject/audit retained | Async event/command ledger, explicit checklist/reason, reject/revoke, restart, replay defense and races executed; only fixture authority/provenance provider available | Official Site identity + existing admin resolution and trusted real source decision provider; owner is not auto-admin |
 | Change invalidation | Native exact version/body/media/account guards; client manifest QA withdrawal now overrides READY/title/PASS filenames in both original catalogue paths | Same fields plus atomic live scope/version/event/object/source-head checks; newer failed/missing/withdrawn source invalidates old approval; old plans show STALE_PREVIEW after read/rejection | Background immediate invalidation not implemented; DB triggers are not owner-tamper protection |
 | Approved media → upload preparation | Native Review/ZIP bytes to original upload/task freeze | Exact reviewed bytes → platform variant → existing content → frozen original DRAFT; SQL rollback/lost ack/duplicate preparation exercised | Actual upload worker/provider; content approval never grants publication permission |
-| Publish/unique submit/readback | Existing per-account native adapters, permits, quotas and executor retained | No HTTP execute route; closed async executor now defaults to exact native PAGE-format permit, atomic same-job reservation/consumption, pre-submit release and readback settlement; concurrent quota, restart, revocation/expiry/day races executed | Trusted real exclusive permit/history custody, account verification, authorized uploader/driver and actual independent readback; synthetic ledger is not live authority |
-| UNKNOWN handling | UNKNOWN→RECONCILE_PENDING, reservation retained | Restart/lost response/missing object/readback unavailable only reconcile original intent; committed-ack loss now returns durable truth or explicit pending, cached receipt binding is checked, concurrent reconcilers cannot revert terminal state; later rejection cannot cause resubmit; UNKNOWN holds original quota across days, readback settles original claim | Real cloud executor/reconciler and operation-specific proof |
+| Publish/unique submit/readback | Existing per-account native adapters, permits, quotas and executor retained | No HTTP execute route; closed async executor now defaults to exact native PAGE-format permit, atomic same-job reservation/consumption, pre-submit release and readback settlement; concurrent quota, restart, revocation/expiry/day races executed | Trusted real exclusive permit/history custody, account verification, authorized uploader/driver and actual independent readback; synthetic ledger is not live authority. Portable Facebook video readback now exists at the original API-driver seam with controlled HTTP and original UNKNOWN persistence tests; its trusted provider is not connected |
+| UNKNOWN handling | UNKNOWN→RECONCILE_PENDING, reservation retained | Restart/lost response/missing object/readback unavailable only reconcile original intent; committed-ack loss now returns durable truth or explicit pending, cached receipt binding is checked, concurrent reconcilers cannot revert terminal state; later rejection cannot cause resubmit; UNKNOWN holds original quota across days, readback settles original claim | Real cloud executor/reconciler and operation-specific proof; native original UNKNOWN → known-video protocol readback is offline-tested, not hosted acceptance |
 | WeChat Channels / WOA | PUBLISHED_ID_PENDING / DRAFT_WRITTEN retained | Shared terminal meanings executed in closed simulation | Real verification remains absent; no public ID/publication invented |
 | Group active posting | Native conditional Facebook browser group path retained and synthetic regression | Unavailable UI destination; no group provider or send route | Supported authorized cloud executor/API where available, rule/identity/per-account approval and readback; Page authorization cannot unlock Groups |
 | Proactive search/likes/replies | Native scoped opt-in scan, draft review, quota/stop path retained | Unavailable destination | Cloud discovery/interaction provider and original scoped approval/quota integration |
@@ -67,7 +67,9 @@ those gaps. Original `publisher-unified` stays unchanged and unmerged.
 3. **Cloud publication and readback.** Async PAGE permit/quota
    transaction is implemented in the closed executor. Next connect a trusted
    existing issuer with exclusive ledger custody, complete history and exact
-   identity, then authorized upload/submit/reconcile per operation. Copying a live
+   identity, then authorized upload/submit/reconcile per operation. Slice 13 adds
+   known-video readback protocol code; its trusted read provider/credential and
+   hosted persistence integration remain missing. Copying a live
    permit from another writable ledger is not an atomic authorization mechanism.
    Keep disabled until those adapters exist; UNKNOWN must keep the original
    attempt. Production content approval does not grant this permission.

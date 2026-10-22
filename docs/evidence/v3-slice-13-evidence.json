@@ -1,0 +1,99 @@
+{
+  "base": "7405029abd4b51d3ada6506c5691ffc87edddd81",
+  "external_platform_requests_in_tests": 0,
+  "real_tokens_used": false,
+  "real_submissions": 0,
+  "hosted_acceptance": false,
+  "deployment_attempted": false,
+  "new_credentials_or_permissions": false,
+  "test_transport": "Node HTTP server on 127.0.0.1; test-only rewrite of fixed Graph GET request; synthetic token strings only",
+  "before": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "command": "node --test test/facebook-cloud-video-readback.test.js",
+    "reason": "injected cloud reader ignored; native local config path called"
+  },
+  "final_targeted": {
+    "total": 33,
+    "passed": 33,
+    "failed": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "duration_ms": 1255.783363,
+    "command": "node --test test/facebook-cloud-video-readback.test.js test/unified-drivers.test.js"
+  },
+  "full": {
+    "total": 1181,
+    "passed": 1181,
+    "failed": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "duration_ms": 117371.506557,
+    "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+    "stage": "Final implementation after explicit READBACK operation binding; subsequent change only removed one blank line at EOF"
+  },
+  "original_executor_integration": {
+    "before_read": "UNKNOWN",
+    "failed_http": 503,
+    "after_failed_read": "UNKNOWN",
+    "after_db_restart_and_exact_readback": "PUBLISHED",
+    "original_attempt_retained": true,
+    "submit_calls": 0,
+    "intent_count": 1,
+    "receipt_count": 1
+  },
+  "syntax_checks": 5,
+  "diff_check": "passed",
+  "logs": {
+    "before": {
+      "path": "/tmp/v3-video-protocol-before.log",
+      "sha256": "a427d116ebee7ce46658d2d3320c73426a639297c667ca7cacd837f50afad9e1",
+      "exit_code": 1,
+      "summary": "\u2716 existing API driver can use an injected cloud video reader without opening a local credential/client (1.133773ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 821.940064\n\n\u2716 failing tests:\n\ntest at test/facebook-cloud-video-readback.test.js:5:1\n\u2716 existing API driver can use an injected cloud video reader without opening a local credential/client (1.133773ms)\n  Error: LEGACY_LOCAL_CONFIG_MUST_NOT_RUN\n      at Object.useConfig (file:///workspace/publisher-v3/test/facebook-cloud-video-readback.test.js:7:65)\n      at ApiDriver.readback (file:///workspace/publisher-v3/src/unified-drivers.js:46:23)\n      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/facebook-cloud-video-readback.test.js:8:32)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n"
+    },
+    "targeted": {
+      "path": "/tmp/v3-video-protocol-final-targeted.log",
+      "sha256": "edcd889f070ea278443c3bc8269764034dbac70f6b1ea98cd323a435d24af154",
+      "exit_code": 0,
+      "summary": "\u2139 tests 33\n\u2139 suites 0\n\u2139 pass 33\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 1255.783363"
+    },
+    "full": {
+      "path": "/tmp/v3-video-protocol-full.log",
+      "sha256": "3ef155c75cf68fea728eb7e4fbeabf5feba345f72213475020d3e13319bf125b",
+      "exit_code": 0,
+      "summary": "\u2139 tests 1181\n\u2139 suites 0\n\u2139 pass 1181\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 117371.506557"
+    }
+  },
+  "final_code_sha256": {
+    "src/facebook-video-evidence.js": "02cb43e57136cf235dd4332a84c1dce105b56a13d16bc2b5a6f7bb9f00f8fab2",
+    "src/sites/facebook-video-readback.js": "21ce455d1340bce5bdd9a0152e64c245e76ea4c6839954a90f289d2f702ffd80",
+    "src/publisher-core/facebook-video.ts": "d8531efdb9d1500022a06b817d80ddcd694bbeba68706dbd168dc88a7adb2d1c",
+    "src/unified-drivers.js": "78a1542d4968eb3ce05704f0c7092854e6566fd0bf546216658741750f5e50a6",
+    "test/facebook-cloud-video-readback.test.js": "5e0486e4b721afef62e61b21e145a87189fabd11c64389bc2efcca20db40cb86"
+  },
+  "official_sources": {
+    "video_reference_read": "429; no repeated retry",
+    "graph_overview_read": "429; no repeated retry",
+    "sdk_fields": "https://github.com/facebook/facebook-python-business-sdk/blob/main/facebook_business/adobjects/advideo.py",
+    "sdk_status": "https://github.com/facebook/facebook-python-business-sdk/blob/main/facebook_business/video_uploader.py",
+    "sdk_license": "Meta API-specific license; no code/dependency copied or installed",
+    "api_version_fixture": "v25.0 from existing native default; not proof of current account availability"
+  },
+  "remaining": [
+    "Trusted existing job/receipt/read-authority and in-memory credential provider absent",
+    "Exclusive live publication permit/history provider absent",
+    "Actual upload/submit and hosted Sites identity/D1/R2 integration unverified",
+    "Remote encoded video byte equality not established"
+  ],
+  "helper_check": {
+    "roots": [
+      "/opt/codex",
+      "/workspace/.agents",
+      "/workspace/.codex",
+      "/workspace/sites"
+    ],
+    "matches": 0,
+    "denied_bundle_retried": false
+  }
+}

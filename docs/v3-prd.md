@@ -1,6 +1,10 @@
 # Publisher V3 — PRD / architecture / acceptance plan
 
-Current correction: [dispatch withdrawal repair](v3-dispatch-approval-repair.md)
+Current update: [slice 13](v3-slice-13.md) adds the portable read-only Facebook
+video receipt adapter to the existing API-driver seam. Controlled HTTP and original
+UNKNOWN restart/readback are exercised; no real credential provider is configured.
+
+Previous correction: [dispatch withdrawal repair](v3-dispatch-approval-repair.md)
 closes the reproduced rejection/source-QA race between intent and actual dispatch;
 readback of already committed results remains available.
 

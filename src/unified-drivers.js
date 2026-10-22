@@ -13,7 +13,7 @@ function assertIdentities(s){if(!/^\d+$/.test(s.operatorActorId||'')||!/^\d+$/.t
 function unwrap(value){return value?.post||value?.data||value;}
 
 export class ApiDriver {
-  constructor(snapshot,{client=new FacebookMcpConnector()}={}){assertIdentities(snapshot);this.snapshot=snapshot;this.client=client;}
+  constructor(snapshot,{client=new FacebookMcpConnector(),videoReadback=null}={}){assertIdentities(snapshot);this.snapshot=snapshot;this.client=client;this.videoReadback=videoReadback;}
   async inspect(){const config=parseConfig(normalizeLocalConfig(this.snapshot.credentialRef));if(String(config.FB_PAGE_ID)!==this.snapshot.targetPageId)throw Error('API 授权与身份不一致');await this.client.useConfig(this.snapshot.credentialRef);const auth=await this.client.call('fb_get_auth_status');assertFacebookReady(auth);if(String(auth.page_id)!==this.snapshot.targetPageId)throw Error('API 实际身份不一致');return {healthy:true,externalId:this.snapshot.operatorActorId,operatorActorId:this.snapshot.operatorActorId,targetPageId:this.snapshot.targetPageId,identityEvidence:'API_TARGET_PAGE_AUTH'};}
   async prepare(snapshot,assets) {
     const config=parseConfig(normalizeLocalConfig(snapshot.credentialRef));
@@ -43,6 +43,12 @@ export class ApiDriver {
     return {id,url:`https://www.facebook.com/${id.replace('_','/posts/')}`};
   }
   async readback(snapshot,receipt) {
+    // Optional server dependency only; never sourced from HTTP input or enabled
+    // by approval/import tokens. The default native path is unchanged.
+    if(this.videoReadback){
+      if(snapshot.platform!=='facebook'||snapshot.media?.length!==1||!snapshot.media[0].toLowerCase().endsWith('.mp4'))throw Error('CLOUD_VIDEO_READBACK_ONLY');
+      return this.videoReadback.readback(snapshot,receipt);
+    }
     await this.client.useConfig(snapshot.credentialRef);
     const config=parseConfig(normalizeLocalConfig(snapshot.credentialRef));if(String(config.FB_PAGE_ID)!==snapshot.targetPageId)throw Error('核对配置与原 Page 不一致');
     if(!receipt?.id)throw Error('没有提交回执 ID，需人工平台核对，禁止重发');

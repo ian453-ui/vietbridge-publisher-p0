@@ -88,8 +88,4 @@ export function systemHttpsProxy():AxiosRequestConfig['proxy']{
 }
 export function parseSystemHttpsProxy(raw:string):AxiosRequestConfig['proxy']{const enabled=/HTTPSEnable\s*:\s*1/.test(raw),host=raw.match(/HTTPSProxy\s*:\s*(\S+)/)?.[1],port=Number(raw.match(/HTTPSPort\s*:\s*(\d+)/)?.[1]);return enabled&&host&&Number.isInteger(port)&&port>0?{protocol:'http',host,port}:false;}
 
-export function verifiedFacebookVideo(result:Json,id:string,page:string,title:string,description:string):boolean{
-  return result.id===id&&result.from?.id===page&&result.title===title&&String(result.description||'').trim()===description.trim()
-    &&result.published===true&&result.status?.video_status==='ready'&&/^https:\/\/(?:www\.)?facebook\.com\//.test(result.permalink_url||'');
-}
-
+export {verifiedFacebookVideo} from '../facebook-video-evidence.js';
