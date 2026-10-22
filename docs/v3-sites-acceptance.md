@@ -1,9 +1,9 @@
 # Publisher V3 current user-visible acceptance matrix
 
-2026-10-22, slice 10 plus retained-client QA repair. Formal target: owner-private ChatGPT Sites UI with cloud
+2026-10-22, slice 11 (following canonical import and retained-client QA repair). Formal target: owner-private ChatGPT Sites UI with cloud
 services. Existing project `appgprj_6ad97a034fd08191a8399eeda10f048c` is registered,
 not deployed. The table below supersedes earlier slices' *current* status without
-rewriting their historical evidence. [Slice 10 evidence](v3-slice-10.md) identifies
+rewriting their historical evidence. [Slice 11 evidence](v3-slice-11.md) identifies
 this run; [original matrix](v3-final-acceptance.md) retains V1/V2 module references.
 
 “Executed synthetic” means this cloud workspace ran code with generated inputs and
@@ -25,7 +25,7 @@ for any external operation. A UI Tab is never business-function completion.
 | Change invalidation | Native exact version/body/media/account guards; client manifest QA withdrawal now overrides READY/title/PASS filenames in both original catalogue paths | Same fields plus atomic live scope/version/event/object/source-head checks; newer failed/missing/withdrawn source invalidates old approval; old plans show STALE_PREVIEW after read/rejection | Background immediate invalidation not implemented; DB triggers are not owner-tamper protection |
 | Approved media → upload preparation | Native Review/ZIP bytes to original upload/task freeze | Exact reviewed bytes → platform variant → existing content → frozen original DRAFT; SQL rollback/lost ack/duplicate preparation exercised | Actual upload worker/provider; content approval never grants publication permission |
 | Publish/unique submit/readback | Existing per-account native adapters, permits, quotas and executor retained | No HTTP execute route; closed async synthetic rehearsal on same frozen job demonstrates independent confirmation, unique attempt and readback | Async real permit/quota claim, account verification, authorized uploader/driver and actual independent readback |
-| UNKNOWN handling | UNKNOWN→RECONCILE_PENDING, reservation retained | Restart/lost response/missing object/readback unavailable only reconcile original intent; later rejection cannot cause resubmit | Real cloud executor/reconciler and operation-specific proof |
+| UNKNOWN handling | UNKNOWN→RECONCILE_PENDING, reservation retained | Restart/lost response/missing object/readback unavailable only reconcile original intent; committed-ack loss now returns durable truth or explicit pending, cached receipt binding is checked, concurrent reconcilers cannot revert terminal state; later rejection cannot cause resubmit | Real cloud executor/reconciler and operation-specific proof |
 | WeChat Channels / WOA | PUBLISHED_ID_PENDING / DRAFT_WRITTEN retained | Shared terminal meanings executed in closed simulation | Real verification remains absent; no public ID/publication invented |
 | Group active posting | Native conditional Facebook browser group path retained and synthetic regression | Unavailable UI destination; no group provider or send route | Supported authorized cloud executor/API where available, rule/identity/per-account approval and readback; Page authorization cannot unlock Groups |
 | Proactive search/likes/replies | Native scoped opt-in scan, draft review, quota/stop path retained | Unavailable destination | Cloud discovery/interaction provider and original scoped approval/quota integration |

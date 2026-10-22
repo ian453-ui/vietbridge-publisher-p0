@@ -1,6 +1,8 @@
 # Publisher V3 — PRD / architecture / acceptance plan
 
-Current update: [slice 10](v3-slice-10.md) connects canonical source identity,
+Current update: [slice 11](v3-slice-11.md) repairs committed-outcome acknowledgement
+loss and exact readback binding in the existing async prepared-job path.
+[Slice 10](v3-slice-10.md) connects canonical source identity,
 versions, exact body/media and ZIP references to the existing persistent Review,
 with source-change invalidation and explicit crash reconciliation. Native loose
 body sync now enforces its declared SHA256. The [whole-product matrix](v3-sites-acceptance.md)

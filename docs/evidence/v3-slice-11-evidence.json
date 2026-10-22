@@ -1,0 +1,65 @@
+{
+  "base": "f670338da55537d28a93c40eafcffc869088a5a8",
+  "synthetic_only": true,
+  "real_submission_count": 0,
+  "hosted_acceptance": false,
+  "credentials_or_permissions_changed": false,
+  "native_permit_quota_implementation_changed": false,
+  "before_original_cases": {
+    "total": 4,
+    "passed": 0,
+    "failed": 4
+  },
+  "targeted_executor": {
+    "total": 18,
+    "passed": 18
+  },
+  "full_regression": {
+    "total": 1124,
+    "passed": 1124,
+    "failed": 0,
+    "duration_ms": 111922.626261,
+    "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+    "stage": "Before final narrow error-classification guard for nonexistent plan/attempt; all other implementation identical"
+  },
+  "final_affected_sites": {
+    "total": 101,
+    "passed": 101,
+    "failed": 0,
+    "duration_ms": 19187.223462,
+    "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=2 test/sites-*.test.js",
+    "stage": "After final guard; includes all executor cases and new known-nonexistence assertions"
+  },
+  "syntax_checks": 2,
+  "diff_check": "passed",
+  "final_code_sha256": {
+    "src/sites/async-synthetic-executor.js": "c0f7f8f9d897e1df4c0938d0b97fc9db828a2b8a0f94cdb8503125725942cb5a",
+    "test/sites-async-synthetic-executor.test.js": "427e4626a3698d9d8019bd6139b61e4da1ba57c312abf6cd3b6f241b43690399"
+  },
+  "logs": {
+    "before": {
+      "path": "/tmp/v3-execution-ack-before.log",
+      "sha256": "e44ce20e50225f7426575b30c07c0cd6ce1ad62bbaf017629b5c53a2787e93a3",
+      "exit_code": 1,
+      "summary": "✖ intent commit acknowledgement loss reports persisted truth, never an invented preparation failure (175.429878ms)\n✖ platform commit acknowledgement loss reports persisted truth, never an invented preparation failure (66.184452ms)\n✖ readback commit acknowledgement loss reports persisted truth, never an invented preparation failure (63.478641ms)\n✖ stored readback with wrong account/attempt cannot return synthetic publication success (50.173592ms)\nℹ tests 4\nℹ suites 0\nℹ pass 0\nℹ fail 4\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 453.246873\n\n✖ failing tests:\n\ntest at test/sites-async-synthetic-executor.test.js:25:53\n✖ intent commit acknowledgement loss reports persisted truth, never an invented preparation failure (175.429878ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'BLOCKED'\n  - 'UNKNOWN'\n  \n      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-async-synthetic-executor.test.js:27:200)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'BLOCKED',\n    expected: 'UNKNOWN',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/sites-async-synthetic-executor.test.js:25:53\n✖ platform commit acknowledgement loss reports persisted truth, never an invented preparation failure (66.184452ms)\n  Error: SYNTHETIC_COMMITTED_ACK_LOST\n      at x.f.db.batch (file:///workspace/publisher-v3/test/sites-async-synthetic-executor.test.js:27:93)\n      at async AsyncSyntheticExecutor.batch (file:///workspace/publisher-v3/src/sites/async-storage.js:21:271)\n      at async AsyncSyntheticExecutor.run (file:///workspace/publisher-v3/src/sites/async-synthetic-executor.js:31:4)\n      at async TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-async-synthetic-executor.test.js:27:156)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n\ntest at test/sites-async-synthetic-executor.test.js:25:53\n✖ readback commit acknowledgement loss reports persisted truth, never an invented preparation failure (63.478641ms)\n  Error: SYNTHETIC_COMMITTED_ACK_LOST\n      at x.f.db.batch (file:///workspace/publisher-v3/test/sites-async-synthetic-executor.test.js:27:93)\n      at async AsyncSyntheticExecutor.batch (file:///workspace/publisher-v3/src/sites/async-storage.js:21:271)\n      at async AsyncSyntheticExecutor.reconcile (file:///workspace/publisher-v3/src/sites/async-synthetic-executor.js:46:3)\n      at async TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-async-synthetic-executor.test.js:27:156)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)\n\ntest at test/sites-async-synthetic-executor.test.js:31:1\n✖ stored readback with wrong account/attempt cannot return synthetic publication success (50.173592ms)\n  AssertionError [ERR_ASSERTION]: Missing expected rejection.\n      at async TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-async-synthetic-executor.test.js:32:352)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: /SYNTHETIC_READBACK_BINDING_INVALID/,\n    operator: 'rejects',\n    diff: 'simple'\n  }\n"
+    },
+    "targeted": {
+      "path": "/tmp/v3-execution-consistency.log",
+      "sha256": "a2241d400b96a1af33e7801f0714165abd8cf1141869ca06307fb86f954f97b7",
+      "exit_code": 0,
+      "summary": "ℹ tests 18\nℹ suites 0\nℹ pass 18\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 1613.569011"
+    },
+    "full": {
+      "path": "/tmp/v3-execution-consistency-full.log",
+      "sha256": "540dcec00c4e09bf31ee11d724dccbd25bbafa969bd6f45146ab604c7caf4384",
+      "exit_code": 0,
+      "summary": "ℹ tests 1124\nℹ suites 0\nℹ pass 1124\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 111922.626261"
+    },
+    "final_sites": {
+      "path": "/tmp/v3-execution-consistency-sites-final.log",
+      "sha256": "a68f03bca2d58f8353a0b0e270afb7cb73a5f2c5b60ac8ce5a4428766a44552e",
+      "exit_code": 0,
+      "summary": "ℹ tests 101\nℹ suites 0\nℹ pass 101\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 19187.223462"
+    }
+  }
+}
