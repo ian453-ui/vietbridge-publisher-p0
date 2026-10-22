@@ -66,3 +66,27 @@ test('two independent SQLite processes racing duplicate input persist one observ
  const run=promisify(execFile),jobs=[0,1].map(i=>run(process.execPath,['--input-type=module','-e',code,path,f.demo.dbPath,gate,join(f.root,i+'.ready')],{timeout:15000}));const until=Date.now()+5000;while(![0,1].every(i=>existsSync(join(f.root,i+'.ready')))&&Date.now()<until)await new Promise(r=>setTimeout(r,10));writeFileSync(gate,'go');
  assert.deepEqual((await Promise.all(jobs)).map(x=>JSON.parse(x.stdout).status).sort(),['DUPLICATE','RECORDED']);assert.equal(f.db.prepare('SELECT count(*) n FROM metric_raw_evidence').get().n,1);
 });
+
+test('as-of normalizes future completion before choosing the controlling attempt, including after restart',t=>{
+ const f=fixture(t),at=seconds=>metricNow+seconds*1000,packet=metricPacket(f.target,{at:new Date(at(5)).toISOString()}),shape=metricSelector(packet);
+ const a=f.ledger.beginCollection(f.id,shape,{...f.scope,now:at(0)});const receipt=f.ledger.ingest(f.id,packet,{...f.scope,now:at(5)});const b=f.ledger.beginCollection(f.id,shape,{...f.scope,now:at(10)});
+ f.ledger.failCollection(b.id,{...f.scope,now:at(15)});f.ledger.failCollection(a.id,{...f.scope,now:at(20)});
+ for(const db of [f.db,new DatabaseSync(f.demo.dbPath)]){try{const report=new MetricObservationStore(db).snapshot(receipt.series_id,{...f.scope,asOf:new Date(at(18)).toISOString()});assert.equal(report.status,'COLLECTION_FAILED');assert.equal(report.value,null);assert.equal(report.collection_attempt.id,b.id);}finally{if(db!==f.db)db.close();}}
+});
+test('late failure from an older collection generation cannot override newer successful generation',t=>{
+ const f=fixture(t),at=seconds=>metricNow+seconds*1000,packet=metricPacket(f.target,{at:new Date(at(12)).toISOString(),value:200}),shape=metricSelector(packet);
+ const a=f.ledger.beginCollection(f.id,shape,{...f.scope,now:at(0)}),b=f.ledger.beginCollection(f.id,shape,{...f.scope,now:at(10)});const receipt=f.ledger.ingest(f.id,packet,{...f.scope,attemptId:b.id,now:at(12)});f.ledger.failCollection(a.id,{...f.scope,now:at(20)});
+ for(const db of [f.db,new DatabaseSync(f.demo.dbPath)]){try{const report=new MetricObservationStore(db).snapshot(receipt.series_id,{...f.scope,asOf:new Date(at(30)).toISOString()});assert.equal(report.status,'AVAILABLE');assert.equal(report.value,200);}finally{if(db!==f.db)db.close();}}
+});
+test('older late success is retained as history; duplicate success links to the newer generation',t=>{
+ const f=fixture(t),at=s=>metricNow+s*1000,p=metricPacket(f.target,{value:200,at:new Date(at(12)).toISOString()}),shape=metricSelector(p),a=f.ledger.beginCollection(f.id,shape,{...f.scope,now:at(0)}),b=f.ledger.beginCollection(f.id,shape,{...f.scope,now:at(10)});
+ const accepted=f.ledger.ingest(f.id,p,{...f.scope,attemptId:b.id,now:at(12)});f.ledger.ingest(f.id,metricPacket(f.target,{value:90,at:new Date(at(20)).toISOString()}),{...f.scope,attemptId:a.id,now:at(20)});
+ assert.equal(f.ledger.snapshot(accepted.series_id,f.scope).value,200);assert.equal(f.ledger.history(accepted.series_id,f.scope).entries.length,2);
+ const c=f.ledger.beginCollection(f.id,shape,{...f.scope,now:at(25)});assert.equal(f.ledger.ingest(f.id,p,{...f.scope,attemptId:c.id,now:at(30)}).status,'DUPLICATE');assert.equal(f.ledger.snapshot(accepted.series_id,f.scope).value,200);assert.equal(f.db.prepare('SELECT count(*) n FROM metric_attempt_observations').get().n,3);
+});
+test('legacy attempts with no recorded generation remain explicitly unknown until a fresh ordered attempt',t=>{
+ const f=fixture(t),p=metricPacket(f.target),shape=metricSelector(p),receipt=f.ledger.ingest(f.id,p,f.scope),a=f.ledger.beginCollection(f.id,shape,f.scope);f.ledger.failCollection(a.id,f.scope);f.db.exec('UPDATE metric_collection_attempts SET generation=0');
+ const db=new DatabaseSync(f.demo.dbPath);try{const ledger=new MetricObservationStore(db),snapshot=ledger.snapshot(receipt.series_id,f.scope);assert.equal(snapshot.status,'COLLECTION_ORDER_UNKNOWN');assert.equal(snapshot.value,null);assert.equal(ledger.history(receipt.series_id,f.scope).entries.length,1);
+ const next=ledger.beginCollection(f.id,shape,{...f.scope,now:metricNow+1000});ledger.ingest(f.id,metricPacket(f.target,{value:120,at:new Date(metricNow+1000).toISOString()}),{...f.scope,attemptId:next.id,now:metricNow+1000});assert.equal(ledger.snapshot(receipt.series_id,f.scope).value,120);
+ }finally{db.close();}
+});

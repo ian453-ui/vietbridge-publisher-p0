@@ -220,3 +220,26 @@ log `/tmp/v3-slice03-full.log` SHA256:
 `c55050411d3436464141dadd8b38206cb7570ddaf8d1a2288e31a117ec4d5ca0`.
 The evidence JSON records other environment-local log hashes. The authorized
 real-sample transport denial above is not counted as successful media acceptance.
+
+## Temporal selection correction (start of slice 04)
+
+Independent review supplied a minimal timeline; both counterexamples were
+actually reproduced against b1f04ed. A started at 12:00:00 and failed at :20;
+an observation at :05 held value 100; B started :10 and failed :15. At as-of :18,
+the old selector incorrectly returned AVAILABLE 100. Separately an old attempt's
+late failure replaced a newer successful attempt with null.
+
+Collection attempts now receive a transactionally allocated, persistent per-series
+generation when they begin. Historical status is normalized before selection;
+completion wall-clock order no longer chooses the controlling attempt. Successful
+attempt-to-observation links preserve even duplicate results. Old late successes
+remain history and do not displace a newer successful generation. Independently
+imported evidence newer than a pending/failed attempt's start can remain visible,
+with its explicit source timestamp; collection generations never imply fresher
+source timestamps. No records or conflicts are erased.
+
+Legacy attempts without a stored generation are marked COLLECTION_ORDER_UNKNOWN
+with null until a new explicitly ordered attempt supersedes them; migration does
+not invent past order from completion timestamps. Restart and duplicate-result
+linkage regressions are included. These corrections are synthetic execution,
+not live platform collection proof.

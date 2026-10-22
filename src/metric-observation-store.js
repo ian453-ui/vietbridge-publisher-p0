@@ -24,7 +24,12 @@ export class MetricObservationStore {
    CREATE INDEX IF NOT EXISTS metric_observation_history ON metric_observations(series_id,observed_at,id);
    CREATE TABLE IF NOT EXISTS metric_raw_evidence(observation_id TEXT PRIMARY KEY,sha256 TEXT NOT NULL,data BLOB NOT NULL);
    CREATE TABLE IF NOT EXISTS metric_collection_attempts(id TEXT PRIMARY KEY,series_id TEXT NOT NULL,state TEXT NOT NULL,started_at TEXT NOT NULL,finished_at TEXT,reason TEXT);
-   CREATE INDEX IF NOT EXISTS metric_attempt_history ON metric_collection_attempts(series_id,started_at);`);
+   CREATE INDEX IF NOT EXISTS metric_attempt_history ON metric_collection_attempts(series_id,started_at);
+   CREATE TABLE IF NOT EXISTS metric_attempt_observations(attempt_id TEXT PRIMARY KEY,observation_id TEXT NOT NULL);`);
+  this.tx(()=>{
+   if(!db.prepare('PRAGMA table_info(metric_collection_attempts)').all().some(c=>c.name==='generation'))db.exec('ALTER TABLE metric_collection_attempts ADD COLUMN generation INTEGER NOT NULL DEFAULT 0');
+   if(!db.prepare('PRAGMA table_info(metric_observations)').all().some(c=>c.name==='collection_origin'))db.exec("ALTER TABLE metric_observations ADD COLUMN collection_origin TEXT NOT NULL DEFAULT 'LEGACY'");
+  });
  }
  tx(fn){const nested=this.db.isTransaction,name='metric_'+randomUUID().replaceAll('-','');this.db.exec(nested?'SAVEPOINT '+name:'BEGIN IMMEDIATE');try{const result=fn();this.db.exec(nested?'RELEASE '+name:'COMMIT');return result;}catch(error){this.db.exec(nested?'ROLLBACK TO '+name:'ROLLBACK');if(nested)this.db.exec('RELEASE '+name);throw error;}}
  scope(workspace,account){
@@ -74,12 +79,12 @@ export class MetricObservationStore {
    const old=this.db.prepare('SELECT * FROM metric_observations WHERE id=?').get(entryId);
    if(old)this.entry(old,target);
    if(!old){
-    this.db.prepare('INSERT INTO metric_observations VALUES(?,?,?,?,?,?)').run(entryId,seriesId,record.observed_at,JSON.stringify(record),reason,new Date(now).toISOString());
+    this.db.prepare('INSERT INTO metric_observations VALUES(?,?,?,?,?,?,?)').run(entryId,seriesId,record.observed_at,JSON.stringify(record),reason,new Date(now).toISOString(),attemptId?'COLLECTOR':'OFFLINE');
     this.db.prepare('INSERT INTO metric_raw_evidence VALUES(?,?,?)').run(entryId,record.source.sha256,packet.evidenceBytes);
    }
    const conflicting=this.db.prepare('SELECT id FROM metric_observations WHERE series_id=? AND observed_at=? ORDER BY id').all(seriesId,record.observed_at).map(x=>x.id);
    const status=old?'DUPLICATE':conflicting.length>1?'CONFLICT_RETAINED':'RECORDED';
-   if(attemptId)this.db.prepare("UPDATE metric_collection_attempts SET state='RECORDED',finished_at=? WHERE id=?").run(new Date(now).toISOString(),attemptId);
+   if(attemptId){this.db.prepare('INSERT INTO metric_attempt_observations VALUES(?,?)').run(attemptId,entryId);this.db.prepare("UPDATE metric_collection_attempts SET state='RECORDED',finished_at=? WHERE id=?").run(new Date(now).toISOString(),attemptId);}
    return {id:entryId,series_id:seriesId,status,conflicting_ids:conflicting.length>1?conflicting:[],origin:target.origin,...flags};
   });
  }
@@ -87,7 +92,7 @@ export class MetricObservationStore {
   exact(shape,['metric','window']);exact(shape.metric,metricKeys);const target=this.target(targetId,{workspace,accountId}),at=new Date(now).toISOString(),evidenceBytes=Buffer.from('selector validation only');
   const observation={schema_version:1,...Object.fromEntries(['workspace','account_id','platform','object_id','content_revision','publication_job_id'].map(k=>[k,target[k]])),observed_at:at,source:{transport:target.source_transport,reference:target.source_reference,sha256:hash(evidenceBytes)},window:shape.window,metric:{...shape.metric,value:null,availability:'NOT_COLLECTED'},coverage:{scope:'OBJECT',completeness:'UNKNOWN'},identity_evidence:{...Object.fromEntries(identityKeys.map(k=>[k,target[k]])),verified_at:at,method:'MANUAL_REVIEW',reference:target.mapping_reference}};
   const checked=this.checked(target,{observation,evidenceBytes,unavailable_reason:'NOT_COLLECTED'},now),id=randomUUID();
-  this.tx(()=>{this.db.prepare('INSERT OR IGNORE INTO metric_series VALUES(?,?,?)').run(checked.seriesId,targetId,JSON.stringify(checked.shape));this.db.prepare('INSERT INTO metric_collection_attempts VALUES(?,?,?,?,?,?)').run(id,checked.seriesId,'RUNNING',at,null,null);});
+  this.tx(()=>{this.db.prepare('INSERT OR IGNORE INTO metric_series VALUES(?,?,?)').run(checked.seriesId,targetId,JSON.stringify(checked.shape));const generation=this.db.prepare('SELECT COALESCE(max(generation),0)+1 n FROM metric_collection_attempts WHERE series_id=?').get(checked.seriesId).n;this.db.prepare('INSERT INTO metric_collection_attempts VALUES(?,?,?,?,?,?,?)').run(id,checked.seriesId,'RUNNING',at,null,null,generation);});
   return {id,series_id:checked.seriesId,target};
  }
  failCollection(id,{workspace,accountId,reason='COLLECTOR_FAILED',now=Date.now()}={}){
@@ -109,15 +114,18 @@ export class MetricObservationStore {
  snapshot(id,{workspace,accountId,asOf=new Date().toISOString()}={}){
   if(!iso(asOf)||Date.parse(asOf)>Date.now())fail('METRIC_AS_OF_INVALID');
   const {target,shape}=this.seriesRow(id,workspace,accountId);
-  const latest=this.db.prepare('SELECT max(observed_at) at FROM metric_observations WHERE series_id=? AND observed_at<=?').get(id,asOf).at;
+  // Normalize historical state before selection. Start generation, not completion order, controls a series.
+  const attempt=this.db.prepare(`SELECT *,CASE WHEN finished_at IS NULL OR finished_at>? THEN 'RUNNING' ELSE state END as_of_state FROM metric_collection_attempts WHERE series_id=? AND started_at<=? ORDER BY generation DESC,started_at DESC,id DESC LIMIT 1`).get(asOf,id,asOf);
+  const generation=this.db.prepare("SELECT COALESCE(max(generation),0) n FROM metric_collection_attempts WHERE series_id=? AND generation>0 AND state='RECORDED' AND finished_at<=?").get(id,asOf).n;
+  const latest=this.db.prepare(`SELECT max(o.observed_at) at FROM metric_observations o WHERE o.series_id=? AND o.observed_at<=? AND (o.collection_origin!='COLLECTOR' OR EXISTS(SELECT 1 FROM metric_attempt_observations l JOIN metric_collection_attempts a ON a.id=l.attempt_id WHERE l.observation_id=o.id AND a.generation=? AND a.state='RECORDED' AND a.finished_at<=?))`).get(id,asOf,generation,asOf).at;
   const rows=latest?this.db.prepare('SELECT * FROM metric_observations WHERE series_id=? AND observed_at=? ORDER BY id LIMIT 101').all(id,latest):[];
-  const failed=this.db.prepare("SELECT * FROM metric_collection_attempts WHERE series_id=? AND started_at<=? AND (state!='RECORDED' OR finished_at>?) ORDER BY COALESCE(finished_at,started_at) DESC,id DESC LIMIT 1").get(id,asOf,asOf);
-  const effective=failed&&(failed.finished_at&&failed.finished_at<=asOf?failed.finished_at:failed.started_at);
   let status='NOT_COLLECTED',value=null,reason='NO_OBSERVATIONS',entries=[];
   if(rows.length>100){status='CONFLICT';reason='CONFLICT_HISTORY_LIMIT';}
   else if(rows.length){entries=rows.map(row=>this.entry(row,target));status=entries.length>1?'CONFLICT':entries[0].observation.metric.availability;reason=entries.length>1?'CONFLICTING_AS_OF_SNAPSHOT':entries[0].unavailable_reason;value=status==='AVAILABLE'?entries[0].observation.metric.value:null;}
-  if(failed&&(!latest||effective>=latest)){status=failed.finished_at&&failed.finished_at<=asOf?'COLLECTION_FAILED':'COLLECTION_PENDING';value=null;reason=status==='COLLECTION_FAILED'?failed.reason:'AWAITING_RECONCILIATION';}
-  return {series_id:id,target,selector:shape,as_of:asOf,status,value,reason,observed_at:latest,collection_attempt:failed||null,observation_ids:entries.map(x=>x.id),origin:target.origin,...flags};
+  const independentNewer=attempt&&rows.length&&rows.every(r=>r.collection_origin==='OFFLINE'&&r.observed_at>attempt.started_at);
+  if(attempt?.generation===0){status='COLLECTION_ORDER_UNKNOWN';value=null;reason='LEGACY_ATTEMPT_GENERATION_UNKNOWN';}
+  else if(attempt&&attempt.as_of_state!=='RECORDED'&&!independentNewer){status=attempt.as_of_state==='FAILED'?'COLLECTION_FAILED':'COLLECTION_PENDING';value=null;reason=status==='COLLECTION_FAILED'?attempt.reason:'AWAITING_RECONCILIATION';}
+  return {series_id:id,target,selector:shape,as_of:asOf,status,value,reason,observed_at:latest,collection_attempt:attempt||null,observation_ids:entries.map(x=>x.id),origin:target.origin,...flags};
  }
  list(workspace,accountId,{cursor='',asOf=new Date().toISOString()}={}){
   this.scope(workspace,accountId);if(cursor&&!/^[a-f0-9]{64}$/.test(cursor))fail('METRIC_CURSOR_INVALID');
