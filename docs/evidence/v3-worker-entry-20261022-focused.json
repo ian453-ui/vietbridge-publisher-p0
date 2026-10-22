@@ -1,0 +1,41 @@
+{
+  "name": "focused",
+  "started_at_utc": "2026-10-22T22:05:44.267917+00:00",
+  "ended_at_utc": "2026-10-22T22:06:50.647641+00:00",
+  "cwd": "/workspace/vietbridge-publisher-p0",
+  "command": [
+    "node",
+    "--test",
+    "--test-concurrency=4",
+    "test/sites-worker-entry.test.js",
+    "test/sites-worker-ui.test.js",
+    "test/sites-cloud-authoring.test.js",
+    "test/sites-cloud-console-ui.test.js",
+    "test/sites-evidence-api.test.js",
+    "test/sites-authorization-race.test.js",
+    "test/sites-membership.test.js"
+  ],
+  "environment": {
+    "PUBLISHER_TEST_BROWSER_PATH": "/usr/bin/chromium",
+    "PUBLISHER_TEST_FFMPEG_PATH": "/usr/bin/ffmpeg"
+  },
+  "exit_code": 0,
+  "summary": {
+    "tests": 99,
+    "suites": 0,
+    "pass": 99,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "duration_ms": 66346.20735
+  },
+  "log": "docs/evidence/v3-worker-entry-20261022-focused.log",
+  "log_bytes": 10999,
+  "log_sha256": "d4e78f3aa5d82c32a9161901e5bdc1a2d8b18a6297b8b8914e7881221b63e91c",
+  "changed_source_sha256": {
+    "src/sites/worker-entry.js": "b3426d2af147f22b60a39b0e6b84a6b12510c71bffed3bb3a034664b69280116",
+    "test/sites-worker-entry.test.js": "ab4ef8d6e46f70471b9b11fecf8b3ce19ec3d4c507684015685e3dabb47a657e",
+    "test/sites-worker-ui.test.js": "c29f091951210a77a44342e5313fe3f05908146dbccdc6324a16add08aaf0194"
+  }
+}

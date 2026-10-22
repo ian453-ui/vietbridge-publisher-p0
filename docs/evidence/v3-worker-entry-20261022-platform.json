@@ -1,0 +1,72 @@
+{
+  "project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+  "date": "2026-10-22",
+  "selected_environment_id": "ccarenv_b64_Y2NhcmVudl8wZjEyYTg2M2UzYjA4MTkxOWM5OTViOTE5ZGVhZGUyOQ",
+  "site": {
+    "id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+    "status": "active",
+    "current_user_role": "owner",
+    "latest_version_number": 0,
+    "current_live_url": null,
+    "current_preview_url": null,
+    "expected_url": null,
+    "access": {
+      "mode": "custom",
+      "roles": [
+        "owner"
+      ],
+      "external_visitors": 0
+    }
+  },
+  "versions": {
+    "items": [],
+    "cursor": null
+  },
+  "database": {
+    "project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+    "bindings": [],
+    "selected_binding_name": null,
+    "tables": [],
+    "model_projection": {
+      "truncated": false,
+      "omitted_project_id": false,
+      "omitted_selected_binding": false,
+      "omitted_bindings": 0,
+      "omitted_tables": 0
+    }
+  },
+  "runtime_environment": {
+    "project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+    "revision": 0,
+    "updated_at": null,
+    "keys": []
+  },
+  "official_executable_search": {
+    "roots": [
+      "/workspace",
+      "/opt/codex",
+      "/mnt",
+      "/usr/local/share"
+    ],
+    "found": false
+  },
+  "official_resource_errors": [
+    {
+      "resource": "sites/templates/vinext-starter/app/chatgpt-auth.ts",
+      "error": "failed to read skill resource"
+    },
+    {
+      "resource": "sites/templates/vinext-starter/worker/index.ts",
+      "error": "failed to read skill resource"
+    }
+  ],
+  "official_skill_read": true,
+  "worker_starter_readme_read": true,
+  "credential_created": false,
+  "credential_configured": false,
+  "site_created": false,
+  "site_saved": false,
+  "deployment_attempted": false,
+  "permissions_changed": false,
+  "network_security_changed": false
+}

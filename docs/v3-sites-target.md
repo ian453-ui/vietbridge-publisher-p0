@@ -1,5 +1,10 @@
 # V3 formal target: private ChatGPT Sites + cloud processing
 
+Latest application integration: [Worker entry and runtime binding handoff](v3-worker-entry.md)
+adds the reusable request entry, protected static routing and direct DB/BUCKET
+wiring. The official starter/auth/build and actual hosted binding validation
+remain deployment gates; no live delivery is claimed.
+
 Updated 2026-10-22, slice 09. The user requires the formal UI on ChatGPT Sites
 and services in the cloud, independent of the Mac. Local Node demonstrations are
 only development tests. Existing V1/V2/Mac installations and unrelated sites remain
