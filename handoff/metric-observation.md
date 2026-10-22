@@ -1,5 +1,10 @@
 # MetricObservation — local evidence contract (P0-C)
 
+Historical pure-contract document. [V3 slice 03](../docs/v3-slice-03.md) adds
+durable storage, retained conflicts, collection-attempt status and scoped Review
+reads around this unchanged validator. The historical test counts below remain
+attributed to their original runs. Live metric collection is still unverified.
+
 ## Position in the existing architecture
 
 Baseline `25917a3655c76ed4b9d12772fa7120ff72907736`. Existing `store.js` records

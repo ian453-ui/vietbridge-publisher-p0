@@ -160,7 +160,8 @@ two customers; the inherited identity guard correctly rejected it. The fixture
 now uses distinct synthetic inactive endpoints and explicitly selects its default
 account. No guard was relaxed and no endpoint was contacted.
 
-Known remaining work: real authorized Drive byte transport and actual
+Remaining work at e770bfa (metric storage/offline intake subsequently implemented
+in [slice 03](v3-slice-03.md)): real authorized Drive byte transport and actual
 Publisher/Muse consumption acceptance, source-inventory semantic identity/QA
 revocation integration, durable MetricObservation collector/ledger, and
 authenticated producer/approval transport. No deployment, merge, real publishing,

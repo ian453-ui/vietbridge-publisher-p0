@@ -1,0 +1,72 @@
+{
+  "executed_date_utc": "2026-10-22",
+  "base_release": "4455a4b1faf40fedcd7020636999e165fa4a1386",
+  "previous_slice": "e770bfa0e9d910db2af5a1ca3d3f5e22aea009d2",
+  "archive_followup": "0926b58",
+  "full_run": {
+    "tests": 984,
+    "pass": 984,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "duration_ms": 66275.682363
+  },
+  "scope": "synthetic and existing mocked platform regression only",
+  "syntax": {
+    "javascript_syntax_files": 323,
+    "python_ast": "PASS",
+    "diff_check": "PASS"
+  },
+  "offline_repeat": {
+    "status": "IMPORTED",
+    "receipt_statuses": [
+      "DUPLICATE",
+      "DUPLICATE",
+      "DUPLICATE"
+    ],
+    "publish_allowed": false,
+    "source_authenticated": false
+  },
+  "browser": {
+    "synthetic_provenance_visible": true,
+    "latest_unavailable_value": null,
+    "reach_and_views_separate": true,
+    "delayed_scope_responses_isolated": true,
+    "external_requests": 0,
+    "page_errors": 0,
+    "allowed_local_mutations": "two existing account selection preference POSTs only"
+  },
+  "authorized_real_sample": {
+    "connector_metadata_and_file_reference": "SUCCEEDED",
+    "execution_environment_materialization": "DENIED_NETWORK_PROXY_403",
+    "resolver_review_browser_acceptance": "NOT_RUN_NO_LOCAL_BYTES",
+    "retries_after_denial": 0,
+    "public_user_media_bytes": 0
+  },
+  "local_logs": [
+    {
+      "path": "/tmp/v3-slice03-full.log",
+      "sha256": "c55050411d3436464141dadd8b38206cb7570ddaf8d1a2288e31a117ec4d5ca0"
+    },
+    {
+      "path": "/tmp/v3-slice03-archive-fixes.log",
+      "sha256": "51b5d2b0e1f40ce93205a23e20b66ec7e77268b63e96251483cb76d8bc4ca199"
+    },
+    {
+      "path": "/tmp/v3-metric-integration-accepted.log",
+      "sha256": "d70483a4fc46d3147867a5400f1c9b5b7de8a5dfa641c83fa175e81a5220eed9"
+    },
+    {
+      "path": "/tmp/v3-metric-demo-result.log",
+      "sha256": "251b432043dfc3091cb18e611d64e43166af871a752e3dda0927ed2dd4bae95c"
+    },
+    {
+      "path": "/tmp/v3-metric-offline-result.log",
+      "sha256": "5a14798b9d88757f0bc6461568d525d4134866c40c4206a7494f1790c12d3c7d"
+    }
+  ],
+  "real_metric_collection": "LIVE_UNVERIFIED",
+  "real_publication_interaction_deletion": "NOT_PERFORMED",
+  "permission_or_credential_changes": "NOT_PERFORMED"
+}

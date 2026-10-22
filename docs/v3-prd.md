@@ -67,8 +67,9 @@ uses existing `PublisherAccess`; application tokens do not gain new scopes.
 Scope is always workspace + account + platform target, never a display name.
 Local artifact inspection may bind caller-declared scope but does not authenticate
 the producer. Server account lookup must reject cross-workspace binding.
-Metric storage/collectors are a later adapter over `metric-observation.js`, with
-immutable observations, explicit availability and conflict detection. Never sum
+Metric storage and an injected read-only collector now wrap `metric-observation.js`
+in [slice 03](v3-slice-03.md), with immutable raw evidence, explicit availability
+and retained conflicts. Live collection remains unverified. Never sum
 incompatible windows/definitions or turn unavailable metrics into zero.
 
 ## Inheritance / acceptance matrix
@@ -85,7 +86,7 @@ incompatible windows/definitions or turn unavailable metrics into zero.
 | Groups / proactive / Inbox | `facebook-browser.js`, `proactive-engagement.js`, `engagement-review.js` | Keep drafts, target review, quotas and independent readback; cloud fixtures never publish |
 | Video QA | `production-artifact-contract.js` previously BYTES_HASH_ONLY | Fake MP4, truncated video, audio-only, wrong container and missing decoder fail; real video decodes; review remains pending |
 | Persistence | New production review ledger | Restart, duplicate receipt and conflicting result; no silent overwrite; account-scoped reads |
-| Metrics | `metric-observation.js` is in-memory only | Future durable collector: duplicates/conflicts/restart/source hashes; real collection explicitly unverified |
+| Metrics | Pure `metric-observation.js` retained; slice 03 adds SQLite ledger and read-only adapter interface | Immutable task/account/post/source mapping, raw evidence, duplicates/conflicts/restart, newest failure without stale fallback; live collection explicitly unverified |
 | Full content identity | Parent inventory: 074 identifies distinct trade, permit-rule and Luxshare articles across dates; 075 also repeats | Use full content_id + slug + body semantics + version; never merge or attach images by a three-digit suffix/folder alone. Inventory-semantic implementation remains future work |
 | QA revocation precedence | Parent inventory: 062 title suggests pass, latest QA revoked old mobile PASS | New QA revocation / MOBILE_READABILITY_RETEST_PENDING overrides title markers and historic PASS; no inferred approval. Add actual inventory integration regression before rollout |
 

@@ -370,8 +370,9 @@ export async function mountUnifiedPublisher({workspace,account,token,executionEn
 
 // Production inspection preview; retains the original approval gates.
 const reviewEscape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export const productionReviewView=()=>'<section class="panel"><h2>内容制作审核 · V3</h2><p>查看已保存的正文、媒体及解码结果。所有记录均待审核；事实、视觉、声音和字幕仍需人工核对，原资料库批准门禁继续有效。</p><div id="production-reviews" role="status">正在读取当前客户和账号…</div></section>';
+export const productionReviewView=()=>'<section class="panel"><h2>内容制作审核 · V3</h2><p>查看已保存的正文、媒体及解码结果。所有记录均待审核；事实、视觉、声音和字幕仍需人工核对，原资料库批准门禁继续有效。</p><div id="production-reviews" role="status">正在读取当前客户和账号…</div></section><section class="panel"><h2>指标观测与来源</h2><p>按账号、帖子、定义与时间窗分别显示。合成测试和离线待核证据不代表真实平台指标；采集失败不会沿用旧值。</p><div id="metric-observations" role="status">选择客户与账号后读取。</div></section>';
 export async function mountProductionReview({workspace,accountId,fetcher=fetch}){
+ void mountMetricObservations({workspace,accountId,fetcher});
  const node=document.getElementById('production-reviews');if(!node)return;
  if(!workspace||!accountId){node.textContent='请先选择客户与发布账号。';return;}
  const base='/api/production-reviews',scope=new URLSearchParams({workspace,accountId});
@@ -393,4 +394,29 @@ export async function mountProductionReview({workspace,accountId,fetcher=fetch})
    }catch(error){if(details.isConnected)target.textContent=error.message;}
   });
  }catch(error){if(node.isConnected)node.textContent=error.message;}
+}
+
+async function mountMetricObservations({workspace,accountId,fetcher}){
+ const node=document.getElementById('metric-observations');if(!node)return;if(!workspace||!accountId){node.textContent='请先选择客户与发布账号。';return;}
+ const scope=new URLSearchParams({workspace,accountId}),base='/api/metric-observations';let asOf;
+ const read=async path=>{const response=await fetcher(path);if(!response.ok)throw Error('指标读取失败（'+response.status+'）');return response.json();};
+ const origin=x=>x==='SYNTHETIC'?'合成测试 · 非用户指标':'离线证据 · 真实性待核';
+ const windowText=w=>w.kind==='UNKNOWN'?'未知时间窗':w.start+' 至 '+w.end+' · '+(w.timezone||'时区未知');
+ const showError=(target,error)=>{if(target.isConnected){const p=document.createElement('p');p.textContent=error.message;target.append(p);}};
+ function more(target,label,load){const button=document.createElement('button');button.textContent=label;button.onclick=async()=>{button.disabled=true;try{await load();button.remove();}catch(error){button.disabled=false;showError(target,error);}};target.append(button);}
+ async function history(details,cursor=''){
+  const target=details.querySelector('[data-metric-history]'),data=await read(base+'/series/'+details.dataset.metricSeries+'?'+scope+'&cursor='+cursor);if(!details.isConnected)return;
+  if(!cursor)target.textContent='';
+  for(const entry of data.entries){const p=document.createElement('p');p.textContent=entry.observation.observed_at+' · '+entry.observation.metric.availability+' · '+(entry.observation.metric.value===null?'null':entry.observation.metric.value)+' · '+(entry.unavailable_reason||'');const a=document.createElement('a');a.textContent=' 原始证据';a.download='metric-evidence.bin';a.href=base+'/evidence/'+entry.id+'?'+scope;p.append(a);target.append(p);}
+  if(!data.entries.length)target.textContent='暂无观测；采集状态仍保留。';
+  if(data.next_cursor)more(target,'更多历史记录',()=>history(details,data.next_cursor));
+ }
+ async function page(cursor=''){
+  const report=await read(base+'?'+scope+'&cursor='+cursor+(asOf?'&asOf='+encodeURIComponent(asOf):''));if(!node.isConnected)return;
+  asOf=report.as_of;if(!cursor)node.textContent='';
+  const section=document.createElement('div');section.innerHTML=report.snapshots.map(row=>`<details data-metric-series="${reviewEscape(row.series_id)}"><summary>${reviewEscape(row.target.task_id)} · ${reviewEscape(row.target.platform)} / ${reviewEscape(row.target.object_id)} · ${reviewEscape(row.selector.metric.name)}：${row.value===null?'不可用':reviewEscape(row.value)} · ${reviewEscape(row.status)}</summary><p>${origin(row.origin)} · 正文 ${reviewEscape(row.target.content_id)} / ${reviewEscape(row.target.content_revision)}</p><p>${reviewEscape(row.selector.metric.definition_text)} (${reviewEscape(row.selector.metric.definition_id)} / ${reviewEscape(row.selector.metric.definition_version)})</p><p>时间窗：${reviewEscape(windowText(row.selector.window))}</p><p>观测时间：${reviewEscape(row.observed_at||'尚无观测')} · 原因：${reviewEscape(row.reason||'无')}</p><div data-metric-history>展开读取历史与证据。</div></details>`).join('')||'<p>当前客户与账号暂无指标观测。</p>';node.append(section);
+  for(const details of section.querySelectorAll('[data-metric-series]'))details.addEventListener('toggle',async()=>{if(!details.open||details.dataset.loaded)return;details.dataset.loaded='pending';try{await history(details);details.dataset.loaded='true';}catch(error){delete details.dataset.loaded;showError(details,error);}});
+  if(report.next_cursor)more(node,'更多指标序列',()=>page(report.next_cursor));
+ }
+ try{await page();}catch(error){if(node.isConnected)node.textContent=error.message;}
 }

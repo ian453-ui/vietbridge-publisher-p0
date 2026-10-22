@@ -29,6 +29,7 @@ import {BrowserResources} from './browser-resources.js';
 import {ScanScheduler} from './scan-scheduler.js';
 import {ContentSync} from './content-sync.js';
 import {ProductionReviewStore} from './production-review-store.js';
+import {MetricObservationStore} from './metric-observation-store.js';
 const root=dirname(fileURLToPath(import.meta.url));
 const execFileAsync=promisify(execFile);
 export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/Application Support/VietBridgeSocialOperatorV2'),'mock.sqlite'),options={}){
@@ -40,6 +41,7 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
  const access=cloud?new PublisherAccess(cloud):null;
  const unified=options.unified?new UnifiedPublisher(store):null;
  const productionReviews=unified?new ProductionReviewStore(store.db):null;
+ const metricObservations=unified?new MetricObservationStore(store.db):null;
  if(unified)unified.browserSkill=facebook.browserSkill;
  if(unified&&options.recoverStartup)unified.recoverAfterShutdown();
  const executionEnabled=options.executionEnabled===true;
@@ -80,6 +82,17 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
   const publisherContext=()=>publisher.context(url.searchParams.get('workspace')||'',url.searchParams.get('accountId')||'');
   const requestVerifier=()=>publisher?new PublicationVerifier({scoped:true,fetch:(path,init)=>publisher.fetch(publisherContext(),path,init)}):verifier;
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
+  if(metricObservations&&url.pathname.startsWith('/api/metric-observations')){
+   if(req.method!=='GET')return send(res,405,{error:'METRIC_READ_ONLY'});
+   const workspace=url.searchParams.get('workspace'),accountId=url.searchParams.get('accountId'),scope={workspace,accountId};
+   try{
+    metricObservations.scope(workspace,accountId);
+    if(url.pathname==='/api/metric-observations')return send(res,200,metricObservations.list(workspace,accountId,{cursor:url.searchParams.get('cursor')||'',...(url.searchParams.has('asOf')?{asOf:url.searchParams.get('asOf')}:{})}));
+    const match=url.pathname.match(/^\/api\/metric-observations\/(series|evidence)\/([a-f0-9]{64})$/);if(!match)return send(res,404,{error:'METRIC_NOT_FOUND'});
+    if(match[1]==='series')return send(res,200,metricObservations.history(match[2],{...scope,before:url.searchParams.get('cursor')}));
+    const raw=metricObservations.evidence(match[2],scope);res.setHeader('Content-Type','application/octet-stream');res.setHeader('Content-Disposition','attachment; filename="metric-evidence.bin"');res.setHeader('Content-Security-Policy',"default-src 'none'; sandbox");return res.end(Buffer.from(raw.data));
+   }catch(error){return send(res,error.message==='METRIC_SCOPE_DENIED'?403:error.message==='METRIC_NOT_FOUND'?404:409,{error:['METRIC_SCOPE_DENIED','METRIC_NOT_FOUND','METRIC_STORAGE_CORRUPT'].includes(error.message)?error.message:'METRIC_UNAVAILABLE'});}
+  }
   if(productionReviews&&url.pathname.startsWith('/api/production-reviews')){
    if(req.method!=='GET')return send(res,405,{error:'REVIEW_READ_ONLY'});
    const workspace=url.searchParams.get('workspace'),account=url.searchParams.get('accountId');
