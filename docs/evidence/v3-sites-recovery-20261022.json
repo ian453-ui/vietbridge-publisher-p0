@@ -1,0 +1,84 @@
+{
+  "checked_at": "2026-10-22T05:19:05.341050+00:00",
+  "source_commit": "86385f85e0a1d1918c4420548afef86a95ee960d",
+  "project": {
+    "id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+    "status": "active",
+    "latest_version_number": 0,
+    "current_live_url": null,
+    "current_user_role": "owner",
+    "access_mode": "custom",
+    "allowed_roles": [
+      "owner"
+    ],
+    "external_visitor_count": 0,
+    "saved_versions": [],
+    "cursor": null
+  },
+  "filesystem": {
+    "checked_at": "2026-10-22T05:19:05.341050+00:00",
+    "roots": [
+      "/opt/codex",
+      "/workspace/.agents",
+      "/workspace/.codex",
+      "/workspace/sites"
+    ],
+    "filenames": [
+      "project-setup.mjs",
+      "site-workflow.mjs",
+      "build-site.mjs",
+      "install-dependencies.mjs",
+      "set-project-id.mjs",
+      "configure-execution-profile.mjs",
+      "chatgpt-auth.ts"
+    ],
+    "rg_exit_code": 1,
+    "matches": [],
+    "stderr": "",
+    "installed_plugin_names": [
+      "documents",
+      "pdf",
+      "presentations",
+      "spreadsheets",
+      "template-creator"
+    ]
+  },
+  "skills": {
+    "main": "READ_SUCCEEDED",
+    "troubleshooting": "READ_SUCCEEDED",
+    "executor_catalog": [],
+    "subsequent_catalog_notice": "No cloud skills are currently available",
+    "resources": [
+      {
+        "uri": "skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/scripts/project-setup.mjs",
+        "error": "failed to read skill resource"
+      },
+      {
+        "uri": "skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/sites/templates/vinext-starter/app/chatgpt-auth.ts",
+        "error": "failed to read skill resource"
+      }
+    ]
+  },
+  "historical_parent_report": {
+    "date": "2026-10-21",
+    "download_domain": "sdmntprwestus3.oaiusercontent.com",
+    "download_result": "CONNECT 403",
+    "environment_settings_name": "vietbridge-publisher-p0",
+    "editing_result": "Couldn't start editing environment",
+    "provenance": "PARENT_REPORTED_HISTORY_NOT_REPRODUCED",
+    "same_environment_or_causal_link_to_missing_mount": "UNKNOWN"
+  },
+  "action": {
+    "target": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+    "operation": "Official starter initialization / source build / private deployment",
+    "state": "BLOCKED_NOT_ATTEMPTED",
+    "reason": "Official Sites executable helper and complete starter not mounted in selected execution environment",
+    "deployment_denied_this_check": false,
+    "deployment_outcome_uncertain": false,
+    "credential_created": false,
+    "network_configuration_changed": false,
+    "blocked_download_retried": false,
+    "business_code_changed": false
+  },
+  "minimum_recovery": "Restore the complete official Sites executor plugin/starter mount in this selected cloud environment; verify helper/auth files exist before resuming same project. Inspect provisioning logs to establish whether historic proxy denial is relevant; do not change network policy without confirmed need and authorization."
+}

@@ -119,3 +119,46 @@ second-connection revocation regressions. Hosted identity/D1 remain unverified.
 media to the original content/platform/frozen-task views, and closed async
 UNKNOWN reconciliation. [Current whole-product acceptance](v3-sites-acceptance.md)
 separately lists hosted work, native-only paths and missing business implementations.
+
+## Bounded recovery check after environment restart — 05:19 UTC
+
+[Executed recovery evidence](evidence/v3-sites-recovery-20261022.json) records the
+new check authorized after the parent's 04:59 environment restart. Main Sites
+skill and troubleshooting text were readable. Executor skill discovery returned
+an empty list; later the catalog again reported no cloud skills. Text availability
+did not restore executable files.
+
+`rg --files --hidden` over `/opt/codex`, `/workspace/.agents`, `/workspace/.codex`
+and `/workspace/sites` found none of `project-setup.mjs`, `site-workflow.mjs`,
+`build-site.mjs`, `install-dependencies.mjs`, `set-project-id.mjs`,
+`configure-execution-profile.mjs` or `chatgpt-auth.ts` (exit 1, no stderr).
+Installed plugin names remain documents/pdf/presentations/spreadsheets/template-creator.
+The exact helper and auth resource reads recorded in the evidence both returned
+`failed to read skill resource`. No broader restricted-directory search or
+blocked-download retry was performed.
+
+Native `get_site` plus `list_site_versions` confirmed this same project is active,
+owner-only, latest version **0**, `current_live_url:null`, saved versions `[]`,
+cursor null. No existing saved/deployed version was overlooked. Original local
+hosting identity and unconfigured bindings remain unchanged; the source checkout
+was clean at `86385f85e0a1d1918c4420548afef86a95ee960d`.
+
+The parent reports a **historical** 2026-10-21 `CONNECT 403` for
+`sdmntprwestus3.oaiusercontent.com` and two `Couldn't start editing environment`
+errors in settings for `vietbridge-publisher-p0`. This check did not repeat that
+download or open/change environment settings. No local evidence links the missing
+mount to that exact download or identifies the settings environment as the same
+selected environment. **Causal link and environment identity remain unknown.**
+Missing files, historical network denial and failed settings UI are separate
+observations; do not infer a new network-policy requirement from them.
+
+Minimum recovery is platform-side restoration of the complete official Sites
+executor plugin and Vinext starter into this selected cloud environment. Verify
+the actual helper/auth files exist, then resume supported setup/build/storage/
+private deployment against the saved project ID. If provisioning still fails,
+inspect its actual error/request ID to establish whether the historic proxy denial
+is relevant before proposing any narrowly scoped network change. No new user
+credential, sharing change, Mac availability or another speculative domain change
+is needed to perform that diagnosis. All dependent deployment actions are
+**not attempted**, not denied or uncertain; no further synthetic business code
+was added during this recovery check.
