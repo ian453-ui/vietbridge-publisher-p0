@@ -265,5 +265,8 @@ freeze. Historical committed approval/preparation/submission facts remain visibl
 ordinary or derived Review on its existing platform, with fresh native decode in
 synthetic tests, independent approval and atomic ancestor guards. Repeated cycles
 are bounded by an eight-node lineage budget. Cross-platform media adaptation and
-original bulk/file input remain code gaps. Real inspector transport remains absent; content approval does not authorize
+file replacement remain code gaps. [Bounded batch selection](v3-batch-selection.md)
+now covers up to 20 exact versions, explicit target/platform, per-item preflight and
+original task freezing with atomic revalidation. It never batches approval or
+publication, and scope changes invalidate selection and pending callbacks. Real inspector transport remains absent; content approval does not authorize
 publication.

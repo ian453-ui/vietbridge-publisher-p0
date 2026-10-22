@@ -1,0 +1,213 @@
+{
+  "name": "focused",
+  "started_at_utc": "2026-10-22T21:38:04.045284+00:00",
+  "ended_at_utc": "2026-10-22T21:39:15.606872+00:00",
+  "cwd": "/workspace/vietbridge-publisher-p0",
+  "command": [
+    "node",
+    "--test",
+    "--test-concurrency=4",
+    "test/sites-cloud-authoring.test.js",
+    "test/sites-cloud-console-ui.test.js"
+  ],
+  "environment": {
+    "PUBLISHER_TEST_BROWSER_PATH": "/usr/bin/chromium",
+    "PUBLISHER_TEST_FFMPEG_PATH": "/usr/bin/ffmpeg",
+    "V3_SITES_EVIDENCE_DIR": "/tmp/publisher-v3-recovery-screenshots"
+  },
+  "exit_code": 0,
+  "log": "docs/evidence/v3-batch-recovery-20261022-focused.log",
+  "log_bytes": 8409,
+  "log_sha256": "ec91695d9e972b65b768cdff8c952811a9d4d12d1740057b9176d59b837277e4",
+  "summary": {
+    "tests": 75,
+    "suites": 0,
+    "pass": 75,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "duration_ms": 71520.742149
+  },
+  "screenshots": [
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-approved-platform-plan.png",
+      "bytes": 113799,
+      "sha256": "55d3621d59468105658297fa75322f16929197b96e9940992776da8d6f6ccaf9"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-batch-preflight.png",
+      "bytes": 170703,
+      "sha256": "524c7a7e6740c0290ba0930f7bc62978a17906b1c6164791933b6c2663ae090c",
+      "archived_path": "docs/evidence/v3-batch-recovery-20261022/desktop-batch-preflight.png"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-batch-receipts.png",
+      "bytes": 181093,
+      "sha256": "b54b78f3930741797bc497d389056cc337a2cfc5158b01809807266f320575e2",
+      "archived_path": "docs/evidence/v3-batch-recovery-20261022/desktop-batch-receipts.png"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-canonical-qa-withdrawn.png",
+      "bytes": 116247,
+      "sha256": "7fb0bff0b0eaed9eade267f61cc18d89af0bc987617f9fd60e71a2c65238261a"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-canonical-review.png",
+      "bytes": 116832,
+      "sha256": "84cc7520ca0b796db88f4ebe749fbbfecd9f6caa999aae5d6f2907f874568918"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-cloud-metrics.png",
+      "bytes": 85894,
+      "sha256": "447b5bc96632f6afcf8f44ef936240814dd8b707e0ebc45aa71480667c8e9121"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-cloud-review.png",
+      "bytes": 100605,
+      "sha256": "c0e015fa7de73eac1a52f02e3232b4bca84dfdd394ee750414936aade5308d82"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-cloud-tasks.png",
+      "bytes": 85606,
+      "sha256": "d4eb36c2d6ab384fcb243309be0c5763991bad4e2b960420532f8b4e7a2a9650"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-cloud-video.png",
+      "bytes": 86251,
+      "sha256": "aefa24a4574e407806260820a2faedeee4588cd5ec07042bb8796ad506577481"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-edited-review-frozen.png",
+      "bytes": 120671,
+      "sha256": "a435cf801f932bc5614aa44d298f5bd119b4bb43ca67c15bc520e77ffd578249"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-edited-review-pending.png",
+      "bytes": 125232,
+      "sha256": "5434de08ca475372d0afb799e644c5d923c3d4adf76106cf43f5b6789e3f36aa"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-isolated-draft.png",
+      "bytes": 154266,
+      "sha256": "23496a817ba1c8543816b5d6df150ac8cde8b99f024bbdc7f60f797aa53474e0"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-platform-editor.png",
+      "bytes": 211020,
+      "sha256": "02f8282d63cda7bfe228faab57b138ea2712d7e7c7f92ca1afd4b64bfb79e74c"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-revoked-plan.png",
+      "bytes": 115349,
+      "sha256": "bcbed7664132740575cb14aa09801c4f2773d875312956b0b85d3cdcb747facc"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-shared-target.png",
+      "bytes": 136874,
+      "sha256": "48442f994d790f0c95256d63504579787c7952344d3f19d03c19c2baca7f072a"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/desktop-target-review-plan.png",
+      "bytes": 114958,
+      "sha256": "bcb2e0097f12fe3ab1b93fee26dc3e1fea22e6d254463df93081fafe19098253"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-approved-platform-plan.png",
+      "bytes": 69411,
+      "sha256": "1f905c2265e09478ffc483c11fe67d304877893af1aa29541bb4c763de4373c6"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-batch-preflight.png",
+      "bytes": 188165,
+      "sha256": "d135c053186f842649cf699af311745a15b7076c2eedcc90b4581e876830bee1",
+      "archived_path": "docs/evidence/v3-batch-recovery-20261022/mobile-batch-preflight.png"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-batch-receipts.png",
+      "bytes": 198811,
+      "sha256": "40fc1b33a558ef5b9d52ada15896a5300c857ba9bb3feae3aed979b93da7b1b3",
+      "archived_path": "docs/evidence/v3-batch-recovery-20261022/mobile-batch-receipts.png"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-canonical-qa-withdrawn.png",
+      "bytes": 85817,
+      "sha256": "ebb7f4258b43fa9ee053dac85d7165a00f56180a38d3bfaf4d2159497fb5552b"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-canonical-review.png",
+      "bytes": 89153,
+      "sha256": "4659c65f4f2c769fa2d653a035fe9a59220d284f63935cf1c159671f6e78e3b4"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-cloud-metrics.png",
+      "bytes": 70428,
+      "sha256": "997a7b550eb70ac1254376327b827f469d43325b8777058e306c1b91cf172573"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-cloud-review.png",
+      "bytes": 59943,
+      "sha256": "42eb47312d850bfa74a0c2e16d3cfa9dbe13ecd603cff5ed534979ac9208f11b"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-cloud-tasks.png",
+      "bytes": 68900,
+      "sha256": "2a4e8e447c4b89a6116e65d57f146a4ab056f65edf67c548828f087440d3f329"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-cloud-video.png",
+      "bytes": 60813,
+      "sha256": "1edc2bc93cc39e17c739eb908dc55afadf8f095f95c80a1e71430548c257d0bf"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-edited-media.png",
+      "bytes": 265442,
+      "sha256": "bc202a204a3f6c6d913f95d03562e36ba9aa06daf5812db63bb5d6b4dbe109c5"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-edited-review-frozen.png",
+      "bytes": 88751,
+      "sha256": "b5bcdcc4c7b3c66cf43488bad91ae3b3a1873cecb4084c23484782139022d868"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-edited-review-pending.png",
+      "bytes": 102368,
+      "sha256": "e462118a582fc83307bd56612bb43c682031c4ab7182130690d77089c2f841cf"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-isolated-draft.png",
+      "bytes": 137135,
+      "sha256": "94b5b87ba33ed1b59750d8a848980f7838a6fff50baca538ee687f32d0e7368b"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-platform-editor.png",
+      "bytes": 236319,
+      "sha256": "58d600be5591893f7ad2a7cd5d647b5d68cf84342bcf734c45515cf3dc7366d5"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-revoked-plan.png",
+      "bytes": 77440,
+      "sha256": "94ed1fc2cd49677c86c2b58abe9adf577b66c489995e0923d51d710a96898aee"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-shared-target.png",
+      "bytes": 121871,
+      "sha256": "31dc1e73956fea82117553b29187a38719968ef6ce3ca968ef4029d02f4003a1"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-target-review-plan.png",
+      "bytes": 70256,
+      "sha256": "c5d5d6356c32f801d48306b3e55ffc57f8765f59847002aaf9082c969d5751dd"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-third-derived-review-frozen.png",
+      "bytes": 140745,
+      "sha256": "d82c21d1fa820a254f0d354d7234bbf8b62a1f3898d09fc8d99e81a9c129e2ef"
+    },
+    {
+      "path": "/tmp/publisher-v3-recovery-screenshots/mobile-third-derived-review-pending.png",
+      "bytes": 154529,
+      "sha256": "68f3a518dfa4d20b7fae62876074014be2401fdc9cf4a766bb9350b36d952333"
+    }
+  ]
+}

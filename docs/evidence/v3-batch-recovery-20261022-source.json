@@ -1,0 +1,120 @@
+{
+  "baseline_commit": "f6c61d3ab45c392ad31677f0d44c64c795bcaa6c",
+  "original_staged_tree": "aefa47d9941ebe0844bb5c92afda6e22e3980455",
+  "original_tree_timestamp_utc": null,
+  "patch_sha256": "6bcb3d1fb83db51dd33f68724251fb0372948501f71fa0357c853a97f34e9d7d",
+  "files": [
+    {
+      "path": "docs/evidence/v3-batch-api-final.log",
+      "recorded_characters": 3303,
+      "recovery_status": "FULL_ORIGINAL_BYTES_NOT_AVAILABLE_IN_READABLE_HISTORY",
+      "recovered_sha256": null
+    },
+    {
+      "path": "docs/evidence/v3-batch-before.log",
+      "recorded_characters": 2508,
+      "recovery_status": "FULL_ORIGINAL_BYTES_NOT_AVAILABLE_IN_READABLE_HISTORY",
+      "recovered_sha256": null
+    },
+    {
+      "path": "docs/evidence/v3-batch-focused.log",
+      "recorded_characters": 8137,
+      "recovery_status": "FULL_ORIGINAL_BYTES_NOT_AVAILABLE_IN_READABLE_HISTORY",
+      "recovered_sha256": null
+    },
+    {
+      "path": "docs/evidence/v3-batch-full.log",
+      "recorded_characters": 374107,
+      "recovery_status": "FULL_ORIGINAL_BYTES_NOT_AVAILABLE_IN_READABLE_HISTORY",
+      "recovered_sha256": null
+    },
+    {
+      "path": "docs/evidence/v3-batch-race-after.log",
+      "recorded_characters": 205,
+      "recovery_status": "RECOVERED_FROM_LITERAL_TOOL_HISTORY_AND_PINNED_BASE",
+      "recovered_sha256": "313ddcf6f8ca47399ee5d0d440f2e3af61692eb5923aff513a7b257e78721794"
+    },
+    {
+      "path": "docs/evidence/v3-batch-race-before.log",
+      "recorded_characters": 506,
+      "recovery_status": "FULL_ORIGINAL_BYTES_NOT_AVAILABLE_IN_READABLE_HISTORY",
+      "recovered_sha256": null
+    },
+    {
+      "path": "docs/evidence/v3-batch-selection-evidence.json",
+      "recorded_characters": 6461,
+      "recovery_status": "FULL_ORIGINAL_BYTES_NOT_AVAILABLE_IN_READABLE_HISTORY",
+      "recovered_sha256": null
+    },
+    {
+      "path": "docs/v3-batch-selection.md",
+      "recorded_characters": 8108,
+      "recovery_status": "RECOVERED_FROM_LITERAL_TOOL_HISTORY_AND_PINNED_BASE",
+      "recovered_sha256": "7eb7ceeabb4c40a6ed3feb76c1aa80f52f1e5f0e52c178fcfd030a6e149f1429"
+    },
+    {
+      "path": "docs/v3-inheritance-review-20261022.md",
+      "recorded_characters": 15221,
+      "recovery_status": "RECOVERED_FROM_LITERAL_TOOL_HISTORY_AND_PINNED_BASE",
+      "recovered_sha256": "1150862a8f79b184829084dfb816eb7441c2eff5033a5ede193644245e7e300f"
+    },
+    {
+      "path": "docs/v3-prd.md",
+      "recorded_characters": 20933,
+      "recovery_status": "RECOVERED_FROM_LITERAL_TOOL_HISTORY_AND_PINNED_BASE",
+      "recovered_sha256": "86c10cbab2f97eccc1f125baa16d3c162c78c2885b069d72a22e2df083df26e9"
+    },
+    {
+      "path": "docs/v3-sites-acceptance.md",
+      "recorded_characters": 15215,
+      "recovery_status": "RECOVERED_FROM_LITERAL_TOOL_HISTORY_AND_PINNED_BASE",
+      "recovered_sha256": "032b4320a027545206fef424096aa42ec1f1bfe6a32684c9e8e2aceb6cffc47c"
+    },
+    {
+      "path": "src/sites/cloud-authoring-api.js",
+      "recorded_characters": 32150,
+      "recovery_status": "RECOVERED_FROM_LITERAL_TOOL_HISTORY_AND_PINNED_BASE",
+      "recovered_sha256": "927339c8d090202e7e9991f850a549c54a89049321f22771e1fef955646fa29e"
+    },
+    {
+      "path": "src/sites/cloud-console.css",
+      "recorded_characters": 4256,
+      "recovery_status": "RECOVERED_FROM_LITERAL_TOOL_HISTORY_AND_PINNED_BASE",
+      "recovered_sha256": "136fa313ea156c756bcae8356d2d011288fd20eb024303b21ee28ba55b4d8b5b"
+    },
+    {
+      "path": "src/sites/cloud-console.html",
+      "recorded_characters": 6334,
+      "recovery_status": "RECOVERED_FROM_LITERAL_TOOL_HISTORY_AND_PINNED_BASE",
+      "recovered_sha256": "a06cf86e05fc414def9009fdfd50ec34d979648f74e879c04395c4544ea9a08b"
+    },
+    {
+      "path": "src/sites/cloud-console.js",
+      "recorded_characters": 39819,
+      "recovery_status": "RECOVERED_FROM_LITERAL_TOOL_HISTORY_AND_PINNED_BASE",
+      "recovered_sha256": "530b550b6b1a646cf58fb3a1d5346513424f252d062d8854afdfd2605e7d8e1b"
+    },
+    {
+      "path": "test/sites-cloud-authoring.test.js",
+      "recorded_characters": 29075,
+      "recovery_status": "RECOVERED_FROM_LITERAL_TOOL_HISTORY_AND_PINNED_BASE",
+      "recovered_sha256": "c04d62c67b10193f537619694935fe813860153506f3812124784203a6ce9960"
+    },
+    {
+      "path": "test/sites-cloud-console-ui.test.js",
+      "recorded_characters": 78494,
+      "recovery_status": "RECOVERED_FROM_LITERAL_TOOL_HISTORY_AND_PINNED_BASE",
+      "recovered_sha256": "a4c9ba6a7321ebfaea27b9d100382a8a604ded756b6044aefd79ce2a521499b8"
+    }
+  ],
+  "recovery": {
+    "source_page": "https://chatgpt.com/space/page_756d60e140d48191b54d6e2c0bcd3963",
+    "recovery_date": "2026-10-22",
+    "branch": "publisher-v3/cloud-slice-01",
+    "patch_sha256_verified": true,
+    "all_11_recovered_files_sha256_and_character_count_verified": true,
+    "original_17_file_tree_reproduced": false,
+    "original_screenshots_recovered": false,
+    "note": "Recovered SHA256 values describe the rescued Page content, not lost hashes from the original evidence JSON. Six missing original evidence files have not been recreated. New test evidence uses separate recovery-20261022 filenames."
+  }
+}

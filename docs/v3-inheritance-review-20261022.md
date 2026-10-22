@@ -139,7 +139,8 @@ content only. They are not physical-device, Safari or hosted Sites acceptance.
    [Edited Review handoff](v3-edited-review-handoff.md) now closes fresh inspection
    and independent approval on the original platform. [Repeated derived editing](v3-derived-review-edits.md)
    adds subsequent cycles and target-derived sources with bounded ancestor checks.
-   Bulk selection/file replacement and cross-platform media edits remain code gaps. Preserve
+   [Bounded batch selection](v3-batch-selection.md) now restores multi-select, per-item
+   reasons and exact-target draft freezing. File replacement and cross-platform media edits remain code gaps. Preserve
    account-specific approval and frozen version identity. This can be developed
    independently and is not blocked solely by credentials or deployment.
 2. **Formal cloud delivery:** keep Site `appgprj_6ad97a034fd08191a8399eeda10f048c`.
