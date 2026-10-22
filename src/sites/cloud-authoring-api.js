@@ -2,6 +2,7 @@ import {createSitesReadonlyApi} from './readonly-api.js';
 import {createSitesScopeResolver} from './membership.js';
 import {AsyncReviewStore} from './async-review-store.js';
 import {AsyncApprovalStore} from './async-approval-store.js';
+import {AsyncVariantEdits} from './async-variant-edits.js';
 import {AsyncTargetReview} from './async-target-review.js';
 import {AsyncUploadPlans} from './async-upload-plans.js';
 import {requireProductionAdmin} from '../production-approval-policy.js';
@@ -60,6 +61,15 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
    const identity=await getTrustedIdentity(request);if(!identity||!text(identity.userId,300))fail('IDENTITY_REQUIRED',401);const userId=identity.userId;
    if(url.pathname.startsWith('/api/unified/'))return createSitesReadonlyApi({db,origin,resolveScope:createSitesScopeResolver({db,getTrustedIdentity:async()=>identity})})(request);
    if(!['GET','POST'].includes(request.method))fail('METHOD_NOT_ALLOWED',405);
+   const editRoute=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/contents\/([a-f0-9-]{36})\/variants$/);
+   if(editRoute){
+    const [,workspace,id]=editRoute,accountId=url.searchParams.get('accountId'),scope={workspace,accountId};await account(userId,workspace,accountId);
+    const edits=new AsyncVariantEdits(db,{bucket,authorization:{userId,workspace,accountId}});
+    if(request.method==='GET')return response(200,await edits.view(id,scope));
+    if(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site')fail('ORIGIN_DENIED',403);
+    const input=await readInput(request),source=await edits.source(id,scope),authority=typeof resolveApprovalAuthority==='function'?await resolveApprovalAuthority(request,identity,{workspace,accountId:source.row.account_id}):null;
+    return response(200,await edits.save(id,input,scope,{authority}));
+   }
    const handoff=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/(reviews|plans)\/([a-f0-9]{64})(?:\/(approval|prepare|retarget))?$/);
    if(handoff&&(handoff[2]==='plans'||handoff[4])){
     const [,workspace,resource,id,action]=handoff,accountId=url.searchParams.get('accountId'),scope={workspace,accountId};await account(userId,workspace,accountId);
@@ -90,7 +100,7 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
     if(source){const asset=await store.asset(workspace,accountId,id,decodeURIComponent(source),decodeURIComponent(artifact));return new Response(asset.data,{headers:{'Content-Type':asset.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Length':String(asset.data.byteLength)}});}
     return response(200,id?await store.detail(workspace,accountId,id):await store.list(workspace,accountId,{cursor:url.searchParams.get('cursor')||''}));
    }
-   if(request.method==='GET'&&url.pathname==='/api/sites/capabilities')return response(200,{...flags,mode:'SITES_CLOUD_AUTHORING',persistence:'D1',content_status:'MANUAL_UNVERIFIED',platforms:cloudPlatforms,implemented:['workspace_create','account_mapping_create','content_version_create','task_freeze','scoped_persistent_reads','review_snapshot_reads','metric_ledger_reads','content_decision_receipts','approved_platform_preparation','workspace_source_catalogue','explicit_platform_target_freeze','independent_target_review'],unavailable:['real_producer_transport','media_decode','archive_resolve','real_admin_approval_provider','external_upload','publish','group_post','reply','direct_message','live_metrics']});
+   if(request.method==='GET'&&url.pathname==='/api/sites/capabilities')return response(200,{...flags,mode:'SITES_CLOUD_AUTHORING',persistence:'D1',content_status:'MANUAL_UNVERIFIED',platforms:cloudPlatforms,implemented:['workspace_create','account_mapping_create','content_version_create','task_freeze','scoped_persistent_reads','review_snapshot_reads','metric_ledger_reads','content_decision_receipts','approved_platform_preparation','workspace_source_catalogue','explicit_platform_target_freeze','independent_target_review','single_platform_revision_edit'],unavailable:['real_producer_transport','media_decode','archive_resolve','real_admin_approval_provider','external_upload','publish','group_post','reply','direct_message','live_metrics']});
    if(request.method==='GET'&&url.pathname==='/api/sites/workspaces')return response(200,{workspaces:await rows('SELECT id,name,created_at FROM sites_workspaces WHERE owner_user_id=? ORDER BY created_at,id LIMIT 200',[userId]),...flags});
    if(request.method==='POST'){
     if(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site')fail('ORIGIN_DENIED',403);
@@ -106,13 +116,14 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
      const viewer=url.searchParams.get('accountId');if(viewer!==null)await account(userId,workspace,viewer);
      // Shared source visibility is derived in the same SELECT as owner and active
      // source membership. An approval/plan remains bound to its original account.
-     const contents=await rows(`SELECT c.*,p.id AS plan_id,p.account_id AS plan_account_id FROM sites_contents c
+     const contents=await rows(`SELECT c.*,p.id AS plan_id,p.account_id AS plan_account_id,e.source_plan_id AS edited_plan_id,(SELECT max(v.revision) FROM sites_contents v WHERE v.workspace=c.workspace AND v.account_id=c.account_id AND v.content_id=c.content_id AND v.slug=c.slug) AS latest_revision FROM sites_contents c
       JOIN sites_workspaces w ON w.id=c.workspace AND w.owner_user_id=?
       JOIN sites_project_memberships m ON m.workspace=c.workspace AND m.account_id=c.account_id AND m.user_id=? AND m.role='READER' AND m.revoked_at IS NULL
       LEFT JOIN sites_upload_plans p ON p.content_id=c.id AND p.workspace=c.workspace
+      LEFT JOIN sites_content_edits e ON e.content_id=c.id
       WHERE c.workspace=? AND (? IS NULL OR EXISTS(SELECT 1 FROM sites_project_memberships v WHERE v.workspace=c.workspace AND v.account_id=? AND v.user_id=? AND v.role='READER' AND v.revoked_at IS NULL))
       ORDER BY c.created_at DESC,c.id DESC LIMIT 200`,[userId,userId,workspace,viewer,viewer,userId]);
-     return response(200,{contents:contents.map(({variants_json,plan_id,plan_account_id,...c})=>({...c,variants:JSON.parse(variants_json),review_binding:plan_id?{plan_id,account_id:plan_account_id}:null})),...flags});
+     return response(200,{contents:contents.map(({variants_json,plan_id,plan_account_id,edited_plan_id,...c})=>({...c,variants:JSON.parse(variants_json),review_edit:edited_plan_id?{source_plan_id:edited_plan_id,requires_new_inspection:true}:null,review_binding:plan_id?{plan_id,account_id:plan_account_id}:null})),...flags});
     }
     if(resource==='accounts')return response(200,{accounts:await rows("SELECT a.* FROM sites_account_details a JOIN sites_project_memberships m ON m.workspace=a.workspace AND m.account_id=a.account_id WHERE a.workspace=? AND m.user_id=? AND m.role='READER' AND m.revoked_at IS NULL ORDER BY a.created_at,a.account_id LIMIT 200",[workspace,userId]),...flags});
     const accountId=url.searchParams.get('accountId');await account(userId,workspace,accountId);
@@ -146,7 +157,7 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
    const shared=Boolean(input&&Object.hasOwn(input,'expected_platform'));exact(input,['command_id','account_id','content_id','expected_payload_hash',...(shared?['expected_platform']:[])]);if(!uuid(input.command_id))fail('INVALID_COMMAND_ID',400);const a=await account(userId,workspace,input.account_id);
    if(shared&&input.expected_platform!==a.platform)fail('TARGET_PLATFORM_CHANGED');
    const content=await one('SELECT * FROM sites_contents WHERE workspace=? AND id=?'+(shared?'':' AND account_id=?'),[workspace,input.content_id,...(shared?[]:[input.account_id])]);
-   if(!content)fail('CONTENT_NOT_FOUND',404);await account(userId,workspace,content.account_id);if(await one('SELECT 1 FROM sites_upload_plans WHERE content_id=?',[content.id]))fail('BOUND_REVIEW_TASK_REQUIRED');if(content.payload_hash!==input.expected_payload_hash)fail('CONTENT_CHANGED');const variant=JSON.parse(content.variants_json)[a.platform];if(!variant)fail('EXPLICIT_PLATFORM_VARIANT_REQUIRED');
+   if(!content)fail('CONTENT_NOT_FOUND',404);await account(userId,workspace,content.account_id);if(await one('SELECT 1 FROM sites_upload_plans WHERE content_id=? UNION ALL SELECT 1 FROM sites_content_edits WHERE content_id=? AND source_plan_id IS NOT NULL',[content.id,content.id]))fail('BOUND_REVIEW_TASK_REQUIRED');if(content.payload_hash!==input.expected_payload_hash)fail('CONTENT_CHANGED');const variant=JSON.parse(content.variants_json)[a.platform];if(!variant)fail('EXPLICIT_PLATFORM_VARIANT_REQUIRED');
    const snapshot={schema_version:1,workspace,account_id:a.account_id,platform:a.platform,external_identity:a.external_identity,content_id:content.content_id,slug:content.slug,revision:content.revision,content_row_id:content.id,payload_hash:content.payload_hash,payload:variant,media:[],source_status:content.source_status,publication_authority:'UNCONFIGURED'};
    if(content.account_id!==a.account_id)snapshot.source_account_id=content.account_id;
    await assertCommandCompatible(userId,'TASK',{...input,workspace});
@@ -158,11 +169,11 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
     // a reviewed plan can never be downgraded into an unapproved shared task.
     statement(`INSERT INTO sites_write_assertions(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM sites_contents s JOIN sites_account_details a ON a.workspace=s.workspace
      WHERE s.workspace=? AND s.id=? AND s.account_id=? AND s.content_id=? AND s.slug=? AND s.revision=? AND s.title=? AND s.body=? AND s.variants_json=? AND s.payload_hash=? AND s.source_status=?
-     AND a.account_id=? AND a.platform=? AND a.external_identity IS ? AND NOT EXISTS(SELECT 1 FROM sites_upload_plans p WHERE p.content_id=s.id)) THEN 1 ELSE 0 END`,[workspace,content.id,content.account_id,content.content_id,content.slug,content.revision,content.title,content.body,content.variants_json,content.payload_hash,content.source_status,a.account_id,a.platform,a.external_identity]),
+     AND a.account_id=? AND a.platform=? AND a.external_identity IS ? AND NOT EXISTS(SELECT 1 FROM sites_upload_plans p WHERE p.content_id=s.id) AND NOT EXISTS(SELECT 1 FROM sites_content_edits e WHERE e.content_id=s.id AND e.source_plan_id IS NOT NULL)) THEN 1 ELSE 0 END`,[workspace,content.id,content.account_id,content.content_id,content.slug,content.revision,content.title,content.body,content.variants_json,content.payload_hash,content.source_status,a.account_id,a.platform,a.external_identity]),
     statement("INSERT INTO publisher_jobs SELECT c.entity_id,?,?,?,?,'DRAFT',NULL,?,?"+winning+' ON CONFLICT(id) DO NOTHING',[workspace,a.account_id,content.id,snapshotHash,at,at,...bound(c)]),
     statement('INSERT INTO sites_job_snapshots SELECT c.entity_id,?,?,?'+winning+' ON CONFLICT(job_id) DO NOTHING',[workspace,content.id,JSON.stringify(snapshot),...bound(c)]),
     statement('DELETE FROM sites_write_assertions')
    ]);return response(200,{...result,state:'DRAFT',snapshot_hash:snapshotHash,...flags});
-  }catch(error){const known={'STORAGE_SCOPE_DENIED':403,'METRIC_NOT_FOUND':404,'REVIEW_NOT_FOUND':404,'REVIEW_ASSET_NOT_FOUND':404,'OBJECT_NOT_FOUND':404,'METRIC_CURSOR_INVALID':400,'METRIC_AS_OF_INVALID':400,'REVIEW_CURSOR_INVALID':400,'OBJECT_MISSING':503,'OBJECT_IO_TIMEOUT':503,'OBJECT_CORRUPT':503,'OBJECT_INTEGRITY_MISMATCH':503,'R2_BINDING_REQUIRED':503,'REVIEW_STORAGE_CORRUPT':503,'METRIC_STORAGE_CORRUPT':503},handoffError=/^(APPROVAL_|PRODUCTION_|PRODUCER_AUTH_UNAVAILABLE|ACCOUNT_TARGET_CHANGED|STALE_REVIEW_VERSION|SOURCE_PROVIDER_UNAVAILABLE|SYNTHETIC_PROVENANCE_INVALID|TARGET_IDENTITY_UNKNOWN|ENTERPRISE_SOURCE_APPROVAL_FORBIDDEN)/.test(error.message),status=error.status||known[error.message]||(handoffError?409:503);return response(status,{error:error.status||known[error.message]||handoffError?error.message:'SITES_STORAGE_UNAVAILABLE',...flags});}
+  }catch(error){const known={'STORAGE_SCOPE_DENIED':403,'METRIC_NOT_FOUND':404,'REVIEW_NOT_FOUND':404,'REVIEW_ASSET_NOT_FOUND':404,'OBJECT_NOT_FOUND':404,'METRIC_CURSOR_INVALID':400,'METRIC_AS_OF_INVALID':400,'REVIEW_CURSOR_INVALID':400,'OBJECT_MISSING':503,'OBJECT_IO_TIMEOUT':503,'OBJECT_CORRUPT':503,'OBJECT_INTEGRITY_MISMATCH':503,'R2_BINDING_REQUIRED':503,'REVIEW_STORAGE_CORRUPT':503,'METRIC_STORAGE_CORRUPT':503},handoffError=/^(VARIANT_|APPROVAL_|PRODUCTION_|PRODUCER_AUTH_UNAVAILABLE|ACCOUNT_TARGET_CHANGED|STALE_REVIEW_VERSION|SOURCE_PROVIDER_UNAVAILABLE|SYNTHETIC_PROVENANCE_INVALID|TARGET_IDENTITY_UNKNOWN|ENTERPRISE_SOURCE_APPROVAL_FORBIDDEN)/.test(error.message),status=error.status||known[error.message]||(handoffError?409:503);return response(status,{error:error.status||known[error.message]||handoffError?error.message:'SITES_STORAGE_UNAVAILABLE',...flags});}
  };
 }

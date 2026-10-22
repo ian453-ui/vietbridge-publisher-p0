@@ -1,0 +1,30 @@
+✖ historical approval command still reads its committed receipt after text edit invalidation (217.489485ms)
+✖ historical preparation receipt remains committed/stale after edit without creating another frozen job (73.919195ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 442.61151
+
+✖ failing tests:
+
+test at test/sites-variant-edits.test.js:90:1
+✖ historical approval command still reads its committed receipt after text edit invalidation (217.489485ms)
+  Error: APPROVAL_PLATFORM_EDIT_REVIEW_REQUIRED
+      at fail (file:///workspace/publisher-v3/src/sites/async-storage.js:2:32)
+      at AsyncApprovalStore.decide (file:///workspace/publisher-v3/src/sites/async-approval-store.js:76:76)
+      at async TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-variant-edits.test.js:92:16)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at test/sites-variant-edits.test.js:95:1
+✖ historical preparation receipt remains committed/stale after edit without creating another frozen job (73.919195ms)
+  Error: PRODUCTION_APPROVED_SYNTHETIC_SOURCE_REQUIRED
+      at fail (file:///workspace/publisher-v3/src/sites/async-storage.js:2:32)
+      at AsyncUploadPlans.prepare (file:///workspace/publisher-v3/src/sites/async-upload-plans.js:19:171)
+      at async TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-variant-edits.test.js:97:16)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7)

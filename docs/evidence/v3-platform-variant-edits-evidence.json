@@ -1,0 +1,218 @@
+{
+  "recorded_at": "2026-10-22T17:27:11.033122+00:00",
+  "base_commit": "d634567d4b1e6ce90b56ed7f12da84170229fa33",
+  "branch": "publisher-v3/cloud-slice-01",
+  "site_project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+  "deployment": "NOT_DEPLOYED_BY_THIS_PACKAGE",
+  "execution": "selected original cloud workspace; synthetic identities/providers/generated media; SQLite behind async D1 shape, file-backed object bucket and loopback Chromium",
+  "failures_before": [
+    {
+      "command": "node --test test/sites-variant-edits.test.js",
+      "reason": "Baseline: explicit variant GET returned 404 OPERATION_UNAVAILABLE",
+      "result": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 140.487578
+      },
+      "log": "v3-variant-edits-api-before.log",
+      "sha256": "90d7c5874abbc86f3f514bfedc1c43132e9045f5ec9e8290dc7857cbe0ba0227",
+      "original_path": "/tmp/v3-variants-before.log",
+      "original_sha256": "aa43d6016a880bab7c3bd87c5acc338368a46747e876a6ce5d8712b39daa32e9"
+    },
+    {
+      "command": "node --test --test-name-pattern='prototype names' test/sites-variant-edits.test.js",
+      "reason": "First implementation: __proto__ accepted and created a meaningless new revision",
+      "result": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 145.564987
+      },
+      "log": "v3-variant-edits-prototype-before.log",
+      "sha256": "b763ab437371f5d016b55a5a5535911d0913aec5e562575954ab807e7cad44c0",
+      "original_path": "/tmp/v3-variants-prototype-before.log",
+      "original_sha256": "f2d5ff0ac569cc29a88ee50ec37f42b9feb78665fcbe43011dfa8fddc9072a36"
+    },
+    {
+      "command": "node --test --test-name-pattern='historical .*receipt' test/sites-variant-edits.test.js",
+      "reason": "Earlier ordering: new edit invalidation hid old committed approval and preparation receipts",
+      "result": {
+        "tests": 2,
+        "pass": 0,
+        "fail": 2,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 442.61151
+      },
+      "log": "v3-variant-edits-history-before.log",
+      "sha256": "9c9a0eba50d6d7a96e7bc18b621976cdb17d80d8ac18e32cdf47be6a80011808",
+      "original_path": "/tmp/v3-variants-history-before.log",
+      "original_sha256": "9c9a0eba50d6d7a96e7bc18b621976cdb17d80d8ac18e32cdf47be6a80011808"
+    },
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium node --test --test-name-pattern='pending rebase excludes' test/sites-cloud-console-ui.test.js",
+      "reason": "Rebase GET in flight allowed one save POST; expected zero",
+      "result": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1467.782168
+      },
+      "log": "v3-variant-edits-rebase-before.log",
+      "sha256": "9451a4dd1519ab655c0152053dc1b83c8e7916651bc92af35508c8fbcc425f50",
+      "original_path": "/tmp/v3-variants-rebase-before.log",
+      "original_sha256": "46f673a347648822f0b86e2605c7c3df7e5acba5f48f5606174f50005eedff22"
+    },
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-name-pattern='returning to the original pending platform|mobile reviewed media edit' test/sites-cloud-console-ui.test.js",
+      "reason": "Returning to the pending original platform left controls locked; long reviewed source ID overflowed mobile document",
+      "result": {
+        "tests": 2,
+        "pass": 0,
+        "fail": 2,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2858.021298
+      },
+      "log": "v3-variant-edits-mobile-return-before.log",
+      "sha256": "127f412f6aa9a4e9ecea0b12178169089b49fa3fb8fc39eaa2c2b014db3f8a5a",
+      "original_path": "/tmp/v3-variants-mobile-return-before.log",
+      "original_sha256": "38d44fafc4c8f92158379bd066328dc7724d67e0de258166c263ee85761d5e0d"
+    }
+  ],
+  "final_runs": [
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/workspace/sites/publisher-v3/variant-edit-evidence-20261022 node --test test/sites-variant-edits.test.js test/sites-async-approval.test.js test/sites-async-upload-plans.test.js test/sites-cloud-console-ui.test.js",
+      "result": {
+        "tests": 69,
+        "pass": 69,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 48339.719145
+      },
+      "detail": "21 variant API/ledger cases + 9 approval + 8 preparation + 31 console UI cases",
+      "log": "v3-variant-edits-focused.log",
+      "sha256": "930539622b09d39f1b5397c2316d8a0aa0e6efd5c601d40da1e28f31376f5a63",
+      "original_path": "/tmp/v3-variants-final-focused.log",
+      "original_sha256": "930539622b09d39f1b5397c2316d8a0aa0e6efd5c601d40da1e28f31376f5a63"
+    },
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+      "result": {
+        "tests": 1253,
+        "pass": 1253,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 138903.826717
+      },
+      "summary": "v3-variant-edits-full-summary.log",
+      "summary_sha256": "bcd6a9352342d884142da05259220f4a68f94e1b376f5a1bfcba841a8b64d6fe",
+      "full_log": "/tmp/v3-variants-final-full.log",
+      "full_log_sha256": "445796adaf9d94502937265b1931ab30066105f33b0da215fb2a3c726a06375d"
+    }
+  ],
+  "source_sha256": {
+    "src/sites/async-variant-edits.js": "c5c2b940df66c4c50c5db240b9157f457864e93c2e58df00ab1721f7318ede03",
+    "src/sites/async-approval-store.js": "a7de0a0fc0d1f95829c49b99d3f29ccb691448d41fcd158b9172864f5a75b5a7",
+    "src/sites/async-upload-plans.js": "b89119fd83aa902c0f801679a64705219009124ee0af7314bf3285730e8b7673",
+    "src/sites/cloud-authoring-api.js": "699de5735fc17d4dc3f31dc6a505245d3fd0cac07f1a56361667482007d089b7",
+    "src/sites/cloud-console.css": "cb43eb7555c575a1da779f9048406daa6feb99b78d650678bbfc55b091970ae6",
+    "src/sites/cloud-console.html": "3bd306aba8d8b914178a4235c6969f8b8535d2c44c98b289d6b34d40d5b755d6",
+    "src/sites/cloud-console.js": "912709a7036e818b9df9b4cd0dc054d71282a35453fc3731d0a1c3753e9e95b5",
+    "src/sites/migrations/0009_variant_edits_candidate.sql": "f55df5e27378b6b867a9e2550b1de69f71a1fb67e2b0ece5c9d94f3dd91b6c3d",
+    "test/fixtures/sites-cloud-d1.js": "9264df87807357e857520209424252bfa88e6d7ac68493df4e4642177d6965c4",
+    "test/sites-async-upload-plans.test.js": "6a1e70056730804be79e2095c81bb75ae5f864a30eda9538202100c1811cb28a",
+    "test/sites-variant-edits.test.js": "d0b618259b54f1ad9379287b954804e03af0c95ad026e93241fbc0476be77a85",
+    "test/sites-cloud-console-ui.test.js": "680753179ebd099497a379ab81ebad83f1da9043e54eb5e349d3137ee71ed563"
+  },
+  "screenshots": [
+    {
+      "path": "/workspace/sites/publisher-v3/variant-edit-evidence-20261022/desktop-platform-editor.png",
+      "sha256": "cc0ae0dfd5ed448174da1e9cca3eb18a0a279da4c1ae47d87358a8222397d2a8",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image_pixels": {
+        "width": 1440,
+        "height": 1782
+      }
+    },
+    {
+      "path": "/workspace/sites/publisher-v3/variant-edit-evidence-20261022/mobile-platform-editor.png",
+      "sha256": "8eb151ee96b0a8e50c75324f2474d88c9e4b02f4283a747765d82c74282b1c2a",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "image_pixels": {
+        "width": 390,
+        "height": 2809
+      }
+    },
+    {
+      "path": "/workspace/sites/publisher-v3/variant-edit-evidence-20261022/mobile-edited-media.png",
+      "sha256": "d34de684216640be3509e275f17a2f48c6894c85a2ebc5fd0ff832fbd02b3aee",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "image_pixels": {
+        "width": 390,
+        "height": 3037
+      }
+    }
+  ],
+  "review": "gpt-6-astra read-only design, implementation and final repair reviews; no independent rerun. Implementer reproduced/fixed prototype key and rebase race; self-audit fixed historical receipt order, return-to-pending draft and mobile width.",
+  "recovery": {
+    "original_session": "6874",
+    "session_reconnect": "exec-server transport disconnected; failed to resume exec-server session: recovery timed out after 25s",
+    "normal_exec": "recovered in the same saved workspace; no environment switch",
+    "result_confirmation": "existing complete final focused log read as 69/69; no active test processes; focused test was not rerun on recovery",
+    "subsequent_action": "only final full suite started after those checks"
+  },
+  "intermediate_runs_not_final": [
+    {
+      "log": "/tmp/v3-variants-focused.log",
+      "result": "68/68 before final return/mobile fixes"
+    },
+    {
+      "log": "/tmp/v3-variants-full.log",
+      "result": "1252/1252 before final return/mobile fixes"
+    },
+    {
+      "log": "/tmp/v3-variants-mobile-return-after.log",
+      "result": "2/2 for final return/mobile fixes"
+    }
+  ],
+  "not_verified": [
+    "hosted Sites identity/D1/R2",
+    "real producer/source/admin/target binding and exclusive permit providers",
+    "real authorized social upload/submit/readback",
+    "real Drive sample consumption",
+    "physical phone or Safari",
+    "cloud heavy decode service"
+  ],
+  "remaining_code_gap": "edited reviewed payload to fresh inspection/Review; current reviewed-media editing supports only the existing plan platform; independent source text supports all four explicit platforms",
+  "real_posts": 0,
+  "real_messages": 0,
+  "credentials_created_or_read": false,
+  "denied_downloads_retried": false,
+  "log_normalization": "Committed focused/failure logs trim trailing line whitespace only; original full raw logs stay under /tmp; summary and hashes are committed."
+}

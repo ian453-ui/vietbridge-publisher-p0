@@ -7,3 +7,5 @@ nav button:hover,nav button[aria-current]{background:#e2f0eb;color:#09574d}
 .checklist{margin:15px 0}.checklist label{flex-direction:row;align-items:center;margin:12px 0}.checklist input{width:18px;height:18px}#approval-controls button{margin:12px 8px 12px 0}#approval-controls{border-top:1px solid #dce6e2;padding-top:16px}#prepare-choice{max-width:100%}#preview-body>p{overflow-wrap:anywhere}
 
 #canonical-source{overflow-wrap:anywhere;border-left:3px solid #178575;padding:8px 12px;margin:16px 0;background:#f3f7f6}
+
+#variant-form{overflow-wrap:anywhere}

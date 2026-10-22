@@ -1,0 +1,43 @@
+✖ returning to the original pending platform unlocks its own completed save without losing other drafts (1164.445004ms)
+✖ mobile reviewed media edit shows original image/video binding and blocks ordinary freeze after reload (1260.585819ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2858.021298
+
+✖ failing tests:
+
+test at test/sites-cloud-console-ui.test.js:215:1
+✖ returning to the original pending platform unlocks its own completed save without losing other drafts (1164.445004ms)
+  AssertionError [ERR_ASSERTION]: completed original save must unlock when the user returned to that exact draft
+
+  true !== false
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-cloud-console-ui.test.js:218:166)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/sites-cloud-console-ui.test.js:241:1
+✖ mobile reviewed media edit shows original image/video binding and blocks ordinary freeze after reload (1260.585819ms)
+  AssertionError [ERR_ASSERTION]: long reviewed source identity must wrap within the mobile viewport
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-cloud-console-ui.test.js:242:301)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

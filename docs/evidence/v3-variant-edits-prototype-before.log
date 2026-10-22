@@ -1,0 +1,30 @@
+✖ prototype names cannot become platform variants or create a content/command (51.265602ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 145.564987
+
+✖ failing tests:
+
+test at test/sites-variant-edits.test.js:12:1
+✖ prototype names cannot become platform variants or create a content/command (51.265602ms)
+  AssertionError [ERR_ASSERTION]: {"status":200,"body":{"id":"46318777-4bde-4396-9e25-4e660737613e","revision":2,"payload_hash":"51c15e8405be4b21ea1741d51a5baeb167b5a844590be0956b5f3d4f1b4dfa80","committed":true,"duplicate":false,"current_state":"READBACK_REQUIRED","publish_allowed":false,"producer_authenticated":false,"source_gate_satisfied":false}}
+  + actual - expected
+
+  + undefined
+  - 'VARIANT_INPUT_INVALID'
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-variant-edits.test.js:14:264)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'VARIANT_INPUT_INVALID',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

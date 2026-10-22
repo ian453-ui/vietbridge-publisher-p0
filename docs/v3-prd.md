@@ -239,3 +239,17 @@ readback, including UNKNOWN reconciliation in a fresh process. The application
 only prepares inspectable plans; real producer authentication, original source
 approval and separate per-account/task publication authority remain required and
 unavailable for this new source path. No new live execution permission is inferred.
+
+## Independent platform text revisions
+
+[The bounded platform editor](v3-platform-variant-edits.md) extends the existing
+Sites content tab. A save creates one immutable source revision, changes only the
+explicit platform title/body and preserves other platform fields/full original
+body. Concurrent edits require explicit conflict resolution; unsaved values and
+uncertain commands remain scoped to source/customer/viewer/platform. Missing
+platform text never falls back. Reviewed media retains its source fingerprint,
+requires existing admin authority for editing, and loses its prior approval in
+the same transaction. Edited media cannot bypass fresh inspection through manual
+freeze. Historical committed approval/preparation/submission facts remain visible.
+Fresh inspection/Review for edited payloads and cross-platform media adaptation
+remain implementation work; content approval still does not authorize publication.

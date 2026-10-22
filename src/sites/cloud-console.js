@@ -1,7 +1,7 @@
 const $=selector=>document.querySelector(selector),escape=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const state={workspaces:[],accounts:[],contents:[],tasks:[],reviews:[],metrics:[],workspace:'',account:'',previewPlatform:'facebook',targetAccount:'',generation:0};
 // Unsaved content stays in this page's memory, scoped exactly like its save command.
-const contentDrafts=new Map(),targetReviewCommands=new Map();let editorKey=null,previewEpoch=0;
+const contentDrafts=new Map(),targetReviewCommands=new Map(),variantDrafts=new Map();let variantContext=null,variantKey=null,variantEpoch=0;let editorKey=null,previewEpoch=0;
 const scopeKey=()=>state.workspace&&state.account?JSON.stringify([state.workspace,state.account]):null;
 function clearPreview(){for(const video of $('#preview-body').querySelectorAll('video'))video.pause();$('#preview-body').replaceChildren();}
 function dismissPreview(){++previewEpoch;clearPreview();$('#preview').close();}
@@ -13,7 +13,7 @@ function paintDraft(){
  for(const field of form.querySelectorAll('input,textarea'))field.readOnly=Boolean(draft?.pending);
  form.querySelector('button[type=submit]').disabled=!editorKey||Boolean(draft?.pending);
 }
-function detachDraft(){stashDraft();editorKey=null;$('#content-form').hidden=true;paintDraft();}
+function detachDraft(){detachVariant();stashDraft();editorKey=null;$('#content-form').hidden=true;paintDraft();}
 function bindDraft(){const key=scopeKey();if(key!==editorKey){detachDraft();editorKey=key;if(key&&!contentDrafts.has(key))contentDrafts.set(key,{values:{},command:null,submitted:null,pending:false});}paintDraft();}
 const platformNames={facebook:'Facebook',xiaohongshu:'小红书',wechat_official_account:'微信公众号',wechat_channels:'微信视频号'};
 function status(message,error=false){$('#status').textContent=message;$('#status').classList.toggle('error',error);}
@@ -28,13 +28,14 @@ function render(){
  const platform=state.previewPlatform,target=state.accounts.find(a=>a.account_id===state.targetAccount&&a.platform===platform);if(!target)state.targetAccount='';
  $('#content-platform').value=platform;options($('#target-account'),state.accounts.filter(a=>a.platform===platform),'account_id','display_name',state.targetAccount);
  $('#target-status').textContent=target?'冻结目标：'+target.display_name+' · '+platformNames[platform]+' · '+(target.external_identity||'外部身份未核验')+'。仅创建草稿，不授予发布权限。':'可先预览 '+platformNames[platform]+'；冻结前请明确选择该平台的目标账号。没有平台稿时不会借用其他文案。';
- $('#contents').innerHTML=state.contents.map(c=>'<article data-content="'+escape(c.id)+'"><span class="pill">'+(c.review_binding?'审核准备稿 · 账号绑定':'待来源核验')+' · v'+c.revision+'</span><h3>'+escape(c.title)+'</h3><p>'+escape(c.content_id)+' / '+escape(c.slug)+'</p><p>来源账号：'+escape(state.accounts.find(a=>a.account_id===c.account_id)?.display_name||c.account_id)+'</p><p>'+escape(c.body.length)+' 字符 · '+escape(platformNames[platform])+(c.variants[platform]?' · 明确平台稿':' · 缺少该平台稿')+'</p>'+(c.review_binding?'<p>审批和媒体准备仅绑定来源账号；共享预览不会转移批准。</p>':'')+'<code>SHA256 '+escape(c.payload_hash)+'</code><div><button data-preview="'+escape(c.id)+'" '+(!c.variants[platform]?'disabled':'')+'>完整平台预览</button><button data-freeze="'+escape(c.id)+'" '+(!target||!c.variants[platform]||c.review_binding?'disabled':'')+'>冻结草稿任务</button></div></article>').join('')||(state.workspace?'<p>当前客户尚无可读取的共享内容版本。可先编写并保存完整内容。</p>':'<p>选择客户后读取共享内容。</p>');
+ $('#contents').innerHTML=state.contents.map(c=>'<article data-content="'+escape(c.id)+'"><span class="pill">'+(c.review_edit?'编辑稿 · 须重新校验':c.review_binding?'审核准备稿 · 账号绑定':'待来源核验')+' · v'+c.revision+'</span><h3>'+escape(c.title)+'</h3><p>'+escape(c.content_id)+' / '+escape(c.slug)+'</p><p>来源账号：'+escape(state.accounts.find(a=>a.account_id===c.account_id)?.display_name||c.account_id)+'</p><p>'+escape(c.body.length)+' 字符 · '+escape(platformNames[platform])+(c.variants[platform]?' · 明确平台稿':' · 缺少该平台稿')+'</p>'+(c.review_binding?'<p>审批和媒体准备仅绑定来源账号；共享预览不会转移批准。</p>':'')+'<code>SHA256 '+escape(c.payload_hash)+'</code><div><button data-preview="'+escape(c.id)+'" '+(!c.variants[platform]?'disabled':'')+'>完整平台预览</button><button data-freeze="'+escape(c.id)+'" '+(!target||!c.variants[platform]||c.review_binding||c.review_edit?'disabled':'')+'>冻结草稿任务</button><button data-edit-variant="'+escape(c.id)+'" '+(!state.account||c.revision!==c.latest_revision?'disabled':'')+'>编辑所选平台</button></div></article>').join('')||(state.workspace?'<p>当前客户尚无可读取的共享内容版本。可先编写并保存完整内容。</p>':'<p>选择客户后读取共享内容。</p>');
  $('#tasks').innerHTML=state.tasks.map(t=>'<article data-task="'+escape(t.id)+'"><span class="pill">'+escape(t.state)+'</span><h3>'+escape(t.snapshot.payload.title)+'</h3><p>'+escape(platformNames[t.snapshot.platform])+' · '+escape(t.snapshot.content_id)+' / '+escape(t.snapshot.slug)+' · v'+t.snapshot.revision+'</p><code>'+escape(t.snapshot_hash)+'</code><p>无发布权限 · 原尝试：'+escape(t.attempt_id||'尚未执行')+'</p><button data-task-preview="'+escape(t.id)+'">查看冻结内容</button></article>').join('')||'<p>当前账号尚无冻结任务。</p>';
  $('#reviews').innerHTML=state.reviews.map(r=>'<article><span class="pill">'+escape(r.state)+'</span><h3>'+escape(r.task_id)+'</h3><p>请求版本 '+r.request_revision+' · 审批与发布权限分别核验</p><button data-review="'+escape(r.id)+'">查看素材快照</button></article>').join('')||'<p>当前账号没有已入账的制作快照。</p>';
  $('#metrics').innerHTML=state.metrics.map(m=>'<article><span class="pill">'+escape(m.origin)+'</span><h3>'+escape(m.selector.metric.name)+' · '+escape(m.value===null?'—':m.value)+'</h3><p>'+escape(m.status)+' · '+escape(m.reason||'有观测值')+'</p><p>'+escape(m.selector.metric.definition_text)+'</p><p>'+escape(m.selector.window.kind)+' · '+escape(m.selector.window.start||'未知开始')+' → '+escape(m.selector.window.end||'未知结束')+'</p><button data-metric="'+escape(m.series_id)+'">观测历史</button></article>').join('')||'<p>当前账号没有指标观测。真实采集尚未接入。</p>';
  for(const button of document.querySelectorAll('[data-review]'))button.onclick=()=>showReview(button.dataset.review);
  for(const button of document.querySelectorAll('[data-metric]'))button.onclick=()=>showMetric(button.dataset.metric);
- for(const button of document.querySelectorAll('[data-preview]'))button.onclick=()=>{const c=state.contents.find(c=>c.id===button.dataset.preview);if(c.review_binding)showPlan(c.review_binding.plan_id,c.review_binding.account_id);else preview(c.variants[state.previewPlatform],c.body,c.payload_hash);};
+ for(const button of document.querySelectorAll('[data-preview]'))button.onclick=()=>{const c=state.contents.find(c=>c.id===button.dataset.preview);if(c.review_edit)showEditedContent(c.id);else if(c.review_binding)showPlan(c.review_binding.plan_id,c.review_binding.account_id);else preview(c.variants[state.previewPlatform],c.body,c.payload_hash);};
+ for(const button of document.querySelectorAll('[data-edit-variant]'))button.onclick=()=>openVariant(button.dataset.editVariant,state.previewPlatform);
  for(const button of document.querySelectorAll('[data-task-preview]'))button.onclick=()=>{const t=state.tasks.find(t=>t.id===button.dataset.taskPreview);if(t.snapshot.production_plan)showPlan(t.snapshot.production_plan.id);else preview(t.snapshot.payload,null,t.snapshot_hash);};
  for(const button of document.querySelectorAll('[data-freeze]'))button.onclick=async()=>{
   if(button.disabled)return;button.disabled=true;const c=state.contents.find(c=>c.id===button.dataset.freeze),scope={workspace:state.workspace,account:state.targetAccount,platform:state.previewPlatform},started=state.generation,view=previewEpoch,command=button.dataset.command||(button.dataset.command=crypto.randomUUID());
@@ -76,6 +77,12 @@ $('#content-form').onsubmit=async event=>{
  }
  finally{draft.pending=false;if(editorKey===key)paintDraft();}
 };
+$('#variant-close').onclick=detachVariant;
+$('#variant-form').addEventListener('input',stashVariant);
+$('#variant-platform').onchange=()=>{if(!variantContext)return;stashVariant();selectVariant($('#variant-platform').value);};
+$('#variant-preview').onclick=()=>{stashVariant();const d=variantDrafts.get(variantKey);if(d)previewVariant(d.base,d.values);};
+$('#variant-rebase').onclick=rebaseVariant;
+$('#variant-form').onsubmit=saveVariant;
 await refresh();
 
 function evidencePath(resource,id){return '/api/sites/workspaces/'+state.workspace+'/'+resource+'/'+id+'?accountId='+encodeURIComponent(state.account);}
@@ -115,3 +122,52 @@ function mountTargetReview(plan,source){
   }catch(error){if(current())status(error.message+'；请先回读审核列表，原命令保留，不自动重试。',true);}finally{if(button.isConnected)button.disabled=false;}
  };
 }
+
+
+function variantPath(workspace,id,viewer){return '/api/sites/workspaces/'+workspace+'/contents/'+id+'/variants?accountId='+encodeURIComponent(viewer);}
+function stashVariant(){const d=variantDrafts.get(variantKey);if(d&&!d.pending&&!d.command)d.values={title:$('#variant-title').value,body:$('#variant-body').value};}
+function detachVariant(){stashVariant();variantContext=null;variantKey=null;++variantEpoch;$('#variant-form').hidden=true;}
+function variantCurrent(key,epoch){return key===variantKey&&epoch===variantEpoch&&variantContext?.workspace===state.workspace&&variantContext?.viewer===state.account&&!$('#variant-form').hidden;}
+function paintVariant(){
+ const d=variantDrafts.get(variantKey);if(!d)return;const c=d.base.content,p=d.platform;$('#variant-form').hidden=false;$('#variant-platform').value=p;$('#variant-title').value=d.values.title;$('#variant-body').value=d.values.body;
+ $('#variant-source').textContent='来源账号：'+(state.accounts.find(a=>a.account_id===c.account_id)?.display_name||c.account_id)+' · '+c.content_id+' / '+c.slug+' · 基础版本 '+c.revision+' · '+platformNames[p];
+ $('#variant-status').textContent=d.message||(d.base.requires_new_inspection?'保留原媒体绑定；文字变更将撤销相关批准，编辑稿必须重新校验与审核。':d.base.content.variants[p]?'独立编辑此平台；其他平台不会被覆盖。':'此平台尚无明确稿件，请填写；不会借用其他平台正文。');
+ for(const el of [$('#variant-title'),$('#variant-body')])el.readOnly=Boolean(d.pending||d.command||d.rebasing);
+ $('#variant-save').disabled=Boolean(d.pending||d.rebasing);$('#variant-save').textContent=d.command?'使用原命令核对保存结果':'保存此平台新版本';$('#variant-rebase').disabled=Boolean(d.pending||d.command||d.rebasing);
+}
+function selectVariant(platform){
+ if(!variantContext)return;const key=JSON.stringify([variantContext.workspace,variantContext.viewer,variantContext.base.source.root_content_id,platform]);
+ if(!variantDrafts.has(key)){const v=variantContext.base.content.variants[platform];variantDrafts.set(key,{base:variantContext.base,platform,values:{title:v?.title||'',body:v?.body||''},command:null,submitted:null,pending:false,message:''});}
+ variantKey=key;++variantEpoch;paintVariant();
+}
+async function openVariant(id,platform){
+ detachVariant();const epoch=++variantEpoch,workspace=state.workspace,viewer=state.account;if(!viewer)return;
+ try{const base=await api(variantPath(workspace,id,viewer));if(epoch!==variantEpoch||workspace!==state.workspace||viewer!==state.account)return;variantContext={workspace,viewer,base};selectVariant(platform);$('#variant-form').scrollIntoView({behavior:'smooth'});}catch(error){if(epoch===variantEpoch)status(error.message,true);}
+}
+async function rebaseVariant(){
+ stashVariant();const key=variantKey,epoch=variantEpoch,d=variantDrafts.get(key),context=variantContext;if(!d||d.pending||d.command||d.rebasing)return;
+ const base=d.base;d.rebasing=true;paintVariant();
+ try{const current=await api(variantPath(context.workspace,base.content.id,context.viewer)),latest=current.latest.id===base.content.id?current:await api(variantPath(context.workspace,current.latest.id,context.viewer));
+  if(!variantCurrent(key,epoch)||d.pending||d.command||d.base!==base)return;if(latest.source.root_content_id!==base.source.root_content_id)throw Error('来源版本已改变，请从新来源重新打开编辑');d.base=latest;variantContext.base=latest;d.message='已读取最新基础版本，保留当前平台的未保存文字。请核对再保存。';
+ }catch(error){if(variantCurrent(key,epoch))d.message=error.message;}
+ finally{d.rebasing=false;if(key===variantKey&&variantContext?.workspace===state.workspace&&variantContext?.viewer===state.account)paintVariant();}
+}
+async function saveVariant(event){
+ event.preventDefault();stashVariant();const key=variantKey,epoch=variantEpoch,d=variantDrafts.get(key),context=variantContext;if(!d||d.pending||d.rebasing)return;
+ if(!d.command){d.command=crypto.randomUUID();d.submittedBaseId=d.base.content.id;d.submitted={command_id:d.command,expected_payload_hash:d.base.content.payload_hash,expected_source_binding:d.base.source_binding_hash,platform:d.platform,title:d.values.title.trim(),body:d.values.body.trim()};}
+ d.pending=true;paintVariant();
+ try{const r=await api(variantPath(context.workspace,d.submittedBaseId,context.viewer),d.submitted);d.message='已保存独立平台版本 '+r.revision+'；未上传或发布。';
+  // A committed receipt is enough to unlock the old command. Fetch the new base
+  // before allowing a further edit; if readback fails retain the exact command.
+  const base=await api(variantPath(context.workspace,r.id,context.viewer));d.base=base;d.values={title:base.content.variants[d.platform].title,body:base.content.variants[d.platform].body};d.command=null;d.submitted=null;d.submittedBaseId=null;
+  if(variantCurrent(key,epoch)){variantContext.base=base;const loading=loadScope(),generation=state.generation;await loading;if(generation===state.generation&&variantCurrent(key,epoch))paintVariant();}
+ }catch(error){
+  if(['VARIANT_VERSION_CONFLICT','VARIANT_CONCURRENT_CHANGE','VARIANT_INPUT_INVALID','VARIANT_UNCHANGED','VARIANT_REVIEW_PLATFORM_REQUIRED'].includes(error.message)){d.command=null;d.submitted=null;d.submittedBaseId=null;}
+  d.message=error.message+(d.command?'；结果待核对，保留原命令，不自动重试。':'；草稿保留，可读取最新基础后再保存。');
+ }finally{d.pending=false;if(key===variantKey&&variantContext?.workspace===context.workspace&&variantContext?.viewer===context.viewer&&!$('#variant-form').hidden){variantContext.base=d.base;paintVariant();}}
+}
+function previewVariant(view,payload){
+ preview(payload,view.content.body,view.content.payload_hash);if(!view.source.source_plan_id)return;
+ const section=document.createElement('section');section.innerHTML='<p>原版本媒体仅供核对；当前编辑稿尚未通过新检查与审核。</p>'+view.source.media.map(a=>{const path='/api/sites/workspaces/'+view.content.workspace+'/reviews/'+view.source.source_review_id+'/assets/'+encodeURIComponent(a.source_id)+'/'+encodeURIComponent(a.artifact_id)+'?accountId='+encodeURIComponent(view.content.account_id);return '<section class="review-asset">'+(a.mime.startsWith('video/')?'<video controls preload="metadata" src="'+escape(path)+'"></video>':'<img alt="原版本媒体，编辑稿待重新审核" src="'+escape(path)+'">')+'<code>SHA256 '+escape(a.sha256)+'</code></section>';}).join('');$('#preview-body').append(section);
+}
+async function showEditedContent(id){const current=beginPreview(),workspace=state.workspace,viewer=state.account,platform=state.previewPlatform;try{const v=await api(variantPath(workspace,id,viewer));if(!current())return;previewVariant(v,v.content.variants[platform]);}catch(error){if(current())status(error.message,true);}}
