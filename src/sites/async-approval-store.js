@@ -6,6 +6,15 @@ import {publishingPlatforms} from '../publisher-platform-policy.js';
 const canonical=x=>Array.isArray(x)?x.map(canonical):x&&typeof x==='object'?Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])])):x;
 export const approvalDigest=x=>digest(canonical(x));
 const flags={publish_allowed:false,import_allowed:false,source_gate_satisfied:false,producer_authenticated:false};
+export const APPROVAL_LINEAGE_LIMITS=Object.freeze({nodes:8,bytes:128*1024*1024,wallMs:CLOUD_REVIEW_LIMITS.wallMs});
+function enterLineage(resolution,scope,id){
+ const r=resolution||{path:[],budget:{nodes:0,bytes:0,deadline:performance.now()+APPROVAL_LINEAGE_LIMITS.wallMs}},key=JSON.stringify([scope.workspace,scope.accountId,id]);
+ if(r.path.includes(key))fail('APPROVAL_LINEAGE_CYCLE');
+ if(++r.budget.nodes>APPROVAL_LINEAGE_LIMITS.nodes)fail('APPROVAL_LINEAGE_LIMIT');
+ if(performance.now()>=r.budget.deadline)fail('APPROVAL_LINEAGE_TIME_LIMIT');
+ return {path:[...r.path,key],budget:r.budget};
+}
+const lineageFailure=error=>{if(/^APPROVAL_LINEAGE_/.test(error.message))throw error;};
 
 /** Same content-only decision policy as ProductionApprovalStore. No Site owner
  * is promoted to admin. Binding rows and authorities are server dependencies;
@@ -13,13 +22,17 @@ const flags={publish_allowed:false,import_allowed:false,source_gate_satisfied:fa
 export class AsyncApprovalStore extends AsyncStorage {
  constructor(db,options={}){super(db,options);this.options=options;this.reviews=new AsyncReviewStore(db,options);}
  async latest(id){return this.one('SELECT * FROM sites_approval_events WHERE review_id=? ORDER BY sequence DESC LIMIT 1',[id]);}
- async subject(id,scope,{allowDerivation=true,allowEdited=true}={}){
+ async subject(id,scope,{allowDerivation=true,allowEdited=true,resolution=null}={}){
+  const traversal=enterLineage(resolution,scope,id);
   const detail=await this.reviews.detail(scope.workspace,scope.accountId,id),row=await this.one('SELECT * FROM sites_reviews WHERE id=?',[id]);
   const request=JSON.parse(row.request_json),result=JSON.parse(row.result_json),account=await this.scope(scope.workspace,scope.accountId);
   if(request.request_fingerprint!==id||request.task_id!==row.task_id||request.request_revision!==row.request_revision||request.workspace!==scope.workspace||request.account_id!==scope.accountId||await approvalDigest(result)!==row.result_fingerprint||result.request_fingerprint!==id||detail.report.receipt?.result_fingerprint!==row.result_fingerprint)fail('APPROVAL_STORAGE_CORRUPT');
   if(detail.report.status!=='REVIEW_REQUIRED'||detail.report.structure!=='VALIDATED'||detail.report.scope_status==='UNKNOWN')fail('APPROVAL_STATE_UNKNOWN');
   const expected=result.items.flatMap(item=>item.artifacts.map(a=>({source_id:item.source_id,artifact_id:a.artifact_id,sha256:a.sha256})));
-  if(expected.length!==detail.assets.length||detail.assets.length>CLOUD_REVIEW_LIMITS.artifacts||detail.assets.reduce((n,a)=>n+a.bytes,0)>CLOUD_REVIEW_LIMITS.bytes)fail('APPROVAL_STORAGE_CORRUPT');const deadline=performance.now()+CLOUD_REVIEW_LIMITS.wallMs;
+  const totalBytes=detail.assets.reduce((n,a)=>n+a.bytes,0);
+  if(expected.length!==detail.assets.length||detail.assets.length>CLOUD_REVIEW_LIMITS.artifacts||totalBytes>CLOUD_REVIEW_LIMITS.bytes)fail('APPROVAL_STORAGE_CORRUPT');
+  traversal.budget.bytes+=totalBytes;if(traversal.budget.bytes>APPROVAL_LINEAGE_LIMITS.bytes)fail('APPROVAL_LINEAGE_BYTE_LIMIT');
+  if(performance.now()>=traversal.budget.deadline)fail('APPROVAL_LINEAGE_TIME_LIMIT');const deadline=traversal.budget.deadline;
   for(const a of expected){const stored=detail.assets.find(x=>x.source_id===a.source_id&&x.artifact_id===a.artifact_id);if(!stored||stored.sha256!==a.sha256)fail('APPROVAL_STORAGE_CORRUPT');await this.reviews.objects.verify(stored.object_id,scope,{deadline:Math.min(deadline,performance.now()+this.reviews.objects.timeoutMs)});}
   const binding=await this.one('SELECT binding_json FROM sites_approval_bindings WHERE review_id=?',[id]);let b=null;try{b=binding?JSON.parse(binding.binding_json):null;}catch{fail('APPROVAL_STORAGE_CORRUPT');}
   const native=b?.account,accountHash=await approvalDigest(Object.fromEntries(approvalIdentityFields.map(k=>[k,native?.[k]??null]))),targets=[...new Set([account.platform,...request.items.flatMap(x=>x.deliverables.map(a=>a.platform).filter(Boolean))])].sort();
@@ -34,13 +47,15 @@ export class AsyncApprovalStore extends AsyncStorage {
   const fingerprint=await approvalDigest({request_fingerprint:id,result_fingerprint:row.result_fingerprint,account_hash:accountHash,target_platforms:targets,artifacts:expected,source_refs:request.items.map(x=>({source_id:x.source_id,refs:x.source_refs}))});
   const source_import=await sourceImportState(this,id);if(source_import.blocked)blocked=source_import.blocked;
   const platform_edit=await this.one('SELECT * FROM sites_review_edit_invalidations WHERE review_id=?',[id]);if(platform_edit&&!blocked)blocked='APPROVAL_PLATFORM_EDIT_REVIEW_REQUIRED';
-  const derivation=await this.derivationSubject(id,scope,request,{allowDerivation,accountHash,platform:account.platform});if(derivation.blocked)blocked=derivation.blocked;
-  const edited=await this.editedSubject(id,scope,request,{allowEdited});if(edited.blocked)blocked=edited.blocked;
-  return {fingerprint,blocked,platform_edit,derivation,edited,source_import,target_platforms:targets,provenance:b?.kind==='SYNTHETIC_FIXTURE'?'SYNTHETIC_FIXTURE':'UNVERIFIED',row,request,result,assets:detail.assets,account,binding:binding?.binding_json??null};
+  const derivation=await this.derivationSubject(id,scope,request,{allowDerivation,accountHash,platform:account.platform,resolution:traversal});if(derivation.blocked)blocked=derivation.blocked;
+  const edited=await this.editedSubject(id,scope,request,{allowEdited,allowDerivation,resolution:traversal});if(edited.blocked)blocked=edited.blocked;
+  if(derivation.row&&edited.row)fail('APPROVAL_LINEAGE_AMBIGUOUS');
+  if(performance.now()>=traversal.budget.deadline)fail('APPROVAL_LINEAGE_TIME_LIMIT');
+  return {fingerprint,blocked,platform_edit,derivation,edited,source_import,lineage_usage:{...traversal.budget},target_platforms:targets,provenance:b?.kind==='SYNTHETIC_FIXTURE'?'SYNTHETIC_FIXTURE':'UNVERIFIED',row,request,result,assets:detail.assets,account,binding:binding?.binding_json??null};
  }
- // A single hop from an ordinary original Review. Only its exact edit-generated
- // revocation is allowed; rejection, QA/identity changes and later events deny.
- async editedSource(contentId,scope){
+ // Each edit edge accepts only its exact edit-generated revocation. Ancestors
+ // retain their own edit/target semantics and share one bounded traversal.
+ async editedSource(contentId,scope,{resolution=null,allowDerivation=true}={}){
   await this.scope(scope.workspace,scope.accountId);
   const row=await this.one('SELECT * FROM sites_contents WHERE id=? AND workspace=? AND account_id=?',[contentId,scope.workspace,scope.accountId]),edit=await this.one('SELECT * FROM sites_content_edits WHERE content_id=?',[contentId]);
   if(!row||!edit?.source_plan_id)fail('VARIANT_REVIEW_EDIT_REQUIRED');const variants=JSON.parse(row.variants_json);
@@ -49,7 +64,7 @@ export class AsyncApprovalStore extends AsyncStorage {
   const plan=await this.one('SELECT * FROM sites_upload_plans WHERE id=? AND workspace=? AND account_id=?',[edit.source_plan_id,scope.workspace,scope.accountId]);if(!plan||await digest(plan.manifest_json)!==plan.manifest_hash)fail('VARIANT_MEDIA_BINDING_CHANGED');
   const manifest=JSON.parse(plan.manifest_json),binding={root_content_id:plan.content_id,source_plan_id:plan.id,source_review_id:plan.review_id,source_subject:plan.subject_fingerprint,source_event_id:plan.approval_event_id,manifest_hash:plan.manifest_hash,platform:manifest.platform,media:manifest.media};
   if(await approvalDigest(JSON.parse(edit.source_json))!==await approvalDigest(binding))fail('VARIANT_MEDIA_BINDING_CHANGED');
-  const source=await this.subject(plan.review_id,scope,{allowDerivation:false,allowEdited:false});
+  const source=await this.subject(plan.review_id,scope,{allowDerivation,resolution});
   if(source.blocked!=='APPROVAL_PLATFORM_EDIT_REVIEW_REQUIRED'||source.provenance!=='SYNTHETIC_FIXTURE'||source.fingerprint!==plan.subject_fingerprint||source.account.platform!==manifest.platform||edit.platform!==manifest.platform||!variants[manifest.platform])fail('VARIANT_REVIEW_SOURCE_CHANGED');
   const mark=source.platform_edit,anchor=mark&&await this.one('SELECT c.*,e.source_json FROM sites_content_edits e JOIN sites_contents c ON c.id=e.content_id WHERE e.content_id=?',[mark.content_id]);
   if(!anchor||anchor.workspace!==row.workspace||anchor.account_id!==row.account_id||anchor.content_id!==row.content_id||anchor.slug!==row.slug||anchor.revision>row.revision||anchor.source_json!==edit.source_json||mark.platform!==manifest.platform)fail('VARIANT_REVIEW_SOURCE_CHANGED');
@@ -63,16 +78,16 @@ export class AsyncApprovalStore extends AsyncStorage {
   this.guard('NOT EXISTS(SELECT 1 FROM sites_contents WHERE workspace=? AND account_id=? AND content_id=? AND slug=? AND revision>?)',[r.workspace,r.account_id,r.content_id,r.slug,r.revision]),
   this.guard('EXISTS(SELECT 1 FROM sites_content_edits WHERE content_id=? AND parent_content_id=? AND platform=? AND source_plan_id=? AND source_json=?)',[r.id,e.parent_content_id,e.platform,e.source_plan_id,e.source_json]),
   this.guard('EXISTS(SELECT 1 FROM sites_upload_plans WHERE id=? AND workspace=? AND account_id=? AND review_id=? AND content_id=? AND subject_fingerprint=? AND approval_event_id=? AND manifest_hash=? AND manifest_json=?)',[p.id,p.workspace,p.account_id,p.review_id,p.content_id,p.subject_fingerprint,p.approval_event_id,p.manifest_hash,p.manifest_json])];}
- async editedSubject(id,scope,request,{allowEdited}){
+ async editedSubject(id,scope,request,{allowEdited,allowDerivation,resolution}){
   const row=await this.one('SELECT * FROM sites_variant_reviews WHERE review_id=?',[id]);if(!row)return {blocked:request.task_id.startsWith('SYNTHETIC-EDIT-')?'APPROVAL_EDIT_LINEAGE_MISSING':null};
   if(!allowEdited)return {row,blocked:'APPROVAL_EDIT_CHAIN_UNSUPPORTED'};
-  try{const source=await this.editedSource(row.content_id,scope),lineage=JSON.parse(row.lineage_json);
+  try{const source=await this.editedSource(row.content_id,scope,{resolution,allowDerivation}),lineage=JSON.parse(row.lineage_json);
    if(await approvalDigest(source.lineage)!==await approvalDigest(lineage)||request.task_id!=='SYNTHETIC-EDIT-'+await approvalDigest({workspace:scope.workspace,account_id:scope.accountId,root_content_id:source.plan.content_id})||request.request_revision!==source.row.revision)fail('APPROVAL_EDIT_SOURCE_CHANGED');
    return {row,source,lineage,blocked:null};
-  }catch{return {row,blocked:'APPROVAL_EDIT_SOURCE_CHANGED'};}
+  }catch(error){lineageFailure(error);return {row,blocked:'APPROVAL_EDIT_SOURCE_CHANGED'};}
  }
  editedGuards(s){const e=s.edited;if(!e?.row)return [this.guard('NOT EXISTS(SELECT 1 FROM sites_variant_reviews WHERE review_id=?)',[s.row.id])];if(e.blocked||!e.source)fail('APPROVAL_EDIT_SOURCE_CHANGED');return [this.guard('EXISTS(SELECT 1 FROM sites_variant_reviews WHERE review_id=? AND content_id=? AND lineage_json=?)',[s.row.id,e.row.content_id,e.row.lineage_json]),...this.editedSourceGuards(e.source)];}
- async derivationSubject(id,scope,request,{allowDerivation,accountHash,platform}){
+ async derivationSubject(id,scope,request,{allowDerivation,accountHash,platform,resolution}){
   const row=await this.one('SELECT * FROM sites_review_derivations WHERE review_id=?',[id]);
   if(!row)return {blocked:request.task_id.startsWith('SYNTHETIC-TARGET-')?'APPROVAL_SOURCE_LINEAGE_MISSING':null};
   if(!allowDerivation)return {blocked:'APPROVAL_SOURCE_CHAIN_UNSUPPORTED'};
@@ -80,11 +95,11 @@ export class AsyncApprovalStore extends AsyncStorage {
    const lineage=JSON.parse(row.lineage_json);
    if(request.task_id!=='SYNTHETIC-TARGET-'+await approvalDigest({lineage,target:scope.accountId,accountHash,platform})||lineage.workspace!==scope.workspace||lineage.source_account_id===scope.accountId||!this.authorization)fail('APPROVAL_SOURCE_LINEAGE_INVALID');
    const authorization={...this.authorization,accountId:lineage.source_account_id},store=new AsyncApprovalStore(this.db,{...this.options,authorization});
-   const source=await store.subject(lineage.source_review_id,{workspace:scope.workspace,accountId:lineage.source_account_id},{allowDerivation:false}),latest=await store.latest(lineage.source_review_id);
+   const source=await store.subject(lineage.source_review_id,{workspace:scope.workspace,accountId:lineage.source_account_id},{allowDerivation:false,resolution}),latest=await store.latest(lineage.source_review_id);
    const plan=await store.one('SELECT * FROM sites_upload_plans WHERE id=?',[lineage.source_plan_id]);
    if(source.blocked||source.fingerprint!==lineage.source_subject||latest?.id!==lineage.source_event_id||latest.kind!=='CONTENT_APPROVED'||!plan||plan.workspace!==scope.workspace||plan.account_id!==lineage.source_account_id||plan.review_id!==lineage.source_review_id||plan.manifest_hash!==lineage.source_manifest_hash||plan.subject_fingerprint!==lineage.source_subject||plan.approval_event_id!==lineage.source_event_id)fail('APPROVAL_SOURCE_CHANGED');
    return {row,lineage,store,source,authorization,blocked:null};
-  }catch{return {row,blocked:'APPROVAL_SOURCE_CHANGED'};}
+  }catch(error){lineageFailure(error);return {row,blocked:'APPROVAL_SOURCE_CHANGED'};}
  }
  derivationGuards(s){
   const d=s.derivation;if(!d?.row)return [this.guard('NOT EXISTS(SELECT 1 FROM sites_review_derivations WHERE review_id=?)',[s.row.id])];

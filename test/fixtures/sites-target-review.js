@@ -6,8 +6,8 @@ export const syntheticTargetProvider=db=>({async readTargetBinding(ref){
  const a=(await db.prepare('SELECT * FROM sites_account_details WHERE workspace=? AND account_id=?').bind(ref.workspace,ref.accountId).all()).results[0];
  return {...ref,kind:'SYNTHETIC_FIXTURE',workspace_kind:'synthetic',source_state:'SYNTHETIC_NO_EXTERNAL_SOURCE',account:{id:a.account_id,workspace:a.workspace,platform:a.platform,external_id:a.external_identity,enabled:1}};
 }});
-export async function targetReviewFixture(t,{video=false}={}){
- const x=await approvalFixture(t,{video}),v=await x.approvals.view(x.id,x.scope),a=await x.approvals.decide(x.id,approvalCommand(v),x.scope,{authority:syntheticAdmin}),plans=new AsyncUploadPlans(x.f.db,x.options);
+export async function targetReviewFixture(t,{video=false,sourceRefs=[]}={}){
+ const x=await approvalFixture(t,{video,sourceRefs}),v=await x.approvals.view(x.id,x.scope),a=await x.approvals.decide(x.id,approvalCommand(v),x.scope,{authority:syntheticAdmin}),plans=new AsyncUploadPlans(x.f.db,x.options);
  const plan=await plans.prepare(x.id,{expected_subject:a.approval.subject_fingerprint,expected_event_id:a.event_id,source_id:x.packet.request.items[0].source_id,payload_artifact_id:'platform'},x.scope,{authority:syntheticAdmin});
  const target=(await x.post('/api/sites/workspaces/'+x.workspace+'/accounts',{display_name:'Independent target',platform:'facebook',external_identity:'SYNTHETIC-SECOND-PAGE'})).id;
  const targetScope={workspace:x.workspace,accountId:target},targetOptions={...x.options,authorization:{userId:'synthetic-owner',...targetScope},targetReviewProvider:syntheticTargetProvider(x.f.db)};

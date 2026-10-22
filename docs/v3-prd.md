@@ -1,6 +1,11 @@
 # Publisher V3 — PRD / architecture / acceptance plan
 
-Current update: [edited reviewed copy](v3-edited-review-handoff.md) now reenters
+Current update: [derived Review edits](v3-derived-review-edits.md) supports repeated
+edit → fresh inspection → independent approval → frozen task cycles, including a
+new target account's independently reviewed source. Ancestor scope, exact events
+and source versions remain transactional dependencies; no approval is copied.
+
+Previous update: [edited reviewed copy](v3-edited-review-handoff.md) now reenters
 fresh media inspection and independent PENDING Review before explicit approval
 and a new frozen task. Original media and history remain; no approval is copied.
 The real inspector is unavailable by default.
@@ -257,8 +262,8 @@ requires existing admin authority for editing, and loses its prior approval in
 the same transaction. Edited media cannot bypass fresh inspection through manual
 freeze. Historical committed approval/preparation/submission facts remain visible.
 [Fresh inspection/Review](v3-edited-review-handoff.md) is now connected for an
-ordinary original Review on its existing platform, with fresh native decode in
-synthetic tests, independent approval and atomic lineage guards. Cross-platform
-media adaptation, derived-chain edits and original bulk/file input remain code
-gaps. Real inspector transport remains absent; content approval does not authorize
+ordinary or derived Review on its existing platform, with fresh native decode in
+synthetic tests, independent approval and atomic ancestor guards. Repeated cycles
+are bounded by an eight-node lineage budget. Cross-platform media adaptation and
+original bulk/file input remain code gaps. Real inspector transport remains absent; content approval does not authorize
 publication.

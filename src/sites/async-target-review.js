@@ -1,5 +1,5 @@
 import {AsyncStorage,exact,fail,authorizationGuard} from './async-storage.js';
-import {approvalDigest} from './async-approval-store.js';
+import {approvalDigest,APPROVAL_LINEAGE_LIMITS} from './async-approval-store.js';
 import {AsyncReviewStore} from './async-review-store.js';
 import {AsyncUploadPlans} from './async-upload-plans.js';
 import {bounded} from './scoped-object-store.js';
@@ -31,6 +31,10 @@ export class AsyncTargetReview extends AsyncStorage {
   const source=await sourceStore.subject(plan.review_id,sourceScope,{allowDerivation:false}),latest=await sourceStore.latest(plan.review_id);
   if(source.blocked||source.provenance!=='SYNTHETIC_FIXTURE'||latest?.kind!=='CONTENT_APPROVED'||latest.id!==plan.approval_event_id||source.fingerprint!==plan.subject_fingerprint||input.expected_event_id!==latest.id||input.expected_subject!==source.fingerprint)fail('APPROVAL_SOURCE_CHANGED');
   if(target.platform!==input.expected_platform||target.platform!==manifest.platform)fail('APPROVAL_EXPLICIT_PLATFORM_REQUIRED');
+  // An edited source may itself have ancestors. Reserve the new target's node
+  // and copied bytes before provider/object writes, as for edited reinspection.
+  if(source.lineage_usage.nodes+1>APPROVAL_LINEAGE_LIMITS.nodes)fail('APPROVAL_LINEAGE_LIMIT');
+  if(source.lineage_usage.bytes+source.assets.reduce((n,a)=>n+a.bytes,0)>APPROVAL_LINEAGE_LIMITS.bytes)fail('APPROVAL_LINEAGE_BYTE_LIMIT');
   // No native producer transport is asserted: the source inspection is reused
   // with exact immutable hashes; this is a new local target Review request.
   const ref={workspace:scope.workspace,accountId:scope.accountId,platform:target.platform,source_review_id:source.row.id,source_subject:source.fingerprint,source_event_id:latest.id};

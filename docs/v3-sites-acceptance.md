@@ -1,11 +1,11 @@
 # Publisher V3 current user-visible acceptance matrix
 
-2026-10-22, after edited copy reinspection and independent Review. Formal target: owner-private ChatGPT Sites UI with cloud
+2026-10-22, after repeated derived Review editing. Formal target: owner-private ChatGPT Sites UI with cloud
 services. Existing project `appgprj_6ad97a034fd08191a8399eeda10f048c` is registered,
 not deployed. The [dispatch withdrawal repair](v3-dispatch-approval-repair.md)
 reproduced and closes content rejection/source-QA changes after intent: dispatch
 now rechecks them atomically while prior committed results remain reconcilable.
-[Edited Review evidence](v3-edited-review-handoff.md) records the latest bounded implementation; [platform editing](v3-platform-variant-edits.md) is its preceding package. [Target Review](v3-target-review-handoff.md) and [shared catalogue handoff](v3-shared-content-handoff.md) record the preceding restoration. The table below supersedes earlier slices' *current* status without
+[Derived editing evidence](v3-derived-review-edits.md) records the latest bounded implementation; [first edited Review handoff](v3-edited-review-handoff.md) is historical; [platform editing](v3-platform-variant-edits.md) is its preceding package. [Target Review](v3-target-review-handoff.md) and [shared catalogue handoff](v3-shared-content-handoff.md) record the preceding restoration. The table below supersedes earlier slices' *current* status without
 rewriting their historical evidence. [Slice 13 evidence](v3-slice-13.md) identifies
 that earlier run; [current source-backed comparison](v3-inheritance-review-20261022.md)
 separately identifies actual V1, actual V2 and the unified baseline, with current
@@ -22,7 +22,7 @@ for any external operation. A UI Tab is never business-function completion.
 | Content reading and complete preview | Library/Drive reading, loose media and original preview | Manual immutable content versions, full body/platform preview, reviewed content/media returns to original content and task views | Strict canonical source adapter → original Review now implemented; real registered Drive transport/metadata projection and hosted acceptance still pending |
 | Shared client catalogue and bulk/file input | Actual V2 shares content by workspace; actual V1 supports bulk selection and DOCX/image refresh | Shared source catalogue now joins owner + active source membership; same-client accounts read full existing sources. Original account-only endpoint remains; bulk/file replacement UI is still missing | Implement original bulk/file workflows and pagination beyond the current 200-row window; keep exact source identity |
 | Content identity | Full IDs/revisions/hash in native library | Full content_id + slug + account + revision, no three-digit merging | Synthetic same-suffix/different-date identities and latest QA withdrawal override title flags executed; actual 074/075/062 inventory mapping/semantic review remains unverified |
-| Platform variants | Actual V1 independent platform choices; V2 immutable platform payload/task overrides; four native drivers retained | Explicit platform preview and independent text save on the same source; all other variants/full original body preserved; concurrent save conflicts require explicit rebase; unsaved switch and stale callback isolation exercised. Exact target still required for manual DRAFT. Ordinary original Review edits now reenter fresh inspection → independent PENDING → approval → exact frozen DRAFT in synthetic tests | Real inspector absent. Cross-platform media adaptation and derived-chain edits remain missing; real transport/capability verification per operation |
+| Platform variants | Actual V1 independent platform choices; V2 immutable platform payload/task overrides; four native drivers retained | Explicit platform preview and independent text save on the same source; all other variants/full original body preserved; concurrent save conflicts require explicit rebase; unsaved switch and stale callback isolation exercised. Exact target still required for manual DRAFT. Ordinary and derived Review edits now repeatedly reenter fresh inspection → independent PENDING → approval → exact frozen DRAFT in synthetic tests | Real inspector absent. Cross-platform media adaptation remains missing; chains are bounded to eight Review nodes; real transport/capability verification per operation |
 | Content production | Production request/result contract and content workbench | Original request/result/inspection envelopes persisted and displayed | Real producer dispatch/orchestration and authenticated delivery; no automatic model production claimed |
 | Video/image QA | Real bounded ffprobe/full decode/Pillow; bad MP4 regressions | Accepts exact server inspection receipt and bytes; browser playback exercised | Durable cloud heavy service; cannot execute native ffmpeg in Workers; factual/aesthetic/subtitle QA remains human |
 | ZIP/parts/hot cache | Synthetic resolver, exact hash/member, lease, recovery and loose compatibility | Canonical body + multipart ZIP image now enters original decoded Review; corrupt ZIP invalidates old approval; extracted results persist as immutable objects consumed by plans | Resolver service and authenticated transport not hosted/integrated with Sites; actual user ZIP consumption unverified after 403 |
@@ -60,9 +60,10 @@ Shared client content → explicit platform preview → exact target DRAFT is no
 implemented for existing unreviewed variants. Prepared Review media can create an
 independent target-account Review without approval reuse. Single-platform text
 editing now preserves the other variants and invalidates affected approval. The
-original-platform edited media path now reenters fresh inspection and independent
-Review before freezing; original bulk/file workflows and cross-platform/derived
-media adaptation remain code priorities. They are not explained solely by the deployment block.
+original-platform ordinary/derived media path repeatedly reenters fresh inspection
+and independent Review before freezing, with ancestor validity and a bounded
+lineage. Original bulk/file workflows and cross-platform media adaptation remain
+code priorities. They are not explained solely by the deployment block.
 
 1. **Deliver the existing application on the saved private Sites project.** Official
    starter/helpers and supported build/source workflow must actually be restored;

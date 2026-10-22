@@ -1,0 +1,226 @@
+{
+  "base_commit": "7bc777706377c26a696e8743fe140c547744403d",
+  "branch": "publisher-v3/cloud-slice-01",
+  "site_project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+  "deployment": "NOT_DEPLOYED_BY_THIS_PACKAGE",
+  "execution": "original selected cloud workspace; generated media and test-only providers; SQLite under async D1 shape, file-backed bucket and loopback Chromium",
+  "failures_before": [
+    {
+      "command": "PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test test/sites-review-lineage.test.js",
+      "result": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 0,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1091.446969
+      },
+      "log": "v3-derived-review-second-cycle-before.log",
+      "sha256": "4df60db3bb72afcc064cbec88aa19d6652da897f16e1957f06c0abe9c8ea2824",
+      "original_path": "/tmp/v3-review-lineage-before.log",
+      "original_sha256": "4df60db3bb72afcc064cbec88aa19d6652da897f16e1957f06c0abe9c8ea2824",
+      "reason": "Baseline: second full edit/inspect/approve/freeze cycle fails VARIANT_REVIEW_SOURCE_CHANGED"
+    },
+    {
+      "command": "PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-name-pattern='target creation reserves' test/sites-review-lineage.test.js",
+      "result": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 0,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1926.731487
+      },
+      "log": "v3-derived-review-target-budget-before.log",
+      "sha256": "124dc9626c8b29bda3330bb86afe04244f136c6dd8a9885bac521b7108f7df97",
+      "original_path": "/tmp/v3-review-lineage-target-budget-before.log",
+      "original_sha256": "124dc9626c8b29bda3330bb86afe04244f136c6dd8a9885bac521b7108f7df97",
+      "reason": "First implementation: target creation accepted ninth node; Missing expected rejection"
+    }
+  ],
+  "exact_rechecks": [
+    {
+      "command": "PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test test/sites-review-lineage.test.js",
+      "result": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1719.738406
+      },
+      "log": "v3-derived-review-second-cycle-after.log",
+      "sha256": "ab5c64c5a556bb09db1b6625f40880f79893146f49880bb7cf9042a52bbee215",
+      "original_path": "/tmp/v3-review-lineage-after-core.log",
+      "original_sha256": "ab5c64c5a556bb09db1b6625f40880f79893146f49880bb7cf9042a52bbee215"
+    },
+    {
+      "command": "PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-name-pattern='target creation reserves' test/sites-review-lineage.test.js",
+      "result": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 1649.228223
+      },
+      "log": "v3-derived-review-target-budget-after.log",
+      "sha256": "071cf3ab578c23b4c6b77d89c8ae0ece717bfb7bfd382e2bb2d2f59e701722df",
+      "original_path": "/tmp/v3-review-lineage-target-budget-after.log",
+      "original_sha256": "071cf3ab578c23b4c6b77d89c8ae0ece717bfb7bfd382e2bb2d2f59e701722df"
+    },
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/workspace/sites/publisher-v3/review-lineage-evidence-20261022 node --test --test-name-pattern='mobile derived frozen copy' test/sites-cloud-console-ui.test.js",
+      "result": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 5972.784804
+      },
+      "log": "v3-derived-review-mobile.log",
+      "sha256": "2f48ef8da6dea13f5b30d145b19282b47d268ca8b7131fdd133451bbaed439cd",
+      "original_path": "/tmp/v3-review-lineage-ui.log",
+      "original_sha256": "2f48ef8da6dea13f5b30d145b19282b47d268ca8b7131fdd133451bbaed439cd"
+    }
+  ],
+  "final_runs": [
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/workspace/sites/publisher-v3/review-lineage-evidence-20261022 node --test --test-concurrency=2 test/sites-review-lineage.test.js test/sites-variant-review.test.js test/sites-variant-edits.test.js test/sites-target-review.test.js test/sites-async-approval.test.js test/sites-async-review-store.test.js test/sites-async-upload-plans.test.js test/sites-async-synthetic-executor.test.js test/sites-cloud-console-ui.test.js",
+      "result": {
+        "tests": 166,
+        "suites": 0,
+        "pass": 166,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 70608.655679
+      },
+      "log": "v3-derived-review-focused.log",
+      "sha256": "62c1cc8e4db593474bdb8da7b98d9ccc496191ee61b0c519331adc72f18f90df",
+      "original_path": "/tmp/v3-review-lineage-focused.log",
+      "original_sha256": "62c1cc8e4db593474bdb8da7b98d9ccc496191ee61b0c519331adc72f18f90df"
+    },
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+      "result": {
+        "tests": 1304,
+        "suites": 0,
+        "pass": 1304,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 158777.69177
+      },
+      "summary": "v3-derived-review-full-summary.log",
+      "summary_sha256": "9c94a23dee81bba847fe9d7d1bc3ba627a1704d9372e73ab49ef5d225cc688c8",
+      "full_log": "/tmp/v3-review-lineage-full.log",
+      "full_log_sha256": "c88261930df5bf54a4255ec133114bcecef36cc9097f2cbda2ed0eefb7c82513"
+    }
+  ],
+  "source_sha256": {
+    "src/sites/async-approval-store.js": "01cbaa8abc885919f0284c1c558d9ca056dbf60cf028751e99d6b86a37198b07",
+    "src/sites/async-target-review.js": "e036465782a49cf6ef2043504aa38dcdbe8164de6aea1c6ab25975bcfe26fd61",
+    "src/sites/async-variant-review.js": "0db6d97f45261303f7b0f5da75eaa32dc4eb495e005ffa823a366b10c9cdd482",
+    "src/sites/cloud-console.js": "7f9cb1400506bff337644757ef284449f9ffd5d2fcd76a12987e618d2a732e80",
+    "test/fixtures/sites-approval.js": "5f4c540a764a3a5edd14b97aa2a8d83a13c1f5f7fbf721dc2cdb96427dc4529c",
+    "test/fixtures/sites-evidence.js": "13d053bfae38f114b16b9a3a3344d5f7b37ef9258cc2ac526176e6d86bce13a5",
+    "test/fixtures/sites-target-review.js": "ae0b541892371fe101732848708f08c657882d88601afd90ce6b18a04a71bbc9",
+    "test/sites-review-lineage.test.js": "d5853786d90523fa6f3867b69e4df95c1a7b904dac9812935348e82ef803b0df",
+    "test/sites-cloud-console-ui.test.js": "6adb26a3a7b06fcf30709c116b4ec3610d0d5e796f55b8e738212d5f1b76cec5"
+  },
+  "screenshots": [
+    {
+      "path": "/workspace/sites/publisher-v3/review-lineage-evidence-20261022/mobile-third-derived-review-frozen.png",
+      "sha256": "8eec3ce7cbb913a37b308326139bfa4ae11df2e00d88978556d7bfa59f62fb5f",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "image_pixels": {
+        "width": 390,
+        "height": 1790
+      }
+    },
+    {
+      "path": "/workspace/sites/publisher-v3/review-lineage-evidence-20261022/mobile-third-derived-review-pending.png",
+      "sha256": "953c9d50f9bcfd95662892614b44ae523da1ecd1ea23eaa0e89d1e9ecd434df3",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "image_pixels": {
+        "width": 390,
+        "height": 1812
+      }
+    }
+  ],
+  "review": "gpt-6-astra read-only design and implementation reviews found target prospective budget omission; implementer reproduced/repaired; final read-only review found no new definite P0/P1/P2. Astra did not rerun tests.",
+  "intermediate_runs_not_final": [
+    {
+      "log": "/tmp/v3-review-lineage-expanded.log",
+      "result": {
+        "tests": 15,
+        "suites": 0,
+        "pass": 12,
+        "fail": 3,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 6612.321198
+      },
+      "reason": "three test fixture errors: asserted account_id on view that omits it; twice seeded target permit with original source accountId. Corrected to persistent job account and exact target scope."
+    },
+    {
+      "log": "/tmp/v3-review-lineage-api.log",
+      "result": {
+        "tests": 18,
+        "suites": 0,
+        "pass": 18,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 8639.848592
+      },
+      "reason": "18/18 before original-reference preservation and target-budget boundary additions"
+    }
+  ],
+  "limits": {
+    "review_nodes_including_current": 8,
+    "aggregate_declared_asset_bytes": 134217728,
+    "ancestor_validation_deadline_ms": 30000,
+    "deadline_scope": "one traversal; variant inspection uses its remainder, existing intake/object persistence has a separate budget; not a full-request hard deadline"
+  },
+  "recovery": "normal original environment startup succeeded; clean 7bc7777 worktree, no active tests; prior completed log read rather than restarted",
+  "not_verified": [
+    "hosted Sites identity/D1/R2 and deployment",
+    "real cloud inspector/source/producer/admin/permit/upload/submit/readback providers",
+    "real Drive sample consumption",
+    "physical phone or Safari"
+  ],
+  "remaining_code_gaps": [
+    "cross-platform inspected media adaptation",
+    "original bulk-selection/file replacement",
+    "cloud group/Inbox/reply/takeover workflows and live metric feedback"
+  ],
+  "real_posts": 0,
+  "real_messages": 0,
+  "credentials_created_or_read": false,
+  "denied_downloads_retried": false,
+  "log_normalization": "Committed log copies trim trailing whitespace only; raw logs remain in /tmp; full-run summary and original hash archived separately.",
+  "recorded_at": "2026-10-22T18:36:39.571006+00:00"
+}

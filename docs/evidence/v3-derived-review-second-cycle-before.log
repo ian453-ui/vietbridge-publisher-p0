@@ -1,0 +1,21 @@
+✖ derived frozen Review can be edited and independently re-inspected twice more without approval reuse (979.295173ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1091.446969
+
+✖ failing tests:
+
+test at test/sites-review-lineage.test.js:19:1
+✖ derived frozen Review can be edited and independently re-inspected twice more without approval reuse (979.295173ms)
+  Error: VARIANT_REVIEW_SOURCE_CHANGED
+      at fail (file:///workspace/publisher-v3/src/sites/async-storage.js:2:32)
+      at AsyncApprovalStore.editedSource (file:///workspace/publisher-v3/src/sites/async-approval-store.js:53:262)
+      at async AsyncVariantReview.create (file:///workspace/publisher-v3/src/sites/async-variant-review.js:21:11)
+      at async TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-review-lineage.test.js:26:130)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
