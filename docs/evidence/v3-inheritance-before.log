@@ -1,0 +1,100 @@
+✖ desktop unsaved content drafts stay with exact customer and account (994.466471ms)
+✖ mobile unsaved content drafts stay with exact customer and account (847.955117ms)
+✖ late committed content response cannot reset another account draft or its submit state (1430.740111ms)
+✖ late same-account Review response cannot replace newer metric preview (1427.629324ms)
+✖ refresh closes and clears the current preview (1262.271482ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6427.036249
+
+✖ failing tests:
+
+test at test/sites-cloud-console-ui.test.js:59:103
+✖ desktop unsaved content drafts stay with exact customer and account (994.466471ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  'A1 完整正文' !== ''
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-cloud-console-ui.test.js:61:101)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'A1 完整正文',
+    expected: '',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/sites-cloud-console-ui.test.js:59:103
+✖ mobile unsaved content drafts stay with exact customer and account (847.955117ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  'A1 完整正文' !== ''
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-cloud-console-ui.test.js:61:101)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'A1 完整正文',
+    expected: '',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/sites-cloud-console-ui.test.js:68:1
+✖ late committed content response cannot reset another account draft or its submit state (1430.740111ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  '' !== 'A2 完整正文'
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-cloud-console-ui.test.js:72:9)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: 'A2 完整正文',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/sites-cloud-console-ui.test.js:75:1
+✖ late same-account Review response cannot replace newer metric preview (1427.629324ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  '制作素材快照' !== '指标观测历史'
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-cloud-console-ui.test.js:78:324)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '制作素材快照',
+    expected: '指标观测历史',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/sites-cloud-console-ui.test.js:81:1
+✖ refresh closes and clears the current preview (1262.271482ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  true !== false
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-cloud-console-ui.test.js:84:94)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

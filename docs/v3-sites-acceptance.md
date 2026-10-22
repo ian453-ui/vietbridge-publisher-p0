@@ -1,13 +1,15 @@
 # Publisher V3 current user-visible acceptance matrix
 
-2026-10-22, slice 13 (portable read-only video receipt adapter). Formal target: owner-private ChatGPT Sites UI with cloud
+2026-10-22, after three-round Astra inheritance review and console isolation repair. Formal target: owner-private ChatGPT Sites UI with cloud
 services. Existing project `appgprj_6ad97a034fd08191a8399eeda10f048c` is registered,
 not deployed. The [dispatch withdrawal repair](v3-dispatch-approval-repair.md)
 reproduced and closes content rejection/source-QA changes after intent: dispatch
 now rechecks them atomically while prior committed results remain reconcilable.
 The table below supersedes earlier slices' *current* status without
 rewriting their historical evidence. [Slice 13 evidence](v3-slice-13.md) identifies
-this run; [original matrix](v3-final-acceptance.md) retains V1/V2 module references.
+that earlier run; [current source-backed comparison](v3-inheritance-review-20261022.md)
+separately identifies actual V1, actual V2 and the unified baseline, with current
+failure/recovery evidence. [Original matrix](v3-final-acceptance.md) is historical.
 
 “Executed synthetic” means this cloud workspace ran code with generated inputs and
 closed adapters. ACCOUNT_AUTHORIZED and LIVE_VERIFIED are **not established here**
@@ -15,11 +17,12 @@ for any external operation. A UI Tab is never business-function completion.
 
 | User-visible capability | Existing native V1/V2/V3 path retained | Current Sites application code / acceptance | Remaining work |
 | --- | --- | --- | --- |
-| Customer/account switching and multiple tasks | Existing scoped store and shared-admin UI | Owner + exact active membership; persistent independent scopes; delayed old-customer/account replies cannot replace current view; transactional revocation races executed | Official hosted identity/bindings; no per-tenant individual RBAC claim |
+| Customer/account switching and multiple tasks | Existing scoped store and shared-admin UI | Owner + exact active membership; persistent independent scopes; delayed old-customer/account replies cannot replace current view; transactional revocation races executed. Unsaved drafts/commands now stay with their exact scope; late saves cannot clear another account draft | Official hosted identity/bindings; no per-tenant individual RBAC claim; unsaved drafts remain page-memory only |
 | Tabs/navigation | Original native Tabs and tests retained | Nine operating destinations, with unavailable actions explicitly marked; desktop/mobile exercised | The blocked destinations below still need business code/integration |
 | Content reading and complete preview | Library/Drive reading, loose media and original preview | Manual immutable content versions, full body/platform preview, reviewed content/media returns to original content and task views | Strict canonical source adapter → original Review now implemented; real registered Drive transport/metadata projection and hosted acceptance still pending |
+| Shared client catalogue and bulk/file input | Actual V2 shares content by workspace; actual V1 supports bulk selection and DOCX/image refresh | Sites still filters content by account and lacks original bulk/file replacement UI; these are inherited workflow gaps | Restore workspace source browsing with explicit account-specific draft/approval/freeze; do not relax account approval ownership |
 | Content identity | Full IDs/revisions/hash in native library | Full content_id + slug + account + revision, no three-digit merging | Synthetic same-suffix/different-date identities and latest QA withdrawal override title flags executed; actual 074/075/062 inventory mapping/semantic review remains unverified |
-| Platform variants | FB/XHS/WOA/Channels payloads/drivers retained | Same parser and validation; only explicit deliverable for chosen account/platform accepted; 4-platform synthetic preparation/terminal semantics | Real account transport/capability verification per operation |
+| Platform variants | Actual V1 independent platform choices; unified baseline explicit platform/account preview; four native drivers retained | Same parser and validation; only explicit deliverable for chosen account/platform accepted; 4-platform synthetic preparation/terminal semantics. Sites editor still follows the selected account, lacking independent platform browsing | Restore explicit platform selection and target choice; real account transport/capability verification per operation |
 | Content production | Production request/result contract and content workbench | Original request/result/inspection envelopes persisted and displayed | Real producer dispatch/orchestration and authenticated delivery; no automatic model production claimed |
 | Video/image QA | Real bounded ffprobe/full decode/Pillow; bad MP4 regressions | Accepts exact server inspection receipt and bytes; browser playback exercised | Durable cloud heavy service; cannot execute native ffmpeg in Workers; factual/aesthetic/subtitle QA remains human |
 | ZIP/parts/hot cache | Synthetic resolver, exact hash/member, lease, recovery and loose compatibility | Canonical body + multipart ZIP image now enters original decoded Review; corrupt ZIP invalidates old approval; extracted results persist as immutable objects consumed by plans | Resolver service and authenticated transport not hosted/integrated with Sites; actual user ZIP consumption unverified after 403 |
@@ -51,6 +54,12 @@ Do not silently turn on the synthetic provider or create credentials to bridge
 those gaps. Original `publisher-unified` stays unchanged and unmerged.
 
 ## Value-ordered next repairs and integration
+
+The three-round review also identifies an independent code priority: recover
+shared client content → explicit platform preview → exact target account selection,
+followed by original bulk/file workflows. These gaps can be worked on without a
+live token and are not explained by the helper/deployment block. Keep account-level
+approvals and task snapshots separate from the shared source catalogue.
 
 1. **Deliver the existing application on the saved private Sites project.** Official
    starter/helpers and supported build/source workflow must actually be restored;

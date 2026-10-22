@@ -1,0 +1,105 @@
+{
+  "date_utc": "2026-10-22T16:10:27.778155+00:00",
+  "baseline": "713977f0162a883665c4fb712e8eea0bdc583d89",
+  "branch": "publisher-v3/cloud-slice-01",
+  "original_baselines": {
+    "v1": "fe9b7ad05351001fb2cef6adb7f689ebc5c5cce1",
+    "v2": "85e987a00876a94385c5b4e99be67a7347523457",
+    "publisher-unified": "4455a4b1faf40fedcd7020636999e165fa4a1386"
+  },
+  "reviews": {
+    "model": "gpt-6-astra",
+    "rounds": [
+      "Actual baseline/source inheritance matrix",
+      "Business reproduction test validity and repair boundaries",
+      "Implementation diff self-review and baseline attribution correction"
+    ],
+    "mode": "read-only; did not independently execute tests"
+  },
+  "execution": "Implementing agent in selected cloud workspace; synthetic fixtures and loopback services, Chromium viewport emulation",
+  "before": {
+    "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-name-pattern='unsaved content drafts|late committed content|late same-account|refresh closes' test/sites-cloud-console-ui.test.js",
+    "production_source": "713977f",
+    "pass": 0,
+    "fail": 5,
+    "exit_code": 1,
+    "log": "docs/evidence/v3-inheritance-before.log",
+    "log_sha256": "02a78bf7e26c59cabd49557d798261ade074499fe953e5a93cc25694a53da474",
+    "note": "Corrected lowercase slug, HTTP200 and existing original-account row assertions. Earlier invalid-slug late-response test excluded.",
+    "log_format": "Original output with line-end whitespace removed; raw log /tmp/v3-round2-before-corrected.log"
+  },
+  "ui": {
+    "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/tmp/v3-review-rounds/screenshots node --test test/sites-cloud-console-ui.test.js",
+    "pass": 18,
+    "fail": 0,
+    "cancelled": 0,
+    "exit_code": 0,
+    "duration_ms": 28488.429467,
+    "log": "docs/evidence/v3-inheritance-ui.log",
+    "log_sha256": "459e270e8712ea72309ca8f20e2ce93da969dc00d61884a5fba7976b8545190f"
+  },
+  "full": {
+    "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+    "pass": 1190,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "exit_code": 0,
+    "duration_ms": 127368.002314,
+    "summary": "docs/evidence/v3-inheritance-full-summary.log",
+    "full_log_local": "/tmp/v3-round3-full.log",
+    "full_log_sha256": "365b8952bd978381cbb04c96c53adefbf0c8ddf19ca7208a6a681db0f73acd47"
+  },
+  "intermediate_failure": "One expanded UI run stalled in fixture cleanup and was stopped without a passing result; bounded barriers and server connection cleanup were fixed. Final UI and full runs completed normally.",
+  "changed_executable_sha256": {
+    "src/sites/cloud-console.js": "4f7cc54530e3c696db15d0f7b0e6c87ffa92e4f86646d54c9ac9c6e7c2a6148f",
+    "src/sites/cloud-console.html": "4f559cdb03930668a90daf2515e82e642d0ae81530fdf48c4f218d1ae747a143",
+    "test/sites-cloud-console-ui.test.js": "b0a6f9ffc0791577fd38a3e326e595bd29450974e4f310c1888d373d918648fd"
+  },
+  "screenshots": [
+    {
+      "path": "/workspace/sites/publisher-v3/review-evidence-20261022/desktop-approved-platform-plan.png",
+      "sha256": "e3657d9d40943c91606cbc828ae87bce1b153d9af87b733aeee6c855599b7ce0",
+      "synthetic_only": true,
+      "visually_inspected": true
+    },
+    {
+      "path": "/workspace/sites/publisher-v3/review-evidence-20261022/desktop-isolated-draft.png",
+      "sha256": "50a16b0f2a75ea986513d4131aea1ffe5a9a2170d02129de5614b18537dfea34",
+      "synthetic_only": true,
+      "visually_inspected": true
+    },
+    {
+      "path": "/workspace/sites/publisher-v3/review-evidence-20261022/mobile-approved-platform-plan.png",
+      "sha256": "a0166c9f3b966e7d53ea6846a8f8c8bec72b1d7986cfcd5981162126d1af6b7c",
+      "synthetic_only": true,
+      "visually_inspected": true
+    },
+    {
+      "path": "/workspace/sites/publisher-v3/review-evidence-20261022/mobile-isolated-draft.png",
+      "sha256": "cbd863a5f198a5bc15923f44fa4b1f8e81ec3991e513e544c434988133972c9f",
+      "synthetic_only": true,
+      "visually_inspected": true
+    }
+  ],
+  "site": {
+    "project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+    "deployed": false,
+    "build_attempted": false,
+    "helper_scan": "bounded local scan, no official helper/starter found",
+    "denied_download_retried": false,
+    "cause_of_missing_mounts": "unverified"
+  },
+  "real_platform_operations": 0,
+  "credentials_created": 0,
+  "security_or_sharing_changes": 0,
+  "next_code_priority": "Shared client source catalogue + explicit platform browsing/target selection while preserving per-account approval/task bindings",
+  "not_claimed": [
+    "Hosted Sites acceptance",
+    "Physical mobile or Safari acceptance",
+    "Independent tenant logins/RBAC",
+    "Real source/media consumption",
+    "Live publication, groups, replies or metrics",
+    "Whole V3 completion"
+  ]
+}

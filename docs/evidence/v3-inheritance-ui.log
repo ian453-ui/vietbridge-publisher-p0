@@ -1,0 +1,26 @@
+✔ desktop cloud console persists customer/account/content/platform/task with full preview and reload (1918.675021ms)
+✔ mobile cloud console persists customer/account/content/platform/task with full preview and reload (1757.599869ms)
+✔ desktop unsaved content drafts stay with exact customer and account (1178.088902ms)
+✔ mobile unsaved content drafts stay with exact customer and account (1146.749602ms)
+✔ late committed content response cannot reset another account draft or its submit state (1133.427298ms)
+✔ late same-account Review response cannot replace newer metric preview (1494.141125ms)
+✔ refresh closes and clears the current preview (1359.884937ms)
+✔ button closes pending approval readback without reopening the review (1723.319542ms)
+✔ Escape closes pending approval readback without reopening the review (1681.69357ms)
+✔ lost content save acknowledgement keeps original scoped command and explicit retry is idempotent (1624.984437ms)
+✔ definite invalid content input can be corrected without stranding the scoped draft (862.672089ms)
+✔ desktop cloud Review plays decoded snapshot and reads durable null metric without publication (1667.809566ms)
+✔ mobile cloud Review plays decoded snapshot and reads durable null metric without publication (1651.894954ms)
+✔ delayed old account and old customer responses cannot replace current cloud console data (989.639474ms)
+✔ desktop Review human approval -> media preparation -> original content/task preview -> revoke -> reload (2530.675406ms)
+✔ mobile Review human approval -> media preparation -> original content/task preview -> revoke -> reload (2534.86898ms)
+✔ desktop canonical imported source shows exact identity and latest QA withdraws old approval on reload (1336.762119ms)
+✔ mobile canonical imported source shows exact identity and latest QA withdraws old approval on reload (1405.348342ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28488.429467
