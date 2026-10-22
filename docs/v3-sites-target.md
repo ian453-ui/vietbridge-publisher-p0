@@ -162,3 +162,40 @@ credential, sharing change, Mac availability or another speculative domain chang
 is needed to perform that diagnosis. All dependent deployment actions are
 **not attempted**, not denied or uncertain; no further synthetic business code
 was added during this recovery check.
+
+## Official release resource found; acquisition now explicitly denied
+
+A later parent-supplied official resource route was verified with `codex_apps`
+`read_mcp_resource`, without repeating the earlier filesystem search. The plugin
+metadata identifies Sites **1.1.1**, release
+`pluginrel_6ad94d8f8d1081918c8624c57b60582b`, and advertises the gzip bundle at
+`plugin://plugin_connector_1p_689987207de08191979cf68eca2941c6/bundle`.
+It declares the expected Sites references/scripts/templates and connector.
+The metadata provides no publisher checksum. Release identity is verified from
+the official resource service; archive contents/integrity are not yet verified.
+
+The fresh official resource used **sdmntprcentralus.oaiusercontent.com**, not the
+historical westus3 hostname. One normal GET through the existing HTTPS proxy,
+with default TLS verification and redirects disabled, returned:
+
+```text
+Tunnel connection failed: 403 Forbidden
+```
+
+The attempt was immediately stopped. No archive was obtained, no helper executed,
+no file installed, no URL refreshed, no alternate route tried and no network or
+sharing setting changed. The signed URL passed only through hidden process stdin;
+it is not in files, logs, Git or this report. [Exact sanitized evidence](evidence/v3-sites-official-bundle-block.json)
+records the resource identity, current environment context and denial.
+
+This is now a concrete **current acquisition denial**, distinct from the earlier
+missing-mount observation. It does not prove the initial missing-mount cause or
+that the old settings entry is the same environment.
+
+Minimum approval/repair request: allow this selected cloud execution environment
+HTTPS CONNECT to **sdmntprcentralus.oaiusercontent.com:443**, solely for the
+verified official Sites 1.1.1 distribution. Apply it through the supported
+platform environment policy, without broadening credentials, audience or other
+network destinations. Confirm the actual permission/repair before retrying;
+a newly returned signed URL by itself is not sufficient permission to bypass this
+denial. The original Site and source stay intact. Mac availability is irrelevant.
