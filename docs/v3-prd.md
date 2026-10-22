@@ -1,5 +1,11 @@
 # Publisher V3 — PRD / architecture / acceptance plan
 
+Current update: [slice 09](v3-slice-09.md) implements asynchronous content decisions,
+revocation and Review → explicit platform/media preparation in the existing Sites
+content/task views. Its [whole-product matrix](v3-sites-acceptance.md) is the current
+status, including unfinished user-visible paths and the unchanged hosting blocker.
+Historical test counts below are not this package's execution evidence.
+
 Baseline checked against GitHub on 2026-10-21 UTC: `publisher-unified` =
 `4455a4b1faf40fedcd7020636999e165fa4a1386`. Development branch:
 `publisher-v3/cloud-slice-01`, new worktree `/workspace/publisher-v3`.

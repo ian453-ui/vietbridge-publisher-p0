@@ -1,5 +1,11 @@
 # Publisher V3 bounded development acceptance — 2026-10-22
 
+Current update: [slice 09](v3-slice-09.md) implements asynchronous content decisions,
+revocation and Review → explicit platform/media preparation in the existing Sites
+content/task views. Its [whole-product matrix](v3-sites-acceptance.md) is the current
+status, including unfinished user-visible paths and the unchanged hosting blocker.
+Historical test counts below are not this package's execution evidence.
+
 **Current formal delivery target: ChatGPT Sites UI and cloud services, independent
 of Mac. This document's Node/browser demonstrations are development acceptance,
 not a hosted V3 delivery.** See [Sites runtime/migration status](v3-sites-target.md).

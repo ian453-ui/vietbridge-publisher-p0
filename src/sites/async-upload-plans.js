@@ -1,0 +1,42 @@
+import {AsyncStorage,digest,exact,fail} from './async-storage.js';
+import {AsyncApprovalStore,approvalDigest} from './async-approval-store.js';
+import {requireProductionAdmin} from '../production-approval-policy.js';
+import {sourcePlatformPayload} from '../platform-public-copy.js';
+import {validatePlatformPayloadExtensions} from '../publisher-platform-policy.js';
+const flags={publish_allowed:false,source_gate_satisfied:false,producer_authenticated:false,synthetic_only:true};
+const extension=mime=>({'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp','video/mp4':'.mp4'}[mime]||fail('PRODUCTION_UPLOAD_MEDIA_UNSUPPORTED'));
+/** The native ProductionUploadPlans boundary using immutable object references
+ * instead of files. Existing Sites content + DRAFT job tables remain the UI path.
+ * No upload, real permit, external driver or execution route is introduced. */
+export class AsyncUploadPlans extends AsyncStorage {
+ constructor(db,options={}){super(db,options);this.approvals=new AsyncApprovalStore(db,options);}
+ async choices(id,scope){const s=await this.approvals.subject(id,scope);return s.request.items.flatMap(item=>item.deliverables.filter(a=>a.kind==='platform_payload'&&a.platform===s.account.platform).map(a=>({source_id:item.source_id,payload_artifact_id:a.artifact_id,platform:a.platform})));}
+ async read(id,scope){await this.scope(scope.workspace,scope.accountId);const p=await this.one('SELECT * FROM sites_upload_plans WHERE id=? AND workspace=? AND account_id=?',[id,scope.workspace,scope.accountId]);if(!p)fail('PRODUCTION_PLAN_NOT_FOUND');const manifest=JSON.parse(p.manifest_json);if(await digest(p.manifest_json)!==p.manifest_hash)fail('PRODUCTION_PLAN_CORRUPT');const job=await this.one('SELECT j.*,s.snapshot_json FROM publisher_jobs j JOIN sites_job_snapshots s ON s.job_id=j.id WHERE j.id=? AND j.workspace=? AND j.account_id=?',[p.job_id,scope.workspace,scope.accountId]);if(!job||await approvalDigest(JSON.parse(job.snapshot_json))!==job.snapshot_hash||JSON.parse(job.snapshot_json).production_plan?.manifest_hash!==p.manifest_hash)fail('PRODUCTION_FROZEN_SNAPSHOT_CHANGED');return {p,manifest,job};}
+ async view(id,scope){const {p,manifest,job}=await this.read(id,scope),approval=await this.approvals.view(p.review_id,scope);let blocked=approval.blocked_reason||null;if(approval.state!=='CONTENT_APPROVED'||approval.subject_fingerprint!==p.subject_fingerprint||approval.latest_event_id!==p.approval_event_id)blocked=blocked||'PRODUCTION_APPROVAL_CHANGED';
+  return {id,review_id:p.review_id,content_id:p.content_id,job_id:p.job_id,job_state:job.state,status:blocked?'STALE_PREVIEW':'UPLOAD_PREVIEW_ONLY',blocked_reason:blocked,payload:manifest.payload,media:manifest.media,platform:manifest.platform,source_id:manifest.source_id,payload_source_sha256:manifest.payload_source_sha256,publication_authority:{state:'UNCONFIGURED',reason:'EXISTING_REAL_PERMIT_PROVIDER_NOT_CONNECTED'},...flags};}
+ async prepare(id,input,scope,{authority}={}){
+  requireProductionAdmin(authority);exact(input,['expected_event_id','expected_subject','source_id','payload_artifact_id'],'PRODUCTION_PLAN_INPUT_INVALID');if(Object.values(input).some(x=>typeof x!=='string'||!x))fail('PRODUCTION_PLAN_INPUT_INVALID');
+  const approval=await this.approvals.view(id,scope,{admin:true});if(approval.state!=='CONTENT_APPROVED'||approval.provenance!=='SYNTHETIC_FIXTURE'||!approval.can_decide)fail('PRODUCTION_APPROVED_SYNTHETIC_SOURCE_REQUIRED');if(input.expected_subject!==approval.subject_fingerprint||input.expected_event_id!==approval.latest_event_id)fail('PRODUCTION_APPROVAL_CHANGED');
+  const planId=await approvalDigest({review_id:id,workspace:scope.workspace,account_id:scope.accountId,source_id:input.source_id,payload_artifact_id:input.payload_artifact_id,subject:input.expected_subject,event:input.expected_event_id});
+  const respond=async duplicate=>{try{return {...await this.view(planId,scope),committed:true,duplicate};}catch{return {id:planId,committed:true,duplicate,readback_pending:true,...flags};}};
+  if(await this.one('SELECT id FROM sites_upload_plans WHERE id=?',[planId]))return respond(true);
+  const s=await this.approvals.subject(id,scope);if(s.blocked||s.fingerprint!==input.expected_subject)fail(s.blocked||'PRODUCTION_APPROVAL_CHANGED');
+  const item=s.request.items.find(x=>x.source_id===input.source_id),spec=item?.deliverables.find(a=>a.artifact_id===input.payload_artifact_id);if(!spec||spec.kind!=='platform_payload'||spec.platform!==s.account.platform)fail('PRODUCTION_PLATFORM_PAYLOAD_REQUIRED');
+  const selected=spec.references.map(key=>item.deliverables.find(a=>a.artifact_id===key)).filter(a=>a&&['cover','video'].includes(a.kind));if(!selected.length)fail('PRODUCTION_EXPLICIT_MEDIA_REFERENCE_REQUIRED');
+  const payloadMeta=s.assets.find(a=>a.source_id===item.source_id&&a.artifact_id===spec.artifact_id);if(!payloadMeta||payloadMeta.bytes>256*1024)fail('PRODUCTION_PAYLOAD_SIZE_LIMIT');
+  const raw=await this.approvals.reviews.asset(scope.workspace,scope.accountId,id,item.source_id,spec.artifact_id),payload={...sourcePlatformPayload(new TextDecoder('utf-8',{fatal:true}).decode(raw.data),item.source_id,s.account.platform)};payload.title=payload.title.trim();payload.body=payload.body.trim();payload.author=payload.author||'驻越经营实录';
+  const media=[];for(const a of selected){const data=await this.approvals.reviews.asset(scope.workspace,scope.accountId,id,item.source_id,a.artifact_id),object=s.assets.find(x=>x.source_id===item.source_id&&x.artifact_id===a.artifact_id);media.push({source_id:item.source_id,artifact_id:a.artifact_id,object_id:object.object_id,mime:data.mime,bytes:data.data.byteLength,sha256:data.sha256});}
+  if(media.some(a=>a.mime==='video/mp4')&&media.length!==1)fail('PRODUCTION_UPLOAD_MIXED_MEDIA');validatePlatformPayloadExtensions(s.account.platform,payload,media.map(a=>extension(a.mime)));
+  const manifest={source_id:item.source_id,payload_artifact_id:spec.artifact_id,payload_source_sha256:raw.sha256,platform:s.account.platform,payload,media},manifestJson=JSON.stringify(manifest),manifestHash=await digest(manifestJson),contentId=crypto.randomUUID(),jobId=crypto.randomUUID(),at=new Date().toISOString();
+  const contentSource='production-review:'+planId,slug='approved-platform-preview',variants={[s.account.platform]:payload},payloadHash=await approvalDigest({content_id:contentSource,slug,revision:1,title:payload.title,body:payload.body,variants});
+  const snapshot={schema_version:1,workspace:scope.workspace,account_id:scope.accountId,platform:s.account.platform,external_identity:s.account.external_identity,content_id:contentSource,slug,revision:1,content_row_id:contentId,payload_hash:payloadHash,payload,media,source_status:'MANUAL_UNVERIFIED',publication_authority:'UNCONFIGURED',production_plan:{id:planId,review_id:id,subject_fingerprint:input.expected_subject,approval_event_id:input.expected_event_id,manifest_hash:manifestHash,synthetic_only:true}};
+  const snapshotHash=await approvalDigest(snapshot);
+  try{await this.batch([...this.approvals.subjectGuards(s),this.approvals.latestGuard(id,input.expected_event_id),this.guard("EXISTS(SELECT 1 FROM sites_approval_events WHERE id=? AND kind='CONTENT_APPROVED' AND subject_fingerprint=?)",[input.expected_event_id,input.expected_subject]),
+   this.statement("INSERT INTO sites_contents VALUES(?,?,?,?,?,1,?,?,?,?, 'MANUAL_UNVERIFIED',?)",[contentId,scope.workspace,scope.accountId,contentSource,slug,payload.title,payload.body,JSON.stringify(variants),payloadHash,at]),
+   this.statement('INSERT INTO publisher_content_sources VALUES(?,?,?,?,?)',[scope.workspace,scope.accountId+'::'+contentSource+'::'+slug,'1',contentId,payloadHash]),
+   this.statement("INSERT INTO publisher_jobs VALUES(?,?,?,?,?,'DRAFT',NULL,?,?)",[jobId,scope.workspace,scope.accountId,contentId,snapshotHash,at,at]),this.statement('INSERT INTO sites_job_snapshots VALUES(?,?,?,?)',[jobId,scope.workspace,contentId,JSON.stringify(snapshot)]),
+   this.statement('INSERT INTO sites_upload_plans VALUES(?,?,?,?,?,?,?,?,?,?,?)',[planId,scope.workspace,scope.accountId,id,input.expected_subject,input.expected_event_id,contentId,jobId,manifestJson,manifestHash,at])]);}
+  catch(error){if(await this.one('SELECT 1 FROM sites_upload_plans WHERE id=?',[planId]))return respond(true);if(/CHECK constraint/.test(error.message))fail('PRODUCTION_APPROVAL_CHANGED');throw error;}
+  return respond(false);
+ }
+}

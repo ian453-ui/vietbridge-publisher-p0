@@ -3,3 +3,5 @@
 nav button:hover,nav button[aria-current]{background:#e2f0eb;color:#09574d}
 
 .review-asset{margin:18px 0;padding:12px;border:1px solid #dce6e2;border-radius:6px;overflow-wrap:anywhere}.review-asset img,.review-asset video{display:block;max-width:100%;max-height:300px;margin:10px auto}.review-asset code{display:block;word-break:break-all;font-size:11px}
+
+.checklist{margin:15px 0}.checklist label{flex-direction:row;align-items:center;margin:12px 0}.checklist input{width:18px;height:18px}#approval-controls button{margin:12px 8px 12px 0}#approval-controls{border-top:1px solid #dce6e2;padding-top:16px}#prepare-choice{max-width:100%}#preview-body>p{overflow-wrap:anywhere}

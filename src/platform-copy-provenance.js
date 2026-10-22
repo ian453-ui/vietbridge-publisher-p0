@@ -1,17 +1,11 @@
 import {createHash} from 'node:crypto';
 import {readFileSync,realpathSync,existsSync,statSync} from 'node:fs';
 import {resolve,relative,basename} from 'node:path';
-import {parse as parseYaml} from 'yaml';
 import {ContentLibrary,clientPublicPayload} from './publisher-core/content-library.ts';
-import {parseXhs} from './publisher-core/publication-payloads.ts';
+export {sourcePlatformPayload} from './platform-public-copy.js';
+import {sourcePlatformPayload} from './platform-public-copy.js';
 export const payloadDigest=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const bytesHash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
-export function sourcePlatformPayload(text,title,platform){
- let payload={title,body:text,tags:[]};
- if(['xiaohongshu','wechat_channels'].includes(platform)){const parsed=parseXhs(text),declared=text.match(/^(?:title|标题)\s*[:：]\s*(.+)$/mu)?.[1];payload={title:declared?.trim()||title,...parsed};}
- if(platform==='wechat_official_account'){const front=text.match(/^---\r?\n([\s\S]*?)\r?\n---/),meta=front?parseYaml(front[1]):{};payload={...payload,title:String(meta?.title||title),author:String(meta?.author||'驻越经营实录')};}
- return payload;
-}
 function within(path,root){const real=realpathSync(path),rel=relative(realpathSync(root),real);if(!rel||rel.startsWith('..')||rel.startsWith('/'))throw Error('source outside package');return real;}
 function matchingPayload(expected,actual){return ['body','title','author'].every(k=>String(expected[k]||'')===String(actual[k]||''))&&payloadDigest(expected.tags||[])===payloadDigest(actual.tags||[]);}
 const blocked=()=>({allowed:false,blockedReason:'目标平台稿件来源未核实；请重新选用明确平台稿或人工核对，不能沿用历史推测文案'});

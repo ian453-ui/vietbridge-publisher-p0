@@ -1,0 +1,138 @@
+{
+  "recorded_at": "2026-10-22T04:08:47.157401+00:00",
+  "base_commit": "0feb6c10e1451e036e1fc4aa9293cfced55f60c3",
+  "branch": "publisher-v3/cloud-slice-01",
+  "site_project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+  "site_delivery": "REGISTERED_NOT_DEPLOYED",
+  "environment": "Cloud development; SQLite via asynchronous D1 method shape; file-backed R2 method fixture; native ffmpeg/Pillow; Linux Chromium viewport emulation",
+  "logs": [
+    {
+      "name": "full",
+      "path": "/tmp/v3-slice-09-full.log",
+      "command": "node --test --test-concurrency=4 test/*.test.js",
+      "sha256": "d153a52cd37666e4b57a83dc72b2f66113451fe0c71fabe9300b88418a745869",
+      "counts": {
+        "tests": 1092,
+        "pass": 1069,
+        "fail": 23,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 82459.920832
+      },
+      "status": "FAILED_EXECUTABLE_CONFIGURATION"
+    },
+    {
+      "name": "full-final",
+      "path": "/tmp/v3-slice-09-full-final.log",
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/tmp/v3-slice-09-ui-final node --test --test-concurrency=4 test/*.test.js",
+      "sha256": "db57495378e86e6ef8dd9329f40d9be61cce29961ce814d09d09fde700efb07a",
+      "counts": {
+        "tests": 1092,
+        "pass": 1092,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 104612.497964
+      },
+      "status": "PASSED"
+    },
+    {
+      "name": "sites-final",
+      "path": "/tmp/v3-slice-09-sites-final.log",
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/tmp/v3-slice-09-ui-final node --test --test-concurrency=2 test/sites-*.test.js",
+      "sha256": "f074a92304201fd931c8f1adbf0c7bae275d90405a945fb517b418994ab23ca6",
+      "counts": {
+        "tests": 71,
+        "pass": 71,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 15107.585342
+      },
+      "status": "PASSED"
+    }
+  ],
+  "syntax": {
+    "count": 20,
+    "passed": true,
+    "files": [
+      "src/platform-copy-provenance.js",
+      "src/platform-public-copy.js",
+      "src/production-approval-policy.js",
+      "src/production-approval-store.js",
+      "src/publisher-core/publication-payloads.ts",
+      "src/publisher-platform-policy.js",
+      "src/publisher-platforms.js",
+      "src/sites/async-approval-store.js",
+      "src/sites/async-synthetic-executor.js",
+      "src/sites/async-upload-plans.js",
+      "src/sites/cloud-authoring-api.js",
+      "src/sites/cloud-console.js",
+      "test/fixtures/sites-approval.js",
+      "test/fixtures/sites-cloud-d1.js",
+      "test/fixtures/sites-evidence.js",
+      "test/sites-async-approval.test.js",
+      "test/sites-async-synthetic-executor.test.js",
+      "test/sites-async-upload-plans.test.js",
+      "test/sites-cloud-console-ui.test.js",
+      "test/sites-handoff-api.test.js"
+    ]
+  },
+  "server_graph": {
+    "local_modules": 14,
+    "native_imports": 0,
+    "bundled_dependencies": [
+      "yaml"
+    ]
+  },
+  "screenshots": [
+    {
+      "path": "docs/evidence/v3-slice-09/mobile-approved-platform-plan.png",
+      "sha256": "75e34361878bb37970d9112c8e2414d141215e55e61e259e937ba4e49e72c634",
+      "synthetic_only": true
+    },
+    {
+      "path": "docs/evidence/v3-slice-09/desktop-approved-platform-plan.png",
+      "sha256": "858f78987e73659455afc3e00c073b8d0064082144c782c9bde7a5a7cc4cf77f",
+      "synthetic_only": true
+    },
+    {
+      "path": "docs/evidence/v3-slice-09/mobile-revoked-plan.png",
+      "sha256": "5e50c2a83eec4f7f0f248822d7c37ff5bcb4f208ee6401b22819506949bcdcf1",
+      "synthetic_only": true
+    },
+    {
+      "path": "docs/evidence/v3-slice-09/desktop-revoked-plan.png",
+      "sha256": "ef0d678debce9ac9dd737619a9f7e67771e9c6fb610c5b5b887c944284b7f1cb",
+      "synthetic_only": true
+    }
+  ],
+  "observed_failures": [
+    {
+      "run": "full",
+      "reason": "Missing pre-existing Linux executable overrides; legacy fixtures defaulted to Mac Chrome/Homebrew ffmpeg or absent chrome distribution. No source/permission relaxation; rerun with installed paths passed."
+    }
+  ],
+  "external": {
+    "real_social_logins": 0,
+    "real_publications": 0,
+    "real_messages": 0,
+    "credential_creation": 0,
+    "drive_download_attempts": 0,
+    "original_deletions": 0,
+    "site_creation_attempts": 0,
+    "site_deployment_attempts": 0,
+    "hosted_d1_r2_verified": false,
+    "browser_outside_requests": 0
+  },
+  "limitations": [
+    "No real admin/source/inspection provider is installed; only test fixtures inject trusted bindings.",
+    "No per-tenant individual RBAC. Changed content invalidates on next read/decision.",
+    "Native real permits/quotas retained, not ported as live async executor.",
+    "Official Sites starter/helpers remain unavailable; no repeated blocked resource reads.",
+    "Original Study ZIP 403 was not retried; real consumption remains unverified."
+  ]
+}

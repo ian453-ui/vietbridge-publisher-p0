@@ -1,6 +1,9 @@
 import {createSitesReadonlyApi} from './readonly-api.js';
 import {createSitesScopeResolver} from './membership.js';
 import {AsyncReviewStore} from './async-review-store.js';
+import {AsyncApprovalStore} from './async-approval-store.js';
+import {AsyncUploadPlans} from './async-upload-plans.js';
+import {requireProductionAdmin} from '../production-approval-policy.js';
 import {AsyncMetricStore} from './async-metric-store.js';
 import {authorizationGuard,authorizationChanged} from './async-storage.js';
 
@@ -25,9 +28,10 @@ async function readInput(request){
 
 /** Portable Worker/D1 business boundary. No identity parser or fake hosted auth.
  * The official Sites server adapter supplies getTrustedIdentity per request.
- * All publication, approval, upload, credential and interaction routes stay shut.
+ * Only server-resolved existing admins can decide/prepare synthetic review snapshots.
+ * Publication, upload, credential and interaction routes stay shut.
  */
-export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=null,now=()=>new Date().toISOString()}={}){
+export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=null,resolveApprovalAuthority=null,now=()=>new Date().toISOString()}={}){
  const statement=(sql,args=[])=>db.prepare(sql).bind(...args);
  async function rows(sql,args=[]){const result=await statement(sql,args).all();if(result.success===false||!Array.isArray(result.results))fail('STORAGE_UNAVAILABLE',503);return result.results;}
  async function one(sql,args=[]){return (await rows(sql,args))[0]||null;}
@@ -55,6 +59,23 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
    const identity=await getTrustedIdentity(request);if(!identity||!text(identity.userId,300))fail('IDENTITY_REQUIRED',401);const userId=identity.userId;
    if(url.pathname.startsWith('/api/unified/'))return createSitesReadonlyApi({db,origin,resolveScope:createSitesScopeResolver({db,getTrustedIdentity:async()=>identity})})(request);
    if(!['GET','POST'].includes(request.method))fail('METHOD_NOT_ALLOWED',405);
+   const handoff=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/(reviews|plans)\/([a-f0-9]{64})(?:\/(approval|prepare))?$/);
+   if(handoff&&(handoff[2]==='plans'||handoff[4])){
+    const [,workspace,resource,id,action]=handoff,accountId=url.searchParams.get('accountId'),scope={workspace,accountId};await account(userId,workspace,accountId);
+    const options={bucket,authorization:{userId,workspace,accountId}},approvals=new AsyncApprovalStore(db,options),plans=new AsyncUploadPlans(db,options);
+    // The resolver is installed by a server adapter, never by client input.
+    const authority=typeof resolveApprovalAuthority==='function'?await resolveApprovalAuthority(request,identity,scope):null;let admin=false;try{requireProductionAdmin(authority);admin=true;}catch{}
+    if(request.method==='POST'){
+     if(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site')fail('ORIGIN_DENIED',403);
+     if(!admin)fail('APPROVAL_ADMIN_REQUIRED',403);const input=await readInput(request);
+     if(resource==='reviews'&&action==='approval')return response(200,await approvals.decide(id,input,scope,{authority}));
+     if(resource==='reviews'&&action==='prepare')return response(200,await plans.prepare(id,input,scope,{authority}));
+     fail('METHOD_NOT_ALLOWED',405);
+    }
+    if(resource==='plans'&&!action)return response(200,await plans.view(id,scope));
+    if(resource==='reviews'&&action==='approval'){const approval=await approvals.view(id,scope,{admin});return response(200,{...approval,choices:approval.can_decide?await plans.choices(id,scope):[]});}
+    fail('METHOD_NOT_ALLOWED',405);
+   }
    const evidenceRoute=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/(reviews|metrics)(?:\/([a-f0-9]{64})(?:\/(history|assets\/([^/]+)\/([^/]+)))?)?$/);
    if(evidenceRoute){
     if(request.method!=='GET')fail('METHOD_NOT_ALLOWED',405);const [,workspace,resource,id,tail,source,artifact]=evidenceRoute,accountId=url.searchParams.get('accountId');await account(userId,workspace,accountId);
@@ -63,7 +84,7 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
     if(source){const asset=await store.asset(workspace,accountId,id,decodeURIComponent(source),decodeURIComponent(artifact));return new Response(asset.data,{headers:{'Content-Type':asset.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Length':String(asset.data.byteLength)}});}
     return response(200,id?await store.detail(workspace,accountId,id):await store.list(workspace,accountId,{cursor:url.searchParams.get('cursor')||''}));
    }
-   if(request.method==='GET'&&url.pathname==='/api/sites/capabilities')return response(200,{...flags,mode:'SITES_CLOUD_AUTHORING',persistence:'D1',content_status:'MANUAL_UNVERIFIED',platforms:cloudPlatforms,implemented:['workspace_create','account_mapping_create','content_version_create','task_freeze','scoped_persistent_reads','review_snapshot_reads','metric_ledger_reads'],unavailable:['real_producer_transport','media_decode','archive_resolve','content_approval','external_upload','publish','group_post','reply','direct_message','live_metrics']});
+   if(request.method==='GET'&&url.pathname==='/api/sites/capabilities')return response(200,{...flags,mode:'SITES_CLOUD_AUTHORING',persistence:'D1',content_status:'MANUAL_UNVERIFIED',platforms:cloudPlatforms,implemented:['workspace_create','account_mapping_create','content_version_create','task_freeze','scoped_persistent_reads','review_snapshot_reads','metric_ledger_reads','content_decision_receipts','approved_platform_preparation'],unavailable:['real_producer_transport','media_decode','archive_resolve','real_admin_approval_provider','external_upload','publish','group_post','reply','direct_message','live_metrics']});
    if(request.method==='GET'&&url.pathname==='/api/sites/workspaces')return response(200,{workspaces:await rows('SELECT id,name,created_at FROM sites_workspaces WHERE owner_user_id=? ORDER BY created_at,id LIMIT 200',[userId]),...flags});
    if(request.method==='POST'){
     if(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site')fail('ORIGIN_DENIED',403);
@@ -104,7 +125,7 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
     ]);return response(200,{...result,payload_hash:payloadHash,...flags});
    }
    exact(input,['command_id','account_id','content_id','expected_payload_hash']);if(!uuid(input.command_id))fail('INVALID_COMMAND_ID',400);const a=await account(userId,workspace,input.account_id),content=await one('SELECT * FROM sites_contents WHERE workspace=? AND account_id=? AND id=?',[workspace,input.account_id,input.content_id]);
-   if(!content)fail('CONTENT_NOT_FOUND',404);if(content.payload_hash!==input.expected_payload_hash)fail('CONTENT_CHANGED');const variant=JSON.parse(content.variants_json)[a.platform];if(!variant)fail('EXPLICIT_PLATFORM_VARIANT_REQUIRED');
+   if(!content)fail('CONTENT_NOT_FOUND',404);if(await one('SELECT 1 FROM sites_upload_plans WHERE content_id=?',[content.id]))fail('BOUND_REVIEW_TASK_REQUIRED');if(content.payload_hash!==input.expected_payload_hash)fail('CONTENT_CHANGED');const variant=JSON.parse(content.variants_json)[a.platform];if(!variant)fail('EXPLICIT_PLATFORM_VARIANT_REQUIRED');
    const snapshot={schema_version:1,workspace,account_id:a.account_id,platform:a.platform,external_identity:a.external_identity,content_id:content.content_id,slug:content.slug,revision:content.revision,content_row_id:content.id,payload_hash:content.payload_hash,payload:variant,media:[],source_status:content.source_status,publication_authority:'UNCONFIGURED'};
    await assertCommandCompatible(userId,'TASK',{...input,workspace});
    const snapshotHash=await cloudDigest(snapshot),existing=await one('SELECT id,state FROM publisher_jobs WHERE workspace=? AND account_id=? AND content_id=? AND snapshot_hash=?',[workspace,a.account_id,content.id,snapshotHash]);
@@ -113,6 +134,6 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
     statement("INSERT INTO publisher_jobs SELECT c.entity_id,?,?,?,?,'DRAFT',NULL,?,?"+winning+' ON CONFLICT(id) DO NOTHING',[workspace,a.account_id,content.id,snapshotHash,at,at,...bound(c)]),
     statement('INSERT INTO sites_job_snapshots SELECT c.entity_id,?,?,?'+winning+' ON CONFLICT(job_id) DO NOTHING',[workspace,content.id,JSON.stringify(snapshot),...bound(c)])
    ]);return response(200,{...result,state:'DRAFT',snapshot_hash:snapshotHash,...flags});
-  }catch(error){const known={'STORAGE_SCOPE_DENIED':403,'METRIC_NOT_FOUND':404,'REVIEW_NOT_FOUND':404,'REVIEW_ASSET_NOT_FOUND':404,'OBJECT_NOT_FOUND':404,'METRIC_CURSOR_INVALID':400,'METRIC_AS_OF_INVALID':400,'REVIEW_CURSOR_INVALID':400,'OBJECT_MISSING':503,'OBJECT_IO_TIMEOUT':503,'OBJECT_CORRUPT':503,'OBJECT_INTEGRITY_MISMATCH':503,'R2_BINDING_REQUIRED':503,'REVIEW_STORAGE_CORRUPT':503,'METRIC_STORAGE_CORRUPT':503},status=error.status||known[error.message]||503;return response(status,{error:error.status||known[error.message]?error.message:'SITES_STORAGE_UNAVAILABLE',...flags});}
+  }catch(error){const known={'STORAGE_SCOPE_DENIED':403,'METRIC_NOT_FOUND':404,'REVIEW_NOT_FOUND':404,'REVIEW_ASSET_NOT_FOUND':404,'OBJECT_NOT_FOUND':404,'METRIC_CURSOR_INVALID':400,'METRIC_AS_OF_INVALID':400,'REVIEW_CURSOR_INVALID':400,'OBJECT_MISSING':503,'OBJECT_IO_TIMEOUT':503,'OBJECT_CORRUPT':503,'OBJECT_INTEGRITY_MISMATCH':503,'R2_BINDING_REQUIRED':503,'REVIEW_STORAGE_CORRUPT':503,'METRIC_STORAGE_CORRUPT':503},handoffError=/^(APPROVAL_|PRODUCTION_|PRODUCER_AUTH_UNAVAILABLE|ACCOUNT_TARGET_CHANGED|STALE_REVIEW_VERSION|SOURCE_PROVIDER_UNAVAILABLE|SYNTHETIC_PROVENANCE_INVALID|TARGET_IDENTITY_UNKNOWN|ENTERPRISE_SOURCE_APPROVAL_FORBIDDEN)/.test(error.message),status=error.status||known[error.message]||(handoffError?409:503);return response(status,{error:error.status||known[error.message]||handoffError?error.message:'SITES_STORAGE_UNAVAILABLE',...flags});}
  };
 }

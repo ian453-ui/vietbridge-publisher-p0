@@ -1,4 +1,6 @@
 import {createHash,randomUUID} from 'node:crypto';
+import {productionReviewChecks,requireProductionAdmin,validateProductionDecision,approvalIdentityFields} from './production-approval-policy.js';
+export {productionReviewChecks} from './production-approval-policy.js';
 import {verifyProductionRequest,productionResultFingerprint,PRODUCTION_BATCH_LIMITS} from './production-artifact-contract.js';
 import {publishingPlatforms} from './publisher-platforms.js';
 import {sourceEvidenceState,approvalSourceChanged,bindApprovalSource} from './production-source-state.js';
@@ -7,8 +9,6 @@ const fail=code=>{throw Error(code);};
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const canonical=x=>Array.isArray(x)?x.map(canonical):x&&typeof x==='object'?Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])])):x;
 const digest=x=>hash(JSON.stringify(canonical(x)));
-const exact=(x,keys)=>{if(!x||Array.isArray(x)||typeof x!=='object'||Object.keys(x).length!==keys.length||keys.some(k=>!Object.hasOwn(x,k)))fail('APPROVAL_COMMAND_INVALID');};
-export const productionReviewChecks=Object.freeze(['CONTENT_FACTS','VISUAL_QA','VIDEO_PLAYBACK_AND_SUBTITLE_ALIGNMENT','ORIGINAL_SOURCE_REVIEW']);
 const flags={publish_allowed:false,import_allowed:false,source_gate_satisfied:false,producer_authenticated:false};
 
 /** Content decisions only. No production producer-authentication or publication authority. */
@@ -32,7 +32,7 @@ export class ProductionApprovalStore {
  }
  accountHash(workspace,accountId){
   const row=this.db.prepare('SELECT * FROM facebook_accounts WHERE workspace=? AND id=?').get(workspace,accountId);if(!row)fail('APPROVAL_SCOPE_DENIED');
-  return digest(Object.fromEntries(['id','workspace','platform','external_id','operator_actor_id','target_page_id','identity_type','expected_identity','profile_id','publisher_transport','publisher_options_json','enabled'].map(k=>[k,row[k]??null])));
+  return digest(Object.fromEntries(approvalIdentityFields.map(k=>[k,row[k]??null])));
  }
  latest(id){return this.db.prepare('SELECT * FROM production_approval_events WHERE review_id=? ORDER BY sequence DESC LIMIT 1').get(id)||null;}
  append(id,fingerprint,kind,actorId,reason,checks={},now=Date.now()){
@@ -81,10 +81,7 @@ export class ProductionApprovalStore {
   return {state:subject.blocked?(latest?.kind==='REVOKED'?'REVOKED':'BLOCKED'):(latest?.kind||'PENDING'),blocked_reason:subject.blocked,subject_fingerprint:subject.fingerprint,latest_event_id:latest?.id||null,target_platforms:subject.target_platforms,provenance:subject.provenance,source_verification:subject.source_verification,can_decide:admin&&!subject.blocked,required_checks:productionReviewChecks,history:events.slice(0,100),history_truncated:events.length>100,...flags};
  });}
  decide(id,input,scope,{authority,now=Date.now()}={}){
-  if(authority?.kind!=='EXISTING_ADMIN'||!/^admin:[a-f0-9]{64}$/.test(authority.actor_id||''))fail('APPROVAL_ADMIN_REQUIRED');
-  exact(input,['command_id','decision','expected_subject','expected_event_id','reason','checks','confirmation']);exact(input.checks,productionReviewChecks);
-  if(!/^[a-f0-9-]{36}$/.test(input.command_id||'')||!['APPROVE','REJECT'].includes(input.decision)||!/^([a-f0-9]{64})$/.test(input.expected_subject||'')||input.expected_event_id!==null&&!/^[a-f0-9-]{36}$/.test(input.expected_event_id)||typeof input.reason!=='string'||input.reason.trim()!==input.reason||input.reason.length>1000||input.decision==='REJECT'&&!input.reason||productionReviewChecks.some(k=>typeof input.checks[k]!=='boolean')||input.confirmation!=='CONTENT_ONLY')fail('APPROVAL_COMMAND_INVALID');
-  if(input.decision==='APPROVE'&&productionReviewChecks.some(k=>!input.checks[k]))fail('APPROVAL_CHECKLIST_REQUIRED');
+  requireProductionAdmin(authority);validateProductionDecision(input);
   // A denial still commits any newly discovered invalidation; no approval command is recorded.
   const outcome=this.tx(()=>{
    const subject=this.reconcile(id,scope,now);if(subject.blocked)return {denied:subject.blocked};if(subject.fingerprint!==input.expected_subject)return {denied:'APPROVAL_STALE_SUBJECT'};
