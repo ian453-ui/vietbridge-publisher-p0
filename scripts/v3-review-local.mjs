@@ -1,9 +1,11 @@
-import {readFileSync} from 'node:fs';
+import {existsSync,readFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {createApp} from '../src/server.js';
 const directory=resolve(process.argv[2]||'');
 const demo=JSON.parse(readFileSync(join(directory,'demo.json'),'utf8'));
 if(demo.synthetic_only!==true||demo.dbPath!==join(directory,'publisher-unified.sqlite'))throw Error('SYNTHETIC_DEMO_REQUIRED');
-const server=createApp(demo.dbPath,{unified:true,executionEnabled:false,scanScheduler:false});
+const acceptanceFile=join(directory,'acceptance-demo.json'),acceptance=existsSync(acceptanceFile)?JSON.parse(readFileSync(acceptanceFile,'utf8')):null;
+if(acceptance&&(acceptance.synthetic_only!==true||acceptance.dbPath!==demo.dbPath||acceptance.libraryRoot!==join(directory,'synthetic-library')||acceptance.snapshotRoot!==join(directory,'synthetic-library-snapshots')))throw Error('SYNTHETIC_DEMO_REQUIRED');
+const server=createApp(demo.dbPath,{unified:true,executionEnabled:false,scanScheduler:false,...(acceptance?{library:{roots:[acceptance.libraryRoot],snapshotRoot:acceptance.snapshotRoot,gptInboxBase:null}}:{})});
 server.listen(0,'127.0.0.1',()=>console.log(JSON.stringify({url:'http://127.0.0.1:'+server.address().port,synthetic_only:true,executionEnabled:false})));
 for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>server.close());

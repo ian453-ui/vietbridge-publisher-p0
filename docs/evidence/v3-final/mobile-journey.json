@@ -1,0 +1,24 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "steps": [
+    "two distinct full IDs sharing 074, complete image/text preview, separate platform copy, per-account task queues, missing-platform account blocks creation",
+    "original Tabs render without browser errors; navigation is not proof of live business completion",
+    "ZIP multipart resolve + hash/image/full video decode, browser playback, explicit admin decision + durable readback, current unavailable views and separate reach",
+    "customer/account isolation, three original DRAFT jobs unchanged, zero adapter calls or external browser requests"
+  ],
+  "external": [],
+  "errors": [],
+  "writes": [
+    "/auth/login",
+    "/api/unified/workspaces/ws-b72101ef-ae44-404c-b2d7-2264376212dc/accounts/select",
+    "/api/unified/workspaces/ws-b72101ef-ae44-404c-b2d7-2264376212dc/accounts/select",
+    "/api/production-reviews/24a04d5926c5f3a6bf8e1417dd359e6d44a64f977044d7a583fb9c8f405dd8ce/decision",
+    "/api/unified/workspaces/ws-b72101ef-ae44-404c-b2d7-2264376212dc/accounts/select"
+  ],
+  "adapterCalls": 0,
+  "realPlatformVerified": false,
+  "syntheticOnly": true
+}

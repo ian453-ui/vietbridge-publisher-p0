@@ -159,3 +159,13 @@ work. Separate current executed tests, synthetic/local tests and unverified live
 platforms. Historical 934/934 is never a current test result. No merge, production
 service change, credential creation, purchase or real external interaction is
 part of cloud acceptance.
+
+## Final bounded development acceptance
+
+[The final acceptance matrix](v3-final-acceptance.md) records the 2026-10-22
+executed desktop/mobile integration, complete regression, screenshots, local demo
+and remaining implementation gaps across the full business chain. The four slices
+are a development increment; direct messaging, full human handoff, authenticated
+producer transport, archive-to-uploader handoff, live metric adapters and automated
+metric-to-production iteration are not completed by these slices. No new live
+authorization, merge or deployment follows from passing synthetic tests.

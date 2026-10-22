@@ -1,0 +1,97 @@
+{
+  "date": "2026-10-22",
+  "baseline": "4455a4b1faf40fedcd7020636999e165fa4a1386",
+  "previous_commit": "a598d4f5065acc9badd7247f98d8fa2b6d54eab0",
+  "branch": "publisher-v3/cloud-slice-01",
+  "commands": {
+    "full_regression": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_ACCEPTANCE_EVIDENCE_DIR=/tmp/v3-final-evidence node --test --test-concurrency=4 test/*.test.js",
+    "integrated_journey": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_ACCEPTANCE_EVIDENCE_DIR=/tmp/v3-final-evidence node --test test/v3-acceptance-journey.test.js",
+    "demo_create": "node scripts/v3-acceptance-demo.mjs /tmp/publisher-v3-final-demo",
+    "demo_serve": "node scripts/v3-review-local.mjs /tmp/publisher-v3-final-demo"
+  },
+  "full_regression": {
+    "tests": 999,
+    "pass": 999,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "duration_ms": 78388.535914
+  },
+  "integrated_journey": {
+    "tests": 2,
+    "pass": 2,
+    "fail": 0,
+    "duration_ms": 13009.208619
+  },
+  "mobile_before_fix": {
+    "tests": 1,
+    "pass": 0,
+    "fail": 1,
+    "reason": "review text, hashes and metric evidence must wrap within their panel"
+  },
+  "syntax": {
+    "javascript_files": 331,
+    "python_files": 1,
+    "errors": []
+  },
+  "demo_smoke": {
+    "demo_created": true,
+    "loopback_only": true,
+    "media_status": 200,
+    "media_bytes": 7281,
+    "approval_state": "PENDING",
+    "can_decide": false,
+    "metric_series": 2,
+    "execution_enabled": false,
+    "real_platform_actions": false
+  },
+  "log_evidence": {
+    "full_regression": {
+      "local_path": "/tmp/v3-final-full.log",
+      "sha256": "61198f986d2a26be5675a868c450a194094b66e8bfdd897df549d1af62b1c830"
+    },
+    "integrated_journey": {
+      "local_path": "/tmp/v3-final-journey-accepted.log",
+      "sha256": "aa7095fac1b9e40d2a194436997f586dba4d3764aaf1276c7680c9d5ab3f21a2"
+    },
+    "mobile_overflow_before_fix": {
+      "local_path": "/tmp/v3-final-mobile-before.log",
+      "sha256": "d09a1ab4634b366506fde02dd9e98422e92ebc154d48d23477389732783bc1dd"
+    },
+    "syntax": {
+      "local_path": "/tmp/v3-final-syntax.json",
+      "sha256": "9b5e09036cf1f5a9c828ff5574bfcab451d2a19322a118c36ae7777324c2d7e1"
+    },
+    "combined_demo_create": {
+      "local_path": "/tmp/v3-final-demo-create.log",
+      "sha256": "eeba20c35cc9bdfcb0be2fe63f553a5f41a4186ae99396e9ab0b1f8297fb78de"
+    },
+    "combined_demo_read_only_smoke": {
+      "local_path": "/tmp/v3-final-demo-smoke.log",
+      "sha256": "1ff1bf8f59ed8c850c57acb9b2302de0a2cacb092d1fe82de7f9f3a54af27b32"
+    }
+  },
+  "tested_code_sha256": {
+    "src/styles.css": "cf405ef16af72daab0ee1bc726a93aeb3de881887c938c35c8db40d56d8f4544",
+    "scripts/v3-review-local.mjs": "37b4fd21d8d357dec3ab8c52bb6f6a7b6d3bb5fc8921e1dccb2ff9075f7c5b03",
+    "scripts/v3-acceptance-demo.mjs": "ffb41ed2b44993e802485612cd8405b7b191a76b382d24a9541c70420e2c32b4",
+    "test/v3-acceptance-journey.test.js": "34d6843e4fc209d99e44f9a6e7b911cb9a58b928281e87e8ad95a980658b0495"
+  },
+  "artifacts": {
+    "docs/evidence/v3-final/desktop-approval.png": "4a0596a4873d41b03753bbb382464d58f98175236ddf5e9f5dbd88b44881cb97",
+    "docs/evidence/v3-final/desktop-archive-video.png": "8d3cf26d280389baa2f72b8bd2825e22aea3c8f2e069f34a0c39c7905b64bd05",
+    "docs/evidence/v3-final/desktop-journey.json": "010cce1308d0007a103ff357c185920075a2edd2781165ef7ebcd9b484ca7586",
+    "docs/evidence/v3-final/desktop-legacy-preview.png": "f85c28e958ef5ff468f207ff7930e7ced021742bbdb4c71339dd55d069152051",
+    "docs/evidence/v3-final/desktop-metrics.png": "d5588d5060564bc944123bb75cec7456c0e6178810c02d55209c11f8a70e23f3",
+    "docs/evidence/v3-final/mobile-approval.png": "48a581a7b5bef9daa7fb4d719f8b171c1da28a4d4f78878ea4e6bc413901050a",
+    "docs/evidence/v3-final/mobile-archive-video.png": "1b78d47313dbc2f395062c01eee0416b21c65a98ccfc6db9d692056d92486429",
+    "docs/evidence/v3-final/mobile-journey.json": "0e01deae389e74c7e6e0bc2bd325228b224ec5e9f8e51a7024331d227a7fe61d",
+    "docs/evidence/v3-final/mobile-legacy-preview.png": "7a7d79b548471c7b969737f2d82c4b3650331c05e125d5f8bb820dfbdcedbfa7",
+    "docs/evidence/v3-final/mobile-metrics.png": "0701686c550324acce95b39cca1d5fc5f238db5e26a35abe6b09a07a201daff6"
+  },
+  "real_platform_verified": false,
+  "real_sample_transfer_attempted_this_pass": false,
+  "deployed": false,
+  "merged": false,
+  "independent_review": "Parent reported static review; reviewer did not rerun the tests."
+}
