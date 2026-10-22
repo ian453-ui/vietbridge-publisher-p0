@@ -28,7 +28,7 @@ export async function ingestArchiveProduction(request,manifest,{resolver,reviewS
  if(selected.length>PRODUCTION_BATCH_LIMITS.artifacts||videos>PRODUCTION_BATCH_LIMITS.videos||bytes>PRODUCTION_BATCH_LIMITS.bytes||transferBytes>256*1024*1024)fail('ARCHIVE_BATCH_BUDGET_EXCEEDED');
  // All manifest budgets and identity bindings above precede transport or external tools.
  reviewStore.scope(request.workspace,request.account_id);
- const root=mkdtempSync(join(tmpdir(),'publisher-archive-intake-')),leases=[],deadlineAt=performance.now()+30000;
+ const root=mkdtempSync(join(tmpdir(),'publisher-archive-intake-')),leases=[],deadlineAt=performance.now()+30000,cleanup=[];let receipt,primaryError;
  try{
   const selections=manifest.items.map(item=>({source_id:item.source_id,files:[]}));
   for(const [index,item] of selected.entries()){
@@ -45,10 +45,12 @@ export async function ingestArchiveProduction(request,manifest,{resolver,reviewS
   if(performance.now()>deadlineAt)fail('ARCHIVE_BATCH_TIME_LIMIT');
   const remaining=()=>{const left=Math.floor(deadlineAt-performance.now());if(left<1)fail('ARCHIVE_BATCH_TIME_LIMIT');return Math.min(left,30000);};
   const result=packageProductionResult(request,selections,{root,now:completedAt,wallMs:remaining()});
-  const receipt=reviewStore.ingest(request,result,{root,now,wallMs:remaining()});
-  return {...receipt,archive_members:selected.length,originals_deleted:false,upload_input:'EXTRACTED_LOCAL_MEDIA',producer_authenticated:false};
+  receipt=reviewStore.ingest(request,result,{root,now,wallMs:remaining()});
+ }catch(error){primaryError=error;
  }finally{
-  try{for(const lease of leases)resolver.release(lease.id,{binding:lease.binding});}
-  finally{rmSync(root,{recursive:true,force:true});}
+  for(const lease of leases){try{resolver.release(lease.id,{binding:lease.binding});}catch{cleanup.push({operation:'LEASE_RELEASE',lease_id:lease.id,reason:'RELEASE_FAILED_RECONCILE'});}}
+  try{rmSync(root,{recursive:true,force:true});}catch{cleanup.push({operation:'STAGING_REMOVAL',reason:'STAGING_CLEANUP_FAILED_RECONCILE'});}
  }
+ if(primaryError){primaryError.cleanup_pending=cleanup;throw primaryError;}
+ return {...receipt,archive_members:selected.length,originals_deleted:false,upload_input:'EXTRACTED_LOCAL_MEDIA',producer_authenticated:false,cleanup_status:cleanup.length?'RECONCILE_PENDING':'COMPLETE',cleanup_pending:cleanup};
 }

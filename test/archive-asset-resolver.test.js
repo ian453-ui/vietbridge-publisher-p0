@@ -13,6 +13,15 @@ function setup(t,fixture=archiveFixture(),options={}){
  let calls=0;const resolver=new ArchiveAssetResolver({root:join(root,'cache'),fetchPart:async input=>{calls++;return fixture.fetchPart(input);},...options});t.after(()=>resolver.close());
  return {root,resolver,...fixture,calls:()=>calls};
 }
+test('transient cached validation budgets leave correct bytes retryable without sweep or transfer',async t=>{
+ const f=setup(t),first=await f.resolver.resolve(f.reference,{binding});f.resolver.release(first.lease_id,{binding});const validate=f.resolver.entryArtifact.bind(f.resolver),calls=f.calls();
+ for(const code of ['VIDEO_VALIDATION_RESOURCE_LIMIT','ARTIFACT_BATCH_TIME_LIMIT','ARCHIVE_BATCH_TIME_LIMIT','IMAGE_DECODE_INVALID_OR_RESOURCE_LIMIT']){
+  f.resolver.entryArtifact=()=>{throw Error(code);};await assert.rejects(()=>f.resolver.resolve(f.reference,{binding}),new RegExp(code));
+  assert.equal(f.resolver.db.prepare('SELECT state FROM archive_cache WHERE key=?').get(first.cache_key).state,'READY');assert.equal(f.resolver.db.prepare('SELECT count(*) n FROM archive_leases').get().n,0);
+  f.resolver.entryArtifact=validate;const retry=await f.resolver.resolve(f.reference,{binding});assert.equal(retry.sha256,first.sha256);f.resolver.release(retry.lease_id,{binding});
+ }
+ assert.equal(f.calls(),calls);
+});
 test('manifest-selected multipart ZIP yields real decoded video and scope-bound persistent leases',async t=>{
  const f=setup(t,archiveFixture([{name:'074-trade/video.mp4',data:syntheticVideo()}],{kind:'video',member:'074-trade/video.mp4',split:3}));
  const first=await f.resolver.resolve(f.reference,{binding});assert.equal(first.validation.level,'VIDEO_DECODED');assert.equal(first.status,'MATERIALIZED');assert.equal(first.publish_allowed,false);assert.ok(!first.path.includes('.zip'));assert.equal(sha256(readFileSync(join(first.root,first.path))),f.reference.sha256);assert.equal(f.calls(),3);

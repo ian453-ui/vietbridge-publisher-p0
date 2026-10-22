@@ -100,7 +100,12 @@ export class ArchiveAssetResolver {
   try{
    const actual=verified||this.entryArtifact(key,reference,{wallMs:remaining(30000)});remaining(30000);
    return {status:'MATERIALIZED',root:this.root,path:`entries/${key}/media${extension}`,sha256:actual.sha256,bytes:actual.bytes,validation:actual.validation,lease_id:leaseId,cache_key:key,reference,scope_status:'CALLER_BOUND',publish_allowed:false,delete_original_allowed:false};
-  }catch(error){this.tx(()=>{this.db.prepare('DELETE FROM archive_leases WHERE id=?').run(leaseId);this.db.prepare("UPDATE archive_cache SET state='CORRUPT' WHERE key=?").run(key);});throw error;}
+  }catch(error){this.tx(()=>{
+   this.db.prepare('DELETE FROM archive_leases WHERE id=?').run(leaseId);
+   // A budget/tool failure establishes no corruption. Keep READY, but revalidate on every use.
+   const damaged=['ARCHIVE_CACHE_CORRUPT','ARTIFACT_HASH_MISMATCH','ARTIFACT_CHANGED_DURING_READ','INVALID_ARTIFACT_SIZE','VIDEO_DECODE_INVALID','VIDEO_PROBE_INVALID','VIDEO_METADATA_OR_LIMIT_INVALID','VIDEO_STREAMS_UNSUPPORTED','VIDEO_EMPTY_OR_EXCESSIVE_FRAMES'].includes(error.message)||['ENOENT','ENOTDIR','ELOOP'].includes(error.code);
+   if(damaged)this.db.prepare("UPDATE archive_cache SET state='CORRUPT' WHERE key=?").run(key);
+  });throw error;}
  }
  lease(leaseId,binding,requireReady=true){
   if(typeof leaseId!=='string')fail('ARCHIVE_LEASE_INVALID');

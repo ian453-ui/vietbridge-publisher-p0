@@ -23,6 +23,21 @@ test('real synthetic ZIP parts -> selected media -> existing production Review l
   }finally{resolver.close();}
  }finally{db.close();}
 });
+
+test('first or second lease release failure still attempts every release and preserves committed receipt',async t=>{
+ const root=mkdtempSync(join(tmpdir(),'v3-archive-cleanup-'));t.after(()=>rmSync(root,{recursive:true,force:true}));const out=join(root,'demo'),demo=await v3ArchiveDemo(out),db=new DatabaseSync(demo.dbPath),request=JSON.parse(readFileSync(join(out,'archive-request.json'))),manifest=JSON.parse(readFileSync(demo.archive_manifest));
+ const real=new ArchiveAssetResolver({root:join(out,'archive-hot-cache'),fetchPart:()=>{throw Error('unexpected transfer')}}),reviewStore=new ProductionReviewStore(db);
+ try{for(const failAt of [0,1]){
+  db.prepare('DELETE FROM production_review_assets WHERE review_id=?').run(demo.archive_receipt.id);db.prepare('DELETE FROM production_reviews WHERE id=?').run(demo.archive_receipt.id);
+  const visited=[];let retained;
+  const resolver={resolve:(...args)=>real.resolve(...args),release:(id,scope)=>{visited.push(id);if(visited.length-1===failAt){retained={id,scope};throw Error('SYNTHETIC_RELEASE_FAILURE');}real.release(id,scope);}};
+  const receipt=await ingestArchiveProduction(request,manifest,{resolver,reviewStore});
+  assert.equal(receipt.status,'REVIEW_REQUIRED');assert.equal(receipt.cleanup_status,'RECONCILE_PENDING');assert.equal(receipt.cleanup_pending.length,1);assert.equal(visited.length,10);
+  assert.equal(db.prepare('SELECT count(*) n FROM production_reviews WHERE id=?').get(receipt.id).n,1);assert.equal(db.prepare('SELECT count(*) n FROM production_review_assets WHERE review_id=?').get(receipt.id).n,10);
+  assert.equal(db.prepare('SELECT count(*) n FROM publisher_jobs').get().n,0);assert.equal((await ingestArchiveProduction(request,manifest,{resolver:real,reviewStore})).status,'DUPLICATE');
+  real.release(retained.id,retained.scope);
+ }}finally{real.close();db.close();}
+});
 test('full manifest scope and aggregate budgets are checked before transport or review mutation',async t=>{
  const root=mkdtempSync(join(tmpdir(),'v3-archive-preflight-'));t.after(()=>rmSync(root,{recursive:true,force:true}));const out=join(root,'demo'),demo=await v3ArchiveDemo(out),request=JSON.parse(readFileSync(join(out,'archive-request.json'))),manifest=JSON.parse(readFileSync(demo.archive_manifest));let calls=0;
  const resolver={resolve(){calls++;throw Error('should not resolve');}},reviewStore={scope(){calls++;},ingest(){calls++;}};

@@ -165,3 +165,29 @@ Publisher/Muse consumption acceptance, source-inventory semantic identity/QA
 revocation integration, durable MetricObservation collector/ledger, and
 authenticated producer/approval transport. No deployment, merge, real publishing,
 interaction, source migration or deletion has been performed.
+
+## Follow-up review fixes (start of slice 03)
+
+The second review found two reproducible failure paths. A cached validation
+timeout used to mark intact bytes CORRUPT until expiry/sweep; now only affirmative
+hash/structure/path damage marks corruption. Budget/tool failures release the new
+lease and leave cached bytes available for full revalidation. No validation is
+skipped on the next resolve.
+
+An exception from the first lease release used to skip later releases and mask a
+committed review receipt. Intake now attempts every release, reports scoped
+`cleanup_pending` with `cleanup_status:RECONCILE_PENDING`, and preserves the actual
+REVIEW_REQUIRED/DUPLICATE receipt. Primary intake failure stays a failure with
+cleanup details attached. Cleanup pending never creates another publish attempt.
+
+Executed `node --test test/archive-asset-resolver.test.js test/archive-production-intake.test.js`:
+15/15 passed, 6.477 seconds. Fault injection covers transient cache validation,
+first/second release failure, all ten releases attempted, persisted receipt/BLOBs,
+repeat intake DUPLICATE and zero publication jobs. This is additional synthetic
+evidence; it does not replace or relabel the historical 968-test slice-02 run.
+
+Lease reconciliation after a crash must not assume TTL means the holder is dead.
+The rename-before-SQL-commit crash window still relies on BUILDING/dead-owner
+sweep; finer crash-point injection remains follow-up work. Repeated archive
+fetches for multiple members are conservatively budgeted and may be optimized
+later without changing authority or validation semantics.
