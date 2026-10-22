@@ -1,0 +1,82 @@
+{
+  "base": "dca8d9dc1e7e2698eb9c41afd12fe170ef5e3685",
+  "synthetic_only": true,
+  "real_submission_count": 0,
+  "hosted_acceptance": false,
+  "credentials_or_permissions_changed": false,
+  "deployment_attempted": false,
+  "same_site": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+  "native_contract": "TaskActionPermits PAGE scope/hash/dedup/operating day; native consume/issue behavior unchanged",
+  "native_limits": {
+    "page": 1,
+    "groups": 2,
+    "groupPosts": 1,
+    "interactionActions": 3
+  },
+  "async_implemented_scope": "Facebook PAGE only; SYNTHETIC_EXCLUSIVE policy custody; no issuer/provider/HTTP execution endpoint",
+  "before_original_case": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "command": "node --test test/sites-execution-permits.test.js",
+    "meaning": "Missing required-permit model in closed simulator, not live authorization bypass"
+  },
+  "final_targeted": {
+    "total": 55,
+    "passed": 55,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "duration_ms": 2311.991842,
+    "command": "node --test test/sites-execution-permits.test.js test/sites-async-synthetic-executor.test.js test/task-action-permit.test.js"
+  },
+  "full_regression": {
+    "total": 1146,
+    "passed": 1146,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "duration_ms": 123710.680059,
+    "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+    "stage": "Final implementation, after self-review binding and acknowledgement regressions"
+  },
+  "syntax_checks": 9,
+  "diff_check": "passed",
+  "logs": {
+    "before": {
+      "path": "/tmp/v3-permit-before.log",
+      "sha256": "e9514b5d0a0f1f165b3e5c06b2bb418c147c33257da061bff853215bcce2cdff",
+      "exit_code": 1,
+      "summary": "\u2716 required execution permit cannot be replaced by content approval or SYNTHETIC_ONLY confirmation (191.328318ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 314.998048\n\n\u2716 failing tests:\n\ntest at test/sites-execution-permits.test.js:4:1\n\u2716 required execution permit cannot be replaced by content approval or SYNTHETIC_ONLY confirmation (191.328318ms)\n  AssertionError [ERR_ASSERTION]: Missing expected rejection.\n      at async TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-execution-permits.test.js:5:50)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: /EXECUTION_PERMIT_UNAVAILABLE/,\n    operator: 'rejects',\n    diff: 'simple'\n  }\n"
+    },
+    "final_targeted": {
+      "path": "/tmp/v3-permit-reviewed-targeted.log",
+      "sha256": "1487fa774b406bbef7b5794709c400f8251bca7610b6908cf58ddc06cc38e831",
+      "exit_code": 0,
+      "summary": "\u2139 tests 55\n\u2139 suites 0\n\u2139 pass 55\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 2311.991842"
+    },
+    "full": {
+      "path": "/tmp/v3-permit-full.log",
+      "sha256": "54088d26a39653faf6645e35d9b8820889ffdc5f709da86fd5656f2c0b4c1d0d",
+      "exit_code": 0,
+      "summary": "\u2139 tests 1146\n\u2139 suites 0\n\u2139 pass 1146\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 123710.680059"
+    }
+  },
+  "final_code_sha256": {
+    "src/sites/async-execution-permits.js": "f6adede2ac6e998019bdd74f1de2a90605f04149b7ac4f908afa19200ae2bfb6",
+    "src/sites/async-synthetic-executor.js": "d75e6830c87412cca5c01d00966bf437534b0ae055f258d41f40455c4d9fe14f",
+    "src/sites/migrations/0007_execution_permits_candidate.sql": "d0d9ed1e38088d2e779abefb8b386bde69d266637642823b0d8652d29696e917",
+    "src/task-action-permit.js": "f33e86e0a1ea03a373580497535276792490033e77e65b82e38749862e5dd8df",
+    "src/task-action-policy.js": "5c6b091464dbd262a72b1a79a98595e3c63e7509503a9a74943729336dc48cd6",
+    "test/fixtures/sites-cloud-d1.js": "795012f8e402ce4c9e951617a6baeac270300fa9345207dd2569ffbd171a7085",
+    "test/fixtures/sites-evidence.js": "6d1d0747c3be4efa6f79f30653e23ae76dd1093049046d04af54f95cbf248da9",
+    "test/fixtures/sites-permits.js": "6d38bb27c92775f34cde525ec02042e74d55bfefcb9e33a57b1aa8300406bc7d",
+    "test/sites-async-synthetic-executor.test.js": "1417b0f36ca215d930872c21707312cab037acca3354b8ff1986bc103a8d7e49",
+    "test/sites-execution-permits.test.js": "c905633b4295f114ba825c061c0fd4123ada0d3a1a1872e19b5e6c78461b58cb"
+  },
+  "remaining": [
+    "Official Sites runtime/starter/bindings and hosted D1/R2/identity acceptance",
+    "Trusted existing issuer/history provider with exclusive live ledger custody",
+    "Real per-operation upload/submit/readback; general messaging and feedback gaps unchanged"
+  ]
+}

@@ -1,22 +1,9 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {operatingDay} from './operating-day.js';
-const keys=['version','kind','subject_id','workspace','account_id','actor_id','target_page_id','target_id','platform','transport','profile_id','snapshot_hash','body_hash','media_hashes','actions'];
+import {taskActionScopeEntries,taskActionDedupValue,scopedOperationLimits} from './task-action-policy.js';
 const digest=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const fail=message=>{throw Error(message);};
-export function scopeDigest(scope){
- if(!scope||Object.keys(scope).length!==keys.length||keys.some(k=>!Object.hasOwn(scope,k)))fail('EXACT_SCOPE_REQUIRED');
- if(scope.version!==1||!['PAGE','GROUP','INTERACTION'].includes(scope.kind)||scope.platform!=='facebook'||!['BROWSER','BROWSER_SKILL'].includes(scope.transport)||scope.transport==='BROWSER_SKILL'&&!/^bsk:[a-f0-9]{8}$/.test(scope.profile_id||''))fail('UNSUPPORTED_SCOPE');
- for(const k of ['subject_id','workspace','account_id','profile_id'])if(typeof scope[k]!=='string'||!scope[k].trim())fail('INVALID_SCOPE_ID');
- if(scope.transport==='BROWSER_SKILL'&&!scope.subject_id.startsWith(scope.kind+':'))fail('UNSUPPORTED_SCOPE_SUBJECT');
- for(const k of ['actor_id','target_page_id','target_id'])if(!/^[1-9]\d*$/.test(scope[k]))fail('REAL_PLATFORM_ID_REQUIRED');
- for(const k of ['snapshot_hash','body_hash'])if(!/^[a-f0-9]{64}$/.test(scope[k]))fail('FROZEN_HASH_REQUIRED');
- if(!Array.isArray(scope.media_hashes)||scope.media_hashes.some(v=>!v||Object.keys(v).sort().join(',')!=='ordinal,sha256,size'||!Number.isSafeInteger(v.ordinal)||v.ordinal<0||!Number.isSafeInteger(v.size)||v.size<1||!/^[a-f0-9]{64}$/.test(v.sha256))||scope.media_hashes.some((v,i)=>v.ordinal!==i))fail('ORDERED_MEDIA_HASHES_REQUIRED');
- const actions=scope.actions;if(!Array.isArray(actions)||!actions.length||new Set(actions).size!==actions.length||actions.some(a=>!['PUBLISH','LIKE','INITIAL_REPLY'].includes(a)))fail('EXACT_ACTIONS_REQUIRED');
- if(scope.kind==='INTERACTION'){if(scope.media_hashes.length||actions.includes('PUBLISH')||actions.join(',')!==['LIKE','INITIAL_REPLY'].filter(a=>actions.includes(a)).join(','))fail('INVALID_INTERACTION_ACTIONS');}
- else if(actions.join(',')!=='PUBLISH')fail('INVALID_PUBLISH_ACTIONS');
- if(scope.kind==='PAGE'&&scope.target_id!==scope.target_page_id)fail('PAGE_TARGET_MISMATCH');
- return digest(keys.map(k=>[k,scope[k]]));
-}
+export const scopeDigest=scope=>digest(taskActionScopeEntries(scope));
 /** Preparation for reviewed adapters: no browser or HTTP route is created here.
  * current() must independently reconstruct scope from the original task/assets and
  * enforce existing profile/UNKNOWN/group-opt-in/risk/pause guards. Default is deny.
@@ -51,13 +38,13 @@ export class TaskActionPermits{
   const prior=this.priorUsage({scope,day,excludedPermitIds:[...new Set(rows.map(r=>r.permit_id))]});
   if(!prior||!Number.isSafeInteger(prior.page)||prior.page<0||!Number.isSafeInteger(prior.interaction)||prior.interaction<0||!Array.isArray(prior.groups)||prior.groups.some(g=>typeof g!=='string')||typeof prior.duplicate!=='boolean'||typeof prior.pending!=='boolean'||typeof prior.paused!=='boolean')fail('COMPLETE_PRIOR_USAGE_REQUIRED');
   if(prior.pending||prior.paused||prior.duplicate)fail('HISTORICAL_PENDING_PAUSED_OR_DUPLICATE');
-  if(scope.kind==='PAGE'&&prior.page+rows.filter(r=>r.kind==='PAGE').length>=1)fail('PAGE_DAILY_LIMIT_1');
-  if(scope.kind==='GROUP'){const groups=[...prior.groups,...rows.filter(r=>r.kind==='GROUP').map(r=>r.target_id)];if(groups.includes(scope.target_id))fail('GROUP_DAILY_LIMIT_1');if(new Set(groups).size>=2)fail('GROUP_DAILY_LIMIT_2');}
-  if(scope.kind==='INTERACTION'&&prior.interaction+rows.filter(r=>r.kind==='INTERACTION').length+scope.actions.length>3)fail('INTERACTION_DAILY_LIMIT_3');
+  if(scope.kind==='PAGE'&&prior.page+rows.filter(r=>r.kind==='PAGE').length>=scopedOperationLimits.page)fail('PAGE_DAILY_LIMIT_1');
+  if(scope.kind==='GROUP'){const groups=[...prior.groups,...rows.filter(r=>r.kind==='GROUP').map(r=>r.target_id)];if(groups.includes(scope.target_id))fail('GROUP_DAILY_LIMIT_1');if(new Set(groups).size>=scopedOperationLimits.groups)fail('GROUP_DAILY_LIMIT_2');}
+  if(scope.kind==='INTERACTION'&&prior.interaction+rows.filter(r=>r.kind==='INTERACTION').length+scope.actions.length>scopedOperationLimits.interactionActions)fail('INTERACTION_DAILY_LIMIT_3');
   for(const action of scope.actions){const key=this.dedup(scope,action);if(this.db.prepare('SELECT 1 FROM task_action_daily_claims WHERE workspace=? AND actor_id=? AND target_page_id=? AND dedup_key=?').get(scope.workspace,scope.actor_id,scope.target_page_id,key))fail('EXACT_ACTION_ALREADY_CLAIMED');}
   return day;
  }
- dedup(scope,action){return digest([scope.kind,scope.target_id,action,...(scope.kind==='INTERACTION'?[]:[scope.body_hash,scope.media_hashes])]);}
+ dedup(scope,action){return digest(taskActionDedupValue(scope,action));}
  /** Must be called inside the SAME existing task claim transaction, before driver creation. */
  consume(scope,attemptId){if(!this.store.transactionActive)fail('ATOMIC_TASK_CLAIM_REQUIRED');if(typeof attemptId!=='string'||!attemptId)fail('ATTEMPT_REQUIRED');const row=this.read(scope.subject_id);if(!row||row.status!=='AVAILABLE'||row.expires_at<=this.now())fail('PERMIT_SPENT_OR_EXPIRED');if(this.assertScope(scope)!==row.scope_hash)fail('PERMIT_SCOPE_MISMATCH');const day=this.assertBudget(scope),n=this.now();
   const changed=this.db.prepare("UPDATE task_action_permits SET status='CONSUMED',attempt_id=? WHERE id=? AND status='AVAILABLE' AND expires_at>?").run(attemptId,row.id,n);if(changed.changes!==1)fail('PERMIT_SPENT_OR_EXPIRED');

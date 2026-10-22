@@ -1,6 +1,9 @@
 # Publisher V3 — PRD / architecture / acceptance plan
 
-Current update: [slice 11](v3-slice-11.md) repairs committed-outcome acknowledgement
+Current update: [slice 12](v3-slice-12.md) adds the original PAGE permit/limit
+contract to the asynchronous claim, UNKNOWN occupancy and readback settlement
+transactions. Real authority/provider custody remains disabled and unverified.
+[Slice 11](v3-slice-11.md) repairs committed-outcome acknowledgement
 loss and exact readback binding in the existing async prepared-job path.
 [Slice 10](v3-slice-10.md) connects canonical source identity,
 versions, exact body/media and ZIP references to the existing persistent Review,

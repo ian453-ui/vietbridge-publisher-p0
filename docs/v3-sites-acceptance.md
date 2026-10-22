@@ -1,9 +1,9 @@
 # Publisher V3 current user-visible acceptance matrix
 
-2026-10-22, slice 11 (following canonical import and retained-client QA repair). Formal target: owner-private ChatGPT Sites UI with cloud
+2026-10-22, slice 12 (following execution recovery and canonical import). Formal target: owner-private ChatGPT Sites UI with cloud
 services. Existing project `appgprj_6ad97a034fd08191a8399eeda10f048c` is registered,
 not deployed. The table below supersedes earlier slices' *current* status without
-rewriting their historical evidence. [Slice 11 evidence](v3-slice-11.md) identifies
+rewriting their historical evidence. [Slice 12 evidence](v3-slice-12.md) identifies
 this run; [original matrix](v3-final-acceptance.md) retains V1/V2 module references.
 
 “Executed synthetic” means this cloud workspace ran code with generated inputs and
@@ -24,8 +24,8 @@ for any external operation. A UI Tab is never business-function completion.
 | Review and human decisions | Native shared-admin approve/reject/audit retained | Async event/command ledger, explicit checklist/reason, reject/revoke, restart, replay defense and races executed; only fixture authority/provenance provider available | Official Site identity + existing admin resolution and trusted real source decision provider; owner is not auto-admin |
 | Change invalidation | Native exact version/body/media/account guards; client manifest QA withdrawal now overrides READY/title/PASS filenames in both original catalogue paths | Same fields plus atomic live scope/version/event/object/source-head checks; newer failed/missing/withdrawn source invalidates old approval; old plans show STALE_PREVIEW after read/rejection | Background immediate invalidation not implemented; DB triggers are not owner-tamper protection |
 | Approved media → upload preparation | Native Review/ZIP bytes to original upload/task freeze | Exact reviewed bytes → platform variant → existing content → frozen original DRAFT; SQL rollback/lost ack/duplicate preparation exercised | Actual upload worker/provider; content approval never grants publication permission |
-| Publish/unique submit/readback | Existing per-account native adapters, permits, quotas and executor retained | No HTTP execute route; closed async synthetic rehearsal on same frozen job demonstrates independent confirmation, unique attempt and readback | Async real permit/quota claim, account verification, authorized uploader/driver and actual independent readback |
-| UNKNOWN handling | UNKNOWN→RECONCILE_PENDING, reservation retained | Restart/lost response/missing object/readback unavailable only reconcile original intent; committed-ack loss now returns durable truth or explicit pending, cached receipt binding is checked, concurrent reconcilers cannot revert terminal state; later rejection cannot cause resubmit | Real cloud executor/reconciler and operation-specific proof |
+| Publish/unique submit/readback | Existing per-account native adapters, permits, quotas and executor retained | No HTTP execute route; closed async executor now defaults to exact native PAGE-format permit, atomic same-job reservation/consumption, pre-submit release and readback settlement; concurrent quota, restart, revocation/expiry/day races executed | Trusted real exclusive permit/history custody, account verification, authorized uploader/driver and actual independent readback; synthetic ledger is not live authority |
+| UNKNOWN handling | UNKNOWN→RECONCILE_PENDING, reservation retained | Restart/lost response/missing object/readback unavailable only reconcile original intent; committed-ack loss now returns durable truth or explicit pending, cached receipt binding is checked, concurrent reconcilers cannot revert terminal state; later rejection cannot cause resubmit; UNKNOWN holds original quota across days, readback settles original claim | Real cloud executor/reconciler and operation-specific proof |
 | WeChat Channels / WOA | PUBLISHED_ID_PENDING / DRAFT_WRITTEN retained | Shared terminal meanings executed in closed simulation | Real verification remains absent; no public ID/publication invented |
 | Group active posting | Native conditional Facebook browser group path retained and synthetic regression | Unavailable UI destination; no group provider or send route | Supported authorized cloud executor/API where available, rule/identity/per-account approval and readback; Page authorization cannot unlock Groups |
 | Proactive search/likes/replies | Native scoped opt-in scan, draft review, quota/stop path retained | Unavailable destination | Cloud discovery/interaction provider and original scoped approval/quota integration |
@@ -61,8 +61,11 @@ those gaps. Original `publisher-unified` stays unchanged and unmerged.
    payload results into the same Review/preparation chain; do not manufacture a
    platform variant from generic text. Source/import code is now partly complete,
    not equivalent to live Drive recognition.
-3. **Cloud publication and readback.** Port existing permit/quota reservation and
-   exact identity checks, then authorized upload/submit/reconcile per operation.
+3. **Cloud publication and readback.** Async PAGE permit/quota
+   transaction is implemented in the closed executor. Next connect a trusted
+   existing issuer with exclusive ledger custody, complete history and exact
+   identity, then authorized upload/submit/reconcile per operation. Copying a live
+   permit from another writable ledger is not an atomic authorization mechanism.
    Keep disabled until those adapters exist; UNKNOWN must keep the original
    attempt. Production content approval does not grant this permission.
 4. **Interaction/inbox operations.** Preserve native opt-in and scoped review;
@@ -75,8 +78,9 @@ those gaps. Original `publisher-unified` stays unchanged and unmerged.
    identity or silently trigger another publication.
 
 Independent quality work continues against concrete inheritance defects while
-hosting is blocked. The latest package repaired the confirmed body-hash gap and
-source crash/QA invalidation paths. A follow-up [retained-client QA repair](v3-client-qa-repair.md) also closes the reproduced original library gap; feature counts and new mock apps are not goals.
+hosting is blocked. The latest package adds the missing async native-contract permit/usage transaction,
+with default denial and UNKNOWN occupancy. Previous packages repaired the confirmed
+body-hash gap and source crash/QA invalidation paths. A follow-up [retained-client QA repair](v3-client-qa-repair.md) also closes the reproduced original library gap; feature counts and new mock apps are not goals.
 
 [Existing API configuration check](v3-api-availability-check.md) distinguishes
 retained app-token code from an actually available independent cloud endpoint.
