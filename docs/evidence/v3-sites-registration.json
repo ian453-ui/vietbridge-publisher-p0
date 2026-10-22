@@ -1,0 +1,18 @@
+{
+  "project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+  "title": "VietBridge Publisher V3",
+  "created_at": "2026-10-22T02:50:43.614152+00:00",
+  "expected_url": "https://vietbridge-publisher-v3.ardenttang64.chatgpt.site",
+  "access_mode": "custom",
+  "current_user_role": "owner",
+  "allowed_roles": [
+    "owner"
+  ],
+  "external_visitor_count": 0,
+  "version_number": 0,
+  "live_url": null,
+  "manifest_path": "/workspace/sites/publisher-v3/.openai/hosting.json",
+  "credential_persisted": false,
+  "source_pushed": false,
+  "deployment_attempted": false
+}

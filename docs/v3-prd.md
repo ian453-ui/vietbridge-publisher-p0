@@ -47,6 +47,14 @@ test fixture implements a provider; real producer authentication stays disabled.
 Existing publication permit/scoped authority is observed independently, never
 issued by content approval. [Contracts and failure acceptance](v3-slice-06.md).
 
+Slice 07 registers the separate owner-private Publisher Site and implements the
+portable customer/account/content-version/platform-preview/frozen-task API and UI.
+Commands persist atomically through a D1-shaped interface and preserve original
+job/source projections. Local SQLite and browser acceptance pass; official Sites
+identity/build/D1 integration remains blocked by missing starter/helpers. The
+registered Site is still version 0, not a hosted delivery. See the
+[actual migration matrix](v3-slice-07.md); unsupported operations stay disabled.
+
 ## Source-backed architecture and reuse decisions
 
 Reviewed 2026-10-21; these are design references, not installed dependencies or

@@ -8,6 +8,13 @@ interfaces, exact source-decision audit bindings and independent existing-permit
 observation. Real trusted providers remain unconfigured. New execution evidence
 is recorded per slice; none of the earlier counts below is presented as a new run.
 
+Subsequent [slice 07](v3-slice-07.md) registers the separate owner-private Publisher
+Site and implements persistent portable authoring, platform preview and frozen
+tasks, with a newly executed 1042-test regression and final 22-test migration run.
+The Site remains version 0: missing official starter/helpers block hosted identity,
+D1 and build integration. This does not replace the original full-chain acceptance
+below or claim that previously implemented native features are already in Sites.
+
 This records the first four slices. The subsequent [slice 05 business connection](v3-slice-05.md)
 implements approved synthetic Review/ZIP bytes → native content/platform/job/upload
 preparation and closed local simulated submission/readback. Its 1013-test regression

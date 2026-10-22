@@ -1,0 +1,107 @@
+import {createSitesReadonlyApi} from './readonly-api.js';
+import {createSitesScopeResolver} from './membership.js';
+
+export const cloudPlatforms=Object.freeze(['facebook','xiaohongshu','wechat_official_account','wechat_channels']);
+const flags=Object.freeze({executionEnabled:false,publish_allowed:false,source_gate_satisfied:false,media_processing:'CLOUD_SERVICE_NOT_CONNECTED',producer_authenticated:false});
+const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+export async function cloudDigest(value){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(canonical(value)))))].map(x=>x.toString(16).padStart(2,'0')).join('');}
+const fail=(code,status=409)=>{throw Object.assign(Error(code),{status});};
+const exact=(x,keys)=>{if(!x||typeof x!=='object'||Array.isArray(x)||Object.keys(x).length!==keys.length||keys.some(k=>!Object.hasOwn(x,k)))fail('INVALID_COMMAND',400);};
+const text=(x,max)=>typeof x==='string'&&x.length>0&&x.length<=max&&x.trim()===x;
+const uuid=x=>typeof x==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(x);
+const response=(status,data)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+
+async function readInput(request){
+ if(!/^application\/json(?:;\s*charset=utf-8)?$/i.test(request.headers.get('content-type')||''))fail('JSON_REQUIRED',415);
+ const reader=request.body?.getReader();if(!reader)fail('INVALID_COMMAND',400);
+ const chunks=[];let size=0;
+ try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>131072){await reader.cancel();fail('COMMAND_TOO_LARGE',413);}chunks.push(value);}}finally{reader.releaseLock();}
+ const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+ try{return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));}catch{fail('INVALID_JSON',400);}
+}
+
+/** Portable Worker/D1 business boundary. No identity parser or fake hosted auth.
+ * The official Sites server adapter supplies getTrustedIdentity per request.
+ * All publication, approval, upload, credential and interaction routes stay shut.
+ */
+export function createCloudAuthoringApi({db,origin,getTrustedIdentity,now=()=>new Date().toISOString()}={}){
+ const statement=(sql,args=[])=>db.prepare(sql).bind(...args);
+ async function rows(sql,args=[]){const result=await statement(sql,args).all();if(result.success===false||!Array.isArray(result.results))fail('STORAGE_UNAVAILABLE',503);return result.results;}
+ async function one(sql,args=[]){return (await rows(sql,args))[0]||null;}
+ async function owned(userId,workspace){if(!await one('SELECT id FROM sites_workspaces WHERE id=? AND owner_user_id=?',[workspace,userId]))fail('SCOPE_DENIED',403);}
+ async function account(userId,workspace,accountId){await owned(userId,workspace);const a=await one("SELECT a.* FROM sites_account_details a JOIN sites_project_memberships m ON m.workspace=a.workspace AND m.account_id=a.account_id WHERE a.workspace=? AND a.account_id=? AND m.user_id=? AND m.role='READER' AND m.revoked_at IS NULL",[workspace,accountId,userId]);if(!a)fail('SCOPE_DENIED',403);return a;}
+ async function assertCommandCompatible(userId,kind,input){const prior=await one('SELECT * FROM sites_authoring_commands WHERE owner_user_id=? AND command_id=?',[userId,input.command_id]);if(prior&&(prior.kind!==kind||prior.command_hash!==await cloudDigest({kind,input})))fail('COMMAND_CONFLICT');}
+ async function command(userId,kind,input,makeStatements){
+  if(!uuid(input.command_id))fail('INVALID_COMMAND_ID',400);
+  const hash=await cloudDigest({kind,input}),prior=await one('SELECT * FROM sites_authoring_commands WHERE owner_user_id=? AND command_id=?',[userId,input.command_id]);
+  if(prior){if(prior.command_hash!==hash||prior.kind!==kind)fail('COMMAND_CONFLICT');if(prior.committed!==1)fail('COMMAND_OUTCOME_UNKNOWN');return {id:prior.entity_id,duplicate:true};}
+  const entityId=crypto.randomUUID(),at=now(),condition={userId,commandId:input.command_id,hash};
+  // Every dependent INSERT selects the winning command's entity ID. Another
+  // isolate can win the command key; no second side effect uses our losing UUID.
+  const commands=[statement('INSERT INTO sites_authoring_commands(owner_user_id,command_id,kind,command_hash,entity_id,committed,created_at) VALUES(?,?,?,?,?,0,?) ON CONFLICT(owner_user_id,command_id) DO NOTHING',[userId,input.command_id,kind,hash,entityId,at]),...makeStatements(condition,at),statement('UPDATE sites_authoring_commands SET committed=1 WHERE owner_user_id=? AND command_id=? AND command_hash=? AND committed=0',[userId,input.command_id,hash])];
+  try{const results=await db.batch(commands);if(!Array.isArray(results)||results.length!==commands.length||results.some(x=>x.success===false))fail('STORAGE_OUTCOME_UNCONFIRMED',503);}catch(error){if(error.status)throw error;fail('STORAGE_WRITE_REJECTED',409);}
+  const receipt=await one('SELECT * FROM sites_authoring_commands WHERE owner_user_id=? AND command_id=?',[userId,input.command_id]);
+  if(!receipt||receipt.command_hash!==hash||receipt.kind!==kind)fail('COMMAND_CONFLICT');if(receipt.committed!==1)fail('COMMAND_OUTCOME_UNKNOWN');return {id:receipt.entity_id,duplicate:receipt.entity_id!==entityId};
+ }
+ const winning=' FROM sites_authoring_commands c WHERE c.owner_user_id=? AND c.command_id=? AND c.command_hash=? AND c.committed=0';
+ const bound=c=>[c.userId,c.commandId,c.hash];
+ return async request=>{
+  if(!db?.prepare||!db?.batch||!origin||typeof getTrustedIdentity!=='function')return response(503,{error:'SITES_RUNTIME_BINDING_REQUIRED',...flags});
+  const url=new URL(request.url);if(url.origin!==origin)return response(409,{error:'HOST_MISMATCH'});
+  try{
+   const identity=await getTrustedIdentity(request);if(!identity||!text(identity.userId,300))fail('IDENTITY_REQUIRED',401);const userId=identity.userId;
+   if(url.pathname.startsWith('/api/unified/'))return createSitesReadonlyApi({db,origin,resolveScope:createSitesScopeResolver({db,getTrustedIdentity:async()=>identity})})(request);
+   if(!['GET','POST'].includes(request.method))fail('METHOD_NOT_ALLOWED',405);
+   if(request.method==='GET'&&url.pathname==='/api/sites/capabilities')return response(200,{...flags,mode:'SITES_CLOUD_AUTHORING',persistence:'D1',content_status:'MANUAL_UNVERIFIED',platforms:cloudPlatforms,implemented:['workspace_create','account_mapping_create','content_version_create','task_freeze','scoped_persistent_reads'],unavailable:['real_producer_transport','media_decode','archive_resolve','content_approval','external_upload','publish','group_post','reply','direct_message','live_metrics']});
+   if(request.method==='GET'&&url.pathname==='/api/sites/workspaces')return response(200,{workspaces:await rows('SELECT id,name,created_at FROM sites_workspaces WHERE owner_user_id=? ORDER BY created_at,id LIMIT 200',[userId]),...flags});
+   if(request.method==='POST'){
+    if(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site')fail('ORIGIN_DENIED',403);
+    if(url.pathname==='/api/sites/workspaces'){
+     const input=await readInput(request);exact(input,['command_id','name']);if(!text(input.name,120))fail('INVALID_NAME',400);
+     const result=await command(userId,'WORKSPACE',input,(c,at)=>[statement('INSERT INTO sites_workspaces(id,owner_user_id,name,created_at) SELECT c.entity_id,c.owner_user_id,?,?'+winning+' ON CONFLICT(id) DO NOTHING',[input.name,at,...bound(c)])]);return response(200,{workspace_id:result.id,...result,...flags});
+    }
+   }
+   const match=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/(accounts|contents|tasks)$/);if(!match)fail('OPERATION_UNAVAILABLE',404);
+   const [,workspace,resource]=match;await owned(userId,workspace);
+   if(request.method==='GET'){
+    if(resource==='accounts')return response(200,{accounts:await rows("SELECT a.* FROM sites_account_details a JOIN sites_project_memberships m ON m.workspace=a.workspace AND m.account_id=a.account_id WHERE a.workspace=? AND m.user_id=? AND m.role='READER' AND m.revoked_at IS NULL ORDER BY a.created_at,a.account_id LIMIT 200",[workspace,userId]),...flags});
+    const accountId=url.searchParams.get('accountId');await account(userId,workspace,accountId);
+    if(resource==='contents')return response(200,{contents:(await rows('SELECT * FROM sites_contents WHERE workspace=? AND account_id=? ORDER BY created_at DESC,id DESC LIMIT 200',[workspace,accountId])).map(c=>({...c,variants:JSON.parse(c.variants_json),variants_json:undefined})),...flags});
+    return response(200,{tasks:(await rows('SELECT j.*,s.snapshot_json FROM publisher_jobs j JOIN sites_job_snapshots s ON s.job_id=j.id AND s.workspace=j.workspace WHERE j.workspace=? AND j.account_id=? ORDER BY j.created_at DESC,j.id DESC LIMIT 200',[workspace,accountId])).map(j=>({...j,snapshot:JSON.parse(j.snapshot_json),snapshot_json:undefined,canExecute:false})),...flags});
+   }
+   const input=await readInput(request);
+   if(resource==='accounts'){
+    exact(input,['command_id','display_name','platform','external_identity']);if(!text(input.display_name,120)||!cloudPlatforms.includes(input.platform)||input.external_identity!==null&&!text(input.external_identity,200))fail('INVALID_ACCOUNT',400);
+    const result=await command(userId,'ACCOUNT',{...input,workspace},(c,at)=>[
+     statement('INSERT INTO facebook_accounts(id,workspace) SELECT c.entity_id,?'+winning+' ON CONFLICT(id) DO NOTHING',[workspace,...bound(c)]),
+     statement("INSERT INTO sites_account_details SELECT ?,c.entity_id,?,?,?,'UNCONFIGURED',?"+winning+' ON CONFLICT(workspace,account_id) DO NOTHING',[workspace,input.display_name,input.platform,input.external_identity,at,...bound(c)]),
+     statement("INSERT INTO sites_project_memberships SELECT c.owner_user_id,?,c.entity_id,'READER',NULL"+winning+' ON CONFLICT(user_id,workspace,account_id) DO NOTHING',[workspace,...bound(c)])
+    ]);return response(200,{account_id:result.id,...result,...flags});
+   }
+   if(resource==='contents'){
+    exact(input,['command_id','account_id','content_id','slug','revision','title','body','variants']);if(!uuid(input.command_id))fail('INVALID_COMMAND_ID',400);await account(userId,workspace,input.account_id);
+    if(!/^[A-Z][A-Z0-9-]{3,80}$/.test(input.content_id||'')||!text(input.slug,120)||!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.slug)||!Number.isSafeInteger(input.revision)||input.revision<1||input.revision>100000||!text(input.title,200)||!text(input.body,20000))fail('INVALID_CONTENT_VERSION',400);
+    if(!input.variants||typeof input.variants!=='object'||Array.isArray(input.variants)||Object.keys(input.variants).length<1||Object.keys(input.variants).some(p=>!cloudPlatforms.includes(p)))fail('EXPLICIT_PLATFORM_VARIANT_REQUIRED',400);
+    for(const value of Object.values(input.variants)){exact(value,['title','body']);if(!text(value.title,200)||!text(value.body,20000))fail('INVALID_PLATFORM_VARIANT',400);}
+    const payloadHash=await cloudDigest({content_id:input.content_id,slug:input.slug,revision:input.revision,title:input.title,body:input.body,variants:input.variants});
+    await assertCommandCompatible(userId,'CONTENT',{...input,workspace});
+    const existing=await one('SELECT id,payload_hash FROM sites_contents WHERE workspace=? AND account_id=? AND content_id=? AND slug=? AND revision=?',[workspace,input.account_id,input.content_id,input.slug,input.revision]);
+    if(existing){if(existing.payload_hash!==payloadHash)fail('CONTENT_VERSION_CONFLICT');return response(200,{id:existing.id,duplicate:true,...flags});}
+    const result=await command(userId,'CONTENT',{...input,workspace},(c,at)=>[
+     statement("INSERT INTO sites_contents SELECT c.entity_id,?,?,?,?,?,?,?,?,?,'MANUAL_UNVERIFIED',?"+winning,[workspace,input.account_id,input.content_id,input.slug,input.revision,input.title,input.body,JSON.stringify(input.variants),payloadHash,at,...bound(c)]),
+     statement('INSERT INTO publisher_content_sources SELECT ?,?,?,c.entity_id,?'+winning,[workspace,input.account_id+'::'+input.content_id+'::'+input.slug,String(input.revision),payloadHash,...bound(c)])
+    ]);return response(200,{...result,payload_hash:payloadHash,...flags});
+   }
+   exact(input,['command_id','account_id','content_id','expected_payload_hash']);if(!uuid(input.command_id))fail('INVALID_COMMAND_ID',400);const a=await account(userId,workspace,input.account_id),content=await one('SELECT * FROM sites_contents WHERE workspace=? AND account_id=? AND id=?',[workspace,input.account_id,input.content_id]);
+   if(!content)fail('CONTENT_NOT_FOUND',404);if(content.payload_hash!==input.expected_payload_hash)fail('CONTENT_CHANGED');const variant=JSON.parse(content.variants_json)[a.platform];if(!variant)fail('EXPLICIT_PLATFORM_VARIANT_REQUIRED');
+   const snapshot={schema_version:1,workspace,account_id:a.account_id,platform:a.platform,external_identity:a.external_identity,content_id:content.content_id,slug:content.slug,revision:content.revision,content_row_id:content.id,payload_hash:content.payload_hash,payload:variant,media:[],source_status:content.source_status,publication_authority:'UNCONFIGURED'};
+   await assertCommandCompatible(userId,'TASK',{...input,workspace});
+   const snapshotHash=await cloudDigest(snapshot),existing=await one('SELECT id,state FROM publisher_jobs WHERE workspace=? AND account_id=? AND content_id=? AND snapshot_hash=?',[workspace,a.account_id,content.id,snapshotHash]);
+   if(existing)return response(200,{id:existing.id,duplicate:true,state:existing.state,snapshot_hash:snapshotHash,...flags});
+   const result=await command(userId,'TASK',{...input,workspace},(c,at)=>[
+    statement("INSERT INTO publisher_jobs SELECT c.entity_id,?,?,?,?,'DRAFT',NULL,?,?"+winning+' ON CONFLICT(id) DO NOTHING',[workspace,a.account_id,content.id,snapshotHash,at,at,...bound(c)]),
+    statement('INSERT INTO sites_job_snapshots SELECT c.entity_id,?,?,?'+winning+' ON CONFLICT(job_id) DO NOTHING',[workspace,content.id,JSON.stringify(snapshot),...bound(c)])
+   ]);return response(200,{...result,state:'DRAFT',snapshot_hash:snapshotHash,...flags});
+  }catch(error){return response(error.status||503,{error:error.status?error.message:'SITES_STORAGE_UNAVAILABLE',...flags});}
+ };
+}

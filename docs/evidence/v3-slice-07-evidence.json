@@ -1,0 +1,127 @@
+{
+  "package": "07",
+  "base_commit": "31fcb41140b771bfc69221734209b0e82d3fbf96",
+  "branch": "publisher-v3/cloud-slice-01",
+  "recorded_at": "2026-10-22T03:05:34.323904+00:00",
+  "runs": [
+    {
+      "name": "initial authoring",
+      "command": "node --test test/sites-cloud-authoring.test.js",
+      "log_path": "/tmp/v3-sites-authoring-first.log",
+      "log_sha256": "59633b8bc31f6ac06b7db1130526928929b70767ac191ab57f96965b54f8d5a5",
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 189.406196
+    },
+    {
+      "name": "initial combined UI assertion failure",
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium V3_SITES_EVIDENCE_DIR=/tmp/v3-sites-evidence node --test --test-concurrency=2 test/sites-cloud-*.test.js test/sites-readonly-api.test.js test/sites-membership.test.js",
+      "log_path": "/tmp/v3-sites-targeted-first.log",
+      "log_sha256": "ce15238858cff3acb4e0631fb5c26ee5bd2431ad83bf19f43c7064e5a6ca96b4",
+      "tests": 22,
+      "pass": 20,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 4696.868837
+    },
+    {
+      "name": "accepted combined",
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium V3_SITES_EVIDENCE_DIR=/tmp/v3-sites-evidence node --test --test-concurrency=2 test/sites-cloud-*.test.js test/sites-readonly-api.test.js test/sites-membership.test.js",
+      "log_path": "/tmp/v3-sites-targeted-accepted.log",
+      "log_sha256": "aeaf4f9692deab99b4246fb0fb7a8651e95710e685944c168a133ad6837a58ad",
+      "tests": 22,
+      "pass": 22,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 5277.417832
+    },
+    {
+      "name": "full regression before cosmetic changes",
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/tmp/v3-sites-evidence node --test --test-concurrency=4 test/*.test.js",
+      "log_path": "/tmp/v3-sites-full.log",
+      "log_sha256": "ab97af625a7d172eb19c4446acf74aa58d71aec6edc692ea5f9deb3b71f9ba9b",
+      "tests": 1042,
+      "pass": 1042,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 104736.576625
+    },
+    {
+      "name": "final targeted after CSS/list copy/external-request assertion",
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium V3_SITES_EVIDENCE_DIR=/tmp/v3-sites-evidence node --test --test-concurrency=2 test/sites-cloud-*.test.js test/sites-readonly-api.test.js test/sites-membership.test.js",
+      "log_path": "/tmp/v3-sites-targeted-final.log",
+      "log_sha256": "728a751d88806cc02be3d6dc2c8beead3538724c0250b792ea3d4e5c392b59a5",
+      "tests": 22,
+      "pass": 22,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 5249.613113
+    }
+  ],
+  "syntax": {
+    "files": [
+      "src/sites/cloud-authoring-api.js",
+      "src/sites/cloud-console.js",
+      "src/sites/membership.js",
+      "test/fixtures/sites-cloud-d1.js",
+      "test/sites-cloud-authoring.test.js",
+      "test/sites-cloud-console-ui.test.js"
+    ],
+    "result": "PASS; node --check per file"
+  },
+  "diff_check": "PASS",
+  "screenshots": [
+    {
+      "file": "docs/evidence/v3-slice-07-desktop.png",
+      "sha256": "008151d6b59cfe278453d366ad468a800553b102c09b27e5fd911d2742327845",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "content": "Synthetic persisted authoring and DRAFT tasks; loopback Chromium, not hosted Sites"
+    },
+    {
+      "file": "docs/evidence/v3-slice-07-mobile.png",
+      "sha256": "739a558ca66e552ff9c4ac1207f0a0514102b45173c096b81388cafca73fb592",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "content": "Synthetic persisted authoring and DRAFT tasks; loopback Chromium, not hosted Sites"
+    }
+  ],
+  "database_evidence": "Actual file SQLite exposed behind an asynchronous D1-shaped test interface; not real hosted D1",
+  "sites": {
+    "project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+    "registered": true,
+    "version_number": 0,
+    "live_url": null,
+    "source_pushed": false,
+    "build_attempted": false,
+    "deployment_attempted": false,
+    "d1_provisioned": false,
+    "r2_provisioned": false,
+    "official_identity_connected": false,
+    "required_helper_status": "NOT_AVAILABLE",
+    "latest_skill_read_error": "skill package is not available",
+    "cloud_skill_count": 0,
+    "executor_skill_count": 0
+  },
+  "live_social_operations": 0,
+  "real_user_material_reads": 0,
+  "original_media_deletes": 0,
+  "notes": [
+    "Previous package counts are not presented as this run.",
+    "Test fixtures only; no hosted identity or platform login used.",
+    "Full regression preceded the final CSS/list-limit copy/test network-block changes; targeted suite was rerun after them.",
+    "Existing real Study sample 403 remains stopped; no retry or alternate download.",
+    "No static shell, registered Site or loopback screenshot counts as hosted delivery."
+  ]
+}

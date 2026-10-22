@@ -1,7 +1,8 @@
 /** Supply getTrustedIdentity from the official server-only Sites auth integration.
  * This module never interprets browser headers, email, body or member claims as
- * identity. Membership records must be provisioned by an authorized operator;
- * there is no first-visitor enrollment or HTTP grant endpoint.
+ * identity. Membership records must be provisioned by an authorized operator or
+ * explicit owner-scoped account creation; no first-visitor global enrollment or
+ * grant-to-another-user HTTP endpoint exists.
  */
 export function createSitesScopeResolver({db,getTrustedIdentity}={}) {
   if(!db?.prepare||typeof getTrustedIdentity!=='function')throw Error('SITES_IDENTITY_BINDING_REQUIRED');

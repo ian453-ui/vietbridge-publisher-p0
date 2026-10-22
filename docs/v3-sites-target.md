@@ -1,95 +1,107 @@
 # V3 formal target: private ChatGPT Sites + cloud processing
 
-User direction received 2026-10-22 02:17:41 UTC: the formal V3 interaction UI must
-be ChatGPT Sites and its service must operate in the cloud, independent of the
-Mac. Node localhost demos are development/test tools only. Existing Mac/V1/V2
-installations stay untouched. This supersedes any interpretation that the cloud
-development checkout alone is the delivery or that the formal interface will be
-another Mac deployment. No original-domain requirement exists.
+Updated 2026-10-22, slice 07. The user requires the formal UI on ChatGPT Sites
+and services in the cloud, independent of the Mac. Local Node demonstrations are
+only development tests. Existing V1/V2/Mac installations and unrelated sites remain
+untouched. No original-domain requirement exists.
 
-## Evidence actually available in this turn
+## Actual registration and current blocker
 
-* No `.openai/hosting.json` exists in this worktree. Existing repository source
-  already contains `src/sites/readonly-api.js`, `src/sites/membership.js` and a
-  candidate projection migration; reuse them rather than build a second mock.
-* Current Sites connector descriptions expose create/version/private-deploy/status
-  and database-read tools. They require the exact saved `project_id`, pushed
-  commit, build artifact/hosting metadata and saved version before deployment.
-* Current Sites skill read returned `skill package is not available`; both cloud
-  and executor skills lists are empty. No project-setup/site-workflow helper was found in the
-  inspected workspace/opt paths. Thus the mandatory current skill/build workflow
-  could not be read. No Site creation or deployment was attempted speculatively.
-* Parent's current read-only list identified only unrelated public OpenSky; it is
-  not a Publisher project and must never be overwritten. A future Publisher Site
-  must be separate and owner-private. Persist the returned opaque ID atomically
-  before any further operation and never create twice.
-* Current official [Sites overview](https://learn.chatgpt.com/docs/sites) describes
-  hosted web apps. The official [Sparkboard example](https://developers.openai.com/showcase/idea-intake)
-  specifies a Worker-compatible ESM build, a logical D1 `DB` binding and generated
-  Drizzle migrations; its R2 binding is null. This confirms those technologies are
-  used by Sites, **not** that this account has provisioned bindings, that all Node
-  APIs work there, or that its example identity header is sufficient for Publisher
-  authorization. Its workspace-wide sharing instructions do not apply here.
-* Direct retrieval of the official overview Markdown from the executor was denied
-  by the proxy (`Tunnel connection failed: 403 Forbidden`). It produced no file;
-  that retrieval was stopped. Web search/open had already supplied the official
-  overview/example. No workaround for this denial was attempted.
+A new, separate **VietBridge Publisher V3** Site was created with the native Sites
+connector at `2026-10-22T02:50:43.614152+00:00`:
 
-## Concrete minimum and layers
+- Project: `appgprj_6ad97a034fd08191a8399eeda10f048c`.
+- Expected URL: `https://vietbridge-publisher-v3.ardenttang64.chatgpt.site`.
+- Native readback: `current_user_role:owner`, access mode `custom`, allowed role
+  only `owner`, no external visitors, version **0**, `live_url:null`.
+- ID persisted immediately in `/workspace/sites/publisher-v3/.openai/hosting.json`.
+  Reuse this ID; never create a second project for a failed build.
+- [Redacted registration evidence](evidence/v3-sites-registration.json) contains no
+  credentials. The source credential issued by the native Sites flow is ephemeral,
+  held in tool memory only, and has not been used to push. No persistent social,
+  OAuth or service-account credential was created.
 
-| Layer | Reuse / minimum implementation | Actual state |
+**The Site is registered, not deployed.** No source push, saved build, hosted
+migration, D1/R2 provisioning or deployment has been attempted. The expected URL
+is not proof of a working product. The unrelated OpenSky site was only identified
+in the read-only listing and was never modified.
+
+The Sites skill recovered and its main instructions, storage, identity,
+app-integration and local-preview references and starter README were read. Native
+creation followed those instructions. However, the executor does not have the
+plugin directory, `scripts/project-setup.mjs`, `scripts/site-workflow.mjs`,
+`install-dependencies.mjs`, `build-site.mjs`, or complete Vinext starter. Attempts
+to read required script/starter resources returned `failed to read skill resource`.
+A later main-skill read again returned **`skill package is not available`**; both
+skill catalogs then returned zero entries. These are missing workflow resources,
+not a rejected create/deploy permission request or an uncertain deployment.
+
+Instruction source:
+[Sites SKILL.md](skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/sites/SKILL.md)
+and its
+[Vinext starter README](skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/sites/templates/vinext-starter/README.md).
+The readable starter explicitly says: “When using the Sites plugin, follow its
+skill instructions for installation, builds, and publishing.” It also identifies
+`app/chatgpt-auth.ts`, maintained Sites Vite integration and the production Worker
+entry as starter components. Those missing components were not replaced with
+invented authentication headers or a guessed deployment manifest.
+
+The dependent blocked action is supported initialization/build/source publication
+for this exact project, including official identity and binding integration. No
+new user permission is needed to restore those existing tools. Parent instructions
+already authorize a new owner-private V3 Site. The supported helper/starter needs
+to become available in this environment; then continue against the saved ID.
+
+## Supported layers and implemented migration
+
+| Layer | Implemented and tested | Remaining before hosted acceptance |
 | --- | --- | --- |
-| Sites UI | Port the existing Tab/content/platform/Review/metric views to supported Sites starter; same scope selectors and frozen IDs | Existing browser UI tested in cloud Node; Sites entry/build and capability-aware API wiring still missing |
-| Sites identity + API | Existing async read adapter + exact membership resolver; integrate official server-only Sites identity and owner mapping | Local SQLite facade tests run; real Sites dispatch/auth integration unavailable |
-| Persistent reads | Existing `publisher_jobs`, `facebook_accounts`, source-ledger projection; generate/review official D1 migration, no copied real DB | Candidate migration/local tests only; no live D1 |
-| Human decisions / source evidence / metrics | Reuse domain contracts and exact hashes; async repository layer with immutable receipts and concurrency checks | Native cloud Node/SQLite implementation tested; D1 write migration not implemented |
-| Heavy media service | Cloud Linux process with real ffprobe/ffmpeg/Pillow and bounded ZIP extraction; immutable content hash and scoped receipt transport | Runs in development environment; managed durable cloud service not provisioned/connected |
-| Media storage | Versioned immutable objects, hash/size verification, lease/cache lifecycle; use actual R2 only after supported binding contract is known | Local private BLOB/cache proven; R2 transport and object/SQL recovery protocol missing |
-| Publish / interactions | Existing independent per-account permits, quota, submit intent and UNKNOWN reconciliation; separate authorized platform adapters | Synthetic execution proven; no new live authority or cloud browser/official API rollout |
+| Sites-oriented UI | `cloud-console.html/css/js`: customer/account switching, nine inherited navigation destinations, complete content/platform preview, new immutable versions, multiple frozen tasks and reload | Official starter entry/assets wiring and hosted desktop/mobile tests; unsupported tabs explicitly say so |
+| Identity/API | Pure ESM `cloud-authoring-api.js`; server-only identity callback required; existing membership/read API reused; missing identity/bindings fail closed | Official `getChatGPTUser()` integration in the dispatch-owned server context; no browser-provided identity fallback |
+| Persistent authoring | Async D1-shaped SQL, atomic command batches, customer/account/version/frozen-task writes, original source/job projections | Real D1 binding, generated Drizzle schema/migrations and hosted rollback/concurrency validation |
+| Review/source/metrics | Original Node/SQLite implementations and all prior gates retained; current full regression passes | Async persistence port, exact identity/receipt transport and UI connection to the cloud authority boundary |
+| Heavy media | Bounded ZIP/hash/ffprobe/ffmpeg/Pillow implemented and tested in cloud development | A durable authorized cloud Linux service with authenticated receipt transport; no Mac fallback or native ffmpeg inside Workers |
+| Media objects | Original immutable BLOB/cache and lease checks retained | Actual R2 binding, scoped upload/read transport, object/SQL recovery and hosted media acceptance |
+| Publishing/interactions | Existing per-account permits, quotas, idempotency and UNKNOWN reconciliation retained | Separate authorized official/API or cloud executor integrations; this Site has no execution routes |
 
-The existing executable minimum is the **real read API factory**
-`createSitesReadonlyApi({db,origin,resolveScope})` with
-`createSitesScopeResolver({db,getTrustedIdentity})`, not static sample JSON. It
-performs scoped persisted queries and returns original frozen task/attempt state,
-including UNKNOWN. Its local acceptance command is:
+Current Sites instructions describe Workers with 128 MB memory and HTTP outbound
+access, not raw TCP or a persistent Node process. Native SQLite transactions,
+filesystem locks and subprocess decoders must remain separated or be deliberately
+ported. D1 batch tests on SQLite are not hosted D1 acceptance. R2 is not provisioned
+merely because its name appears in an architecture document.
 
-```sh
-node --test test/sites-readonly-api.test.js test/sites-membership.test.js
-```
+The authored console calls real API handlers and persists to the injected database;
+it does not keep business data in browser localStorage or static fixture JSON.
+Only selected customer/account preferences use localStorage. New manual content
+stays `MANUAL_UNVERIFIED`, account mappings stay `UNCONFIGURED`, and frozen tasks
+stay DRAFT with `publish_allowed:false`. Creating a mapping grants no platform
+access. Current lists are bounded to 200 items; pagination remains to implement.
 
-It is a prerequisite, not a complete hosted console. The deployment minimum is:
-read the current Sites skill/starter → create one separate private Publisher Site
-after local build exists → persist project ID → integrate verified dispatch identity
-and explicit owner membership → register generated isolated projection migration
-→ wire the existing UI's scoped jobs/source views to the read API → build/package
-exact pushed commit → save/private-deploy → verify hosted identity denial and
-account isolation plus actual D1 reads on desktop/phone. No dummy auth, static
-shell or public seeded customer data substitutes for these gates. First writes
-require a separate verified transaction design, not just successful read hosting.
+## Resume path without rebuilding or weakening gates
 
-Native `DatabaseSync`, BEGIN IMMEDIATE/read-check-write callbacks, filesystem
-locks, native subprocess decoders and local browser/CDP profiles are not assumed
-portable to Workers. D1 batch behavior does not prove the atomic native
-claim+permit+quota sequence. No native ffmpeg or persistent Node server is claimed
-to run inside Sites. Cloud heavy processing and Sites API/UI need an explicit
-trusted transport boundary; lack of a current authorized provider keeps it shut.
+1. Restore the official Sites plugin/helper directory and Vinext starter. Preserve
+   the existing project ID during initialization; do not overwrite unrelated sites.
+2. Import the prepared portable source from `/workspace/sites/publisher-v3/migration-source`.
+   This is source staging, not a build artifact. The hosting file still declares
+   `d1:null,r2:null`; change them only using the verified supported binding schema.
+3. Connect official server-only Sites identity and D1, generate schema-only Drizzle
+   migrations from the reviewed candidate SQL, and validate with the official
+   local runtime. Do not run DDL or seed users in request handlers.
+4. Use official install/build/source-workflow helpers and native private deployment
+   against the exact pushed commit and artifact. Credentials go only through the
+   helper's supported secret input, never arguments, files, logs or Git remotes.
+5. Verify hosted owner-only access, forged identity denial, customer/account scope,
+   durable reload, duplicate commands, failure rollback and actual D1 reads on
+   desktop/mobile. Only then report a working private URL.
+6. Port Review/metric persistence and connect the separately authorized cloud media
+   service. Keep real source verification, approval and publication authority
+   separate. Unsupported operations remain closed, even on a successful UI deploy.
 
-## Exact outstanding blocker and next authorized work
+[Slice 07](v3-slice-07.md) supplies actual commands, failures, screenshots and the
+acceptance matrix. Native cloud-development regression remains intact; formal
+hosted V3 delivery remains incomplete. This is both a missing supported workflow
+and unfinished integration code, not a Mac availability issue.
 
-The blocked dependent step is **supported Sites initialization/build packaging
-and identity integration**, because the current required Sites skill package and
-helpers are unavailable. This is a missing runtime workflow, not a denied Site
-create/deploy request: none was sent, no uncertain Site resource exists, and no
-Publisher project ID was invented. Existing source evidence package, cloud tests
-and PRD continued independently. No extra permissions were requested.
-
-Once supported instructions become readable, use the already authorized new
-private V3 Site scope; do not ask again merely because it is a Site. Do not reuse
-OpenSky, expose real customer materials, or generate separate OAuth/service-account
-credentials. If the supported flow itself needs additional credentials/access,
-identify that exact step and stop it while continuing local migration work.
-
-Remaining work is explicitly both **code** (Sites UI/API wiring, async repository,
-write-transaction design, object recovery, trusted cloud/media transports) and
-**runtime acceptance** (current build helpers, identity dispatch, provisioned
-bindings, deployment tests). It is not all attributed to Mac availability or hosting.
+The earlier denied real Study ZIP download and official overview Markdown executor
+request remain stopped. No retry, alternate route, sharing change or original
+media deletion was made as part of this migration.
