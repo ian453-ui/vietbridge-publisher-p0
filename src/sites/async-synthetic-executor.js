@@ -33,7 +33,9 @@ export class AsyncSyntheticExecutor extends AsyncStorage {
   if(this.fault!=='CRASH_AFTER_INTENT'){
    // A separate closed simulated platform commit: lost response cannot justify
    // another INSERT. There is no automatic retry at this boundary.
-   try{const dispatch=await this.permits.dispatchStatements(data,scope,attempt);await this.batch([...dispatch,this.guard("EXISTS(SELECT 1 FROM sites_synthetic_attempts WHERE plan_id=? AND attempt_id=? AND state='SUBMITTING')",[id,attempt]),this.statement('INSERT INTO sites_synthetic_objects VALUES(?,?,?,?,?)',[id,attempt,'synthetic-'+id,job.snapshot_hash,JSON.stringify(manifest.media)])]);}
+   // Content may be withdrawn after intent. Recheck the original subject/event
+   // in the actual dispatch transaction; reconciliation must remain independent.
+   try{const dispatch=await this.permits.dispatchStatements(data,scope,attempt);await this.batch([...this.plans.approvals.subjectGuards(subject),this.plans.approvals.latestGuard(p.review_id,p.approval_event_id),...dispatch,this.guard("EXISTS(SELECT 1 FROM sites_synthetic_attempts WHERE plan_id=? AND attempt_id=? AND state='SUBMITTING')",[id,attempt]),this.statement('INSERT INTO sites_synthetic_objects VALUES(?,?,?,?,?)',[id,attempt,'synthetic-'+id,job.snapshot_hash,JSON.stringify(manifest.media)])]);}
    catch(error){if(fatal(error))throw error;return this.recover(id,scope);}
   }
   if(['SUBMIT_RESPONSE_LOST','CRASH_AFTER_INTENT'].includes(this.fault)){try{await this.markUnknown(await this.context(id,scope));return {state:'UNKNOWN',next_action:'RECONCILE_PENDING',...flags};}catch(error){if(fatal(error))throw error;return this.observeAfterError(id,scope);}}

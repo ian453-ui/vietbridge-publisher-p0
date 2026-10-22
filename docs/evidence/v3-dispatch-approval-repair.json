@@ -1,0 +1,62 @@
+{
+  "base": "6aa7d8da8adeaa605ff4a1f857431cc30dafa882",
+  "synthetic_only": true,
+  "real_submission_count": 0,
+  "hosted_acceptance": false,
+  "credentials_permissions_network_changed": false,
+  "deployment_attempted": false,
+  "before": {
+    "total": 2,
+    "passed": 0,
+    "failed": 2,
+    "observed": "PUBLISHED after second-connection CONTENT_REJECTED or bound source QA_BLOCKED, between intent and actual dispatch",
+    "command": "node --test test/sites-dispatch-approval.test.js"
+  },
+  "targeted": {
+    "total": 45,
+    "passed": 45,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "duration_ms": 2378.732619,
+    "command": "node --test test/sites-dispatch-approval.test.js test/sites-execution-permits.test.js test/sites-async-synthetic-executor.test.js"
+  },
+  "full": {
+    "total": 1151,
+    "passed": 1151,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "duration_ms": 115868.835354,
+    "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+    "stage": "Final implementation and all five focused regressions"
+  },
+  "syntax_checks": 2,
+  "diff_check": "passed",
+  "scope": "Only actual dispatch adds original subjectGuards/latestGuard; readback/quota transitions unchanged",
+  "converse_cases": "After-object content rejection and source QA failure retain original restart readback/SETTLED; unchanged source dispatch normal and idempotent",
+  "logs": {
+    "before": {
+      "path": "/tmp/v3-dispatch-approval-before.log",
+      "sha256": "e30157147fdeb76a2b5325f8c69aeefb567437837f3704749ac27199886c4907",
+      "exit_code": 1,
+      "summary": "\u2716 content rejection after intent must atomically block actual dispatch and retain UNKNOWN quota (214.503341ms)\n\u2716 source QA after intent must atomically block actual dispatch and retain UNKNOWN quota (69.065804ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 0\n\u2139 fail 2\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 402.681684\n\n\u2716 failing tests:\n\ntest at test/sites-dispatch-approval.test.js:27:55\n\u2716 content rejection after intent must atomically block actual dispatch and retain UNKNOWN quota (214.503341ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'PUBLISHED'\n  - 'UNKNOWN'\n  \n      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-dispatch-approval.test.js:37:63)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'PUBLISHED',\n    expected: 'UNKNOWN',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n\ntest at test/sites-dispatch-approval.test.js:27:55\n\u2716 source QA after intent must atomically block actual dispatch and retain UNKNOWN quota (69.065804ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 'PUBLISHED'\n  - 'UNKNOWN'\n  \n      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-dispatch-approval.test.js:37:63)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'PUBLISHED',\n    expected: 'UNKNOWN',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n"
+    },
+    "targeted": {
+      "path": "/tmp/v3-dispatch-approval-targeted.log",
+      "sha256": "d5db98e941c76c469f9a84db21ac17ab0d432f74ef842413dd49bfbf2da05c75",
+      "exit_code": 0,
+      "summary": "\u2139 tests 45\n\u2139 suites 0\n\u2139 pass 45\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 2378.732619"
+    },
+    "full": {
+      "path": "/tmp/v3-dispatch-approval-full.log",
+      "sha256": "bf9685b4acd194a2dd31b764d816eacbde317b96c7000620be835db1e6748fff",
+      "exit_code": 0,
+      "summary": "\u2139 tests 1151\n\u2139 suites 0\n\u2139 pass 1151\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 115868.835354"
+    }
+  },
+  "final_code_sha256": {
+    "src/sites/async-synthetic-executor.js": "527a38d7a064da3571f7f95cbdfb133aa09f1ce13aa4e267e175de3e3c9d0cfa",
+    "test/sites-dispatch-approval.test.js": "99cfaab1a7231259156f93c0508de93fc9f9950afe8a9a05f1244fc679a7bf46"
+  }
+}

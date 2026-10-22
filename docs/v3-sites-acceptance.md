@@ -2,7 +2,10 @@
 
 2026-10-22, slice 12 (following execution recovery and canonical import). Formal target: owner-private ChatGPT Sites UI with cloud
 services. Existing project `appgprj_6ad97a034fd08191a8399eeda10f048c` is registered,
-not deployed. The table below supersedes earlier slices' *current* status without
+not deployed. The [dispatch withdrawal repair](v3-dispatch-approval-repair.md)
+reproduced and closes content rejection/source-QA changes after intent: dispatch
+now rechecks them atomically while prior committed results remain reconcilable.
+The table below supersedes earlier slices' *current* status without
 rewriting their historical evidence. [Slice 12 evidence](v3-slice-12.md) identifies
 this run; [original matrix](v3-final-acceptance.md) retains V1/V2 module references.
 
