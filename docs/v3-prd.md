@@ -1,9 +1,10 @@
 # Publisher V3 — PRD / architecture / acceptance plan
 
-Current update: [slice 09](v3-slice-09.md) implements asynchronous content decisions,
-revocation and Review → explicit platform/media preparation in the existing Sites
-content/task views. Its [whole-product matrix](v3-sites-acceptance.md) is the current
-status, including unfinished user-visible paths and the unchanged hosting blocker.
+Current update: [slice 10](v3-slice-10.md) connects canonical source identity,
+versions, exact body/media and ZIP references to the existing persistent Review,
+with source-change invalidation and explicit crash reconciliation. Native loose
+body sync now enforces its declared SHA256. The [whole-product matrix](v3-sites-acceptance.md)
+is current; the formal Sites delivery and real-provider gaps remain explicit.
 Historical test counts below are not this package's execution evidence.
 
 Baseline checked against GitHub on 2026-10-21 UTC: `publisher-unified` =

@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-22T12:02:32.652Z",
+  "project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+  "status": "active",
+  "latest_version_number": 0,
+  "live_url": null,
+  "preview_url": null,
+  "access_mode": "custom",
+  "allowed_roles": [
+    "owner"
+  ],
+  "external_visitor_count": 0,
+  "helper_check": "No official scripts/templates found in /opt/codex or /workspace supported skill/project locations",
+  "download_retried": false
+}

@@ -158,7 +158,10 @@ export const inspectProductionResult=(request,result,options)=>inspectPackage(re
 export const inspectProductionPackage=(request,result,options)=>inspectPackage(request,result,options);
 
 /** Explicit local packaging only; binds supplied bytes, never authenticates a producer. */
-export function packageProductionResult(request,selections,{root,now=Date.now(),wallMs}={}){
+export function packageProductionResult(request,selections,options={}){return packageProductionInspection(request,selections,options).result;}
+
+/** Packaging + review packet from the same bounded decoded bytes; no second decode. */
+export function packageProductionInspection(request,selections,{root,now=Date.now(),wallMs}={}){
  verifyProductionRequest(request);if(!Array.isArray(selections)||selections.length!==request.items.length)fail('INVALID_SELECTIONS');
  const descriptors=[],ids=new Set(),items=selections.map(row=>{exact(row,['source_id','files']);const item=request.items.find(x=>x.source_id===row.source_id);if(!item||ids.has(row.source_id))fail('INVALID_SELECTIONS');ids.add(row.source_id);
   if(!Array.isArray(row.files)||row.files.length!==item.deliverables.length)fail('INVALID_SELECTIONS');
@@ -171,5 +174,5 @@ export function packageProductionResult(request,selections,{root,now=Date.now(),
   for(const artifact of row.artifacts){const spec=request.items.find(x=>x.source_id===row.source_id).deliverables.find(x=>x.artifact_id===artifact.artifact_id);artifact.references=spec.references.map(artifact_id=>({artifact_id,sha256:row.artifacts.find(x=>x.artifact_id===artifact_id)?.sha256}));}
  }
  const result={...Object.fromEntries(resultKeys.filter(k=>!['completed_at','items'].includes(k)).map(k=>[k,request[k]])),completed_at:new Date(now).toISOString(),items};
- inspectPackage(request,result,{root,now},snapshots);return result;
+ return {result,...inspectPackage(request,result,{root,now},snapshots)};
 }

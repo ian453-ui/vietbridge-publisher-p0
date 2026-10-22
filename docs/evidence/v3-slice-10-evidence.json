@@ -1,0 +1,50 @@
+{
+  "base": "770f4664d76975555ed7428a0e16dc85d305ede2",
+  "branch": "publisher-v3/cloud-slice-01",
+  "synthetic_only": true,
+  "hosted_d1_r2_verified": false,
+  "real_source_verified": false,
+  "external_platform_actions": false,
+  "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/tmp/v3-slice-10-ui-final node --test --test-concurrency=4 test/*.test.js",
+  "complete_tests": 1113,
+  "passed": 1113,
+  "failed": 0,
+  "duration_ms": 105927.392812,
+  "syntax_files_passed": 13,
+  "files": {
+    "docs/evidence/v3-slice-10/mobile-canonical-review.png": "d072e41b7ca6e978e156eb642253ae0e59659b1620d3a241acd8c363be6f9b9f",
+    "docs/evidence/v3-slice-10/desktop-canonical-review.png": "ba1fa2929302562e01a38d5d433fbae6e009c30e2979f8e2a669ee6d2777f8be",
+    "docs/evidence/v3-slice-10/mobile-canonical-qa-withdrawn.png": "a33e683d9195c1c8c07586c66b425f929b1b3e4a3ac48c1657876f95aa785eea",
+    "docs/evidence/v3-slice-10/desktop-canonical-qa-withdrawn.png": "dcc15b90096dacd139e7c19bcdeeaa3e34eff4da855a53d6e96065c7928ba8e5",
+    "body_sha_before": {
+      "log": "/tmp/v3-canonical-body-before.log",
+      "sha256": "cc4db22cc7d467da903405e18c4b8fa6fde3b7415c0e311450df5668e307970b",
+      "summary": "✖ declared canonical body SHA must reject changed bytes before replacing the visible manifest entry (22.942498ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 266.758397\n\n✖ failing tests:\n\ntest at test/content-sync.test.js:37:1\n✖ declared canonical body SHA must reject changed bytes before replacing the visible manifest entry (22.942498ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  \n  'READY' !== 'BLOCKED'\n  \n      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/content-sync.test.js:39:145)\n      at async Test.run (node:internal/test_runner/test:1389:7)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 'READY',\n    expected: 'BLOCKED',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+      "executed_in_this_package": true
+    },
+    "body_sha_after": {
+      "log": "/tmp/v3-canonical-body-after.log",
+      "sha256": "35ee89322d12b949146f8f7626a89918481fad12334fda0c4c9e5e49b2c41adc",
+      "summary": "✔ declared canonical body SHA must reject changed bytes before replacing the visible manifest entry (14.574057ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 219.926653\n",
+      "executed_in_this_package": true
+    },
+    "import_targeted": {
+      "log": "/tmp/v3-canonical-import-final.log",
+      "sha256": "91171200bd4c12c6b3bd1060481fb661776308d4a128f43abf12c9b2880f5009",
+      "summary": "ℹ tests 18\nℹ suites 0\nℹ pass 18\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 794.351594",
+      "executed_in_this_package": true
+    },
+    "ui_targeted": {
+      "log": "/tmp/v3-canonical-ui.log",
+      "sha256": "06dc6a49604b62523e85d3f24aba5716a41ffaf9a691e6789ac7311496388179",
+      "summary": "ℹ tests 2\nℹ suites 0\nℹ pass 2\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 3776.495802",
+      "executed_in_this_package": true
+    },
+    "complete_regression": {
+      "log": "/tmp/v3-slice-10-full.log",
+      "sha256": "25f069cdfc1d30d17d61ead12ef8f04a55e7b6de01d09f8031e23e79131fef12",
+      "summary": "ℹ tests 1113\nℹ suites 0\nℹ pass 1113\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 105927.392812",
+      "executed_in_this_package": true
+    }
+  }
+}

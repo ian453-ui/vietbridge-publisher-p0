@@ -47,7 +47,7 @@ export class ManifestDriveSync {
     for(const entry of manifest.items){const item={...entry},id=String(item.content_id||'');
       try{
         if(!/^[-A-Z0-9]{5,80}$/.test(id)||counts.get(id)!==1)throw Error('MANIFEST_CONTENT_ID_INVALID');
-        const specs=[[item.body_source,item.content_drive_file_id,undefined,'content'],[item.primary_image,item.primary_image_drive_file_id,item.primary_image_sha256,'assets']] as const;
+        const specs=[[item.body_source,item.content_drive_file_id,item.body_source_sha256,'content'],[item.primary_image,item.primary_image_drive_file_id,item.primary_image_sha256,'assets']] as const;
         const files=[];
         for(const [path,driveId,expectedHash,kind] of specs){
           if(typeof path!=='string'||typeof driveId!=='string'||!driveId||!new RegExp('^READY/'+kind+'/[A-Za-z0-9_.-]+$').test(path)||!path.includes(id))throw Error('MANIFEST_FILE_BINDING_INVALID');

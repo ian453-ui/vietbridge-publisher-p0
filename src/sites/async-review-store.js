@@ -1,3 +1,4 @@
+import {sourceImportState} from './source-import-state.js';
 import {AsyncStorage,bytes,digest,sha256,text,exact,fail} from './async-storage.js';
 import {ScopedObjectStore,CLOUD_OBJECT_LIMIT,bounded} from './scoped-object-store.js';
 
@@ -52,7 +53,8 @@ export class AsyncReviewStore extends AsyncStorage {
   const request=JSON.parse(row.request_json),result=JSON.parse(row.result_json),report=JSON.parse(row.report_json);if(await digest(JSON.stringify({request,result,report}))!==row.envelope_hash)fail('REVIEW_STORAGE_CORRUPT');
   const assets=await this.rows('SELECT a.source_id,a.artifact_id,a.object_id,o.sha256,o.bytes,o.mime,o.state FROM sites_review_assets a JOIN sites_objects o ON o.id=a.object_id WHERE a.review_id=? AND o.workspace=? AND o.account_id=? ORDER BY a.source_id,a.artifact_id',[id,workspace,accountId]);
   const latest=await this.one('SELECT max(request_revision) revision FROM sites_reviews WHERE task_id=?',[row.task_id]);
-  return {id,task_id:row.task_id,request_revision:row.request_revision,state:latest.revision===row.request_revision?'REVIEW_REQUIRED':'SUPERSEDED',report,assets,blocked_reason:'CLOUD_APPROVAL_TRANSPORT_UNAVAILABLE',...flags};
+  const source=await sourceImportState(this,id),source_import=source.required?{state:source.state,blocked_reason:source.blocked,source_revision:source.source_revision,current_revision:source.current_revision,summary:JSON.parse(source.summary_json)}:null;
+  return {id,source_import,task_id:row.task_id,request_revision:row.request_revision,state:latest.revision===row.request_revision?'REVIEW_REQUIRED':'SUPERSEDED',report,assets,blocked_reason:'CLOUD_APPROVAL_TRANSPORT_UNAVAILABLE',...flags};
  }
  async asset(workspace,accountId,id,source,artifact){
   const review=await this.detail(workspace,accountId,id),asset=review.assets.find(a=>a.source_id===source&&a.artifact_id===artifact);if(!asset)fail('REVIEW_ASSET_NOT_FOUND');if(!this.objects)fail('R2_BINDING_REQUIRED');return this.objects.verify(asset.object_id,{workspace,accountId});
