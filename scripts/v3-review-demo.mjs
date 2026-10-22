@@ -20,7 +20,9 @@ export function v3ReviewDemo(out){
   const receipt=new ProductionReviewStore(store.db).ingest(request,result,{root});
   const otherWorkspace=store.saveWorkspace({name:'Synthetic isolated customer'});
   const otherAccount=publisher.saveAccount(otherWorkspace.id,{platform:'xiaohongshu',display_name:'Synthetic other account',expected_identity:'SYNTHETIC OTHER',external_id:'username:synthetic-other'});
-  const summary={...receipt,synthetic_only:true,dbPath,workspace:workspace.id,accountId:account.id,otherWorkspace:otherWorkspace.id,otherAccountId:otherAccount.id,artifactRoot:root};
+  const secondAccount=publisher.saveAccount(workspace.id,{platform:'xiaohongshu',display_name:'Synthetic same-customer second account',expected_identity:'SYNTHETIC SECOND',external_id:'username:synthetic-second',publisher_options:{mcp_endpoint:'http://127.0.0.1:19998/mcp'}});
+  publisher.selectAccount(workspace.id,account.id);
+  const summary={...receipt,synthetic_only:true,dbPath,workspace:workspace.id,accountId:account.id,secondAccountId:secondAccount.id,otherWorkspace:otherWorkspace.id,otherAccountId:otherAccount.id,artifactRoot:root};
   writeFileSync(join(out,'demo.json'),JSON.stringify(summary,null,2),{flag:'wx'});return summary;
  }finally{store.close();}
 }

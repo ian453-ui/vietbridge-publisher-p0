@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import {createProductionRequest,inspectProductionResult,readProductionArtifact} from './production-artifact-contract.js';
+import {createProductionRequest,inspectProductionPackage} from './production-artifact-contract.js';
 
 const fail=code=>{throw Error(code);};
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -9,6 +9,7 @@ const mime=ext=>({'.mp4':'video/mp4','.mov':'video/quicktime','.webm':'video/web
 export class ProductionReviewStore {
  constructor(db){
   this.db=db;
+  db.exec('PRAGMA busy_timeout=3000');
   db.exec(`CREATE TABLE IF NOT EXISTS production_reviews(
    id TEXT PRIMARY KEY NOT NULL, task_id TEXT NOT NULL, request_revision INTEGER NOT NULL,
    workspace TEXT NOT NULL, account_id TEXT NOT NULL, request_json TEXT NOT NULL,
@@ -23,17 +24,10 @@ export class ProductionReviewStore {
  scope(workspace,account){
   if(typeof workspace!=='string'||!workspace||typeof account!=='string'||!account||!this.db.prepare('SELECT 1 FROM facebook_accounts WHERE workspace=? AND id=?').get(workspace,account))fail('REVIEW_SCOPE_DENIED');
  }
- ingest(request,result,{root,now=Date.now()}={}){
+ ingest(request,result,{root,now=Date.now(),wallMs}={}){
   this.scope(request.workspace,request.account_id);
-  const report=inspectProductionResult(request,result,{root,now}),assets=[];let total=0;
-  // Re-open and re-hash the exact snapshots to be retained. A changed file fails.
-  for(const item of report.items)for(const artifact of item.artifacts){
-   const path=result.items.find(x=>x.source_id===item.source_id).artifacts.find(x=>x.artifact_id===artifact.artifact_id).path;
-   const actual=readProductionArtifact(root,path,artifact.kind,{includeBytes:true});
-   if(actual.sha256!==artifact.sha256)fail('REVIEW_ASSET_CHANGED');
-   total+=actual.bytes;if(total>128*1024*1024)fail('REVIEW_TOTAL_SIZE_LIMIT');
-   assets.push({source:item.source_id,id:artifact.artifact_id,mime:mime(actual.extension),sha256:actual.sha256,data:actual.data});
-  }
+  const {report,snapshots}=inspectProductionPackage(request,result,{root,now,wallMs});
+  const assets=snapshots.map(actual=>({source:actual.source_id,id:actual.artifact_id,mime:mime(actual.extension),sha256:actual.sha256,data:actual.data}));
   const id=report.receipt.request_fingerprint;
   this.db.exec('BEGIN IMMEDIATE');
   try{

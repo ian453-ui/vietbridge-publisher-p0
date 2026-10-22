@@ -26,11 +26,12 @@ with Image.open(io.BytesIO(b),formats=['PNG','JPEG','WEBP']) as im:
   im.load()
 print(json.dumps({'format':fmt,'width':width,'height':height,'frames':frames}))`;
 
-export function validateImage(bytes,extension,declaration={}){
+export function validateImage(bytes,extension,declaration={},{timeoutMs=5000}={}){
+ if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1||timeoutMs>5000)throw Error('IMAGE_RESOURCE_LIMIT');
  if(!Buffer.isBuffer(bytes)||!bytes.length||bytes.length>20000000||!formats[extension.toLowerCase()])throw Error('IMAGE_FORMAT_OR_SIZE_INVALID');
  const key=createHash('sha256').update(bytes).digest('hex')+extension.toLowerCase();let shape=cache.get(key);
  if(!shape){
-  try{shape=JSON.parse(execFileSync(python,['-I','-B','-c',decode],{input:bytes,encoding:'utf8',timeout:5000,maxBuffer:8192,stdio:['pipe','pipe','pipe']}));}
+  try{shape=JSON.parse(execFileSync(python,['-I','-B','-c',decode],{input:bytes,encoding:'utf8',timeout:timeoutMs,killSignal:'SIGKILL',maxBuffer:8192,stdio:['pipe','pipe','pipe']}));}
   catch{throw Error('IMAGE_DECODE_INVALID_OR_RESOURCE_LIMIT');}
   if(shape.format!==formats[extension.toLowerCase()]||!Number.isSafeInteger(shape.width)||shape.width<1||!Number.isSafeInteger(shape.height)||shape.height<1||!Number.isSafeInteger(shape.frames)||shape.frames<1||shape.width*shape.height*shape.frames>40000000)throw Error('IMAGE_FORMAT_OR_DIMENSIONS_INVALID');
   shape=Object.freeze(shape);if(cache.size>=128)cache.delete(cache.keys().next().value);cache.set(key,shape);
