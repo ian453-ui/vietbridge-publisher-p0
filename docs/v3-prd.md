@@ -86,12 +86,14 @@ incompatible windows/definitions or turn unavailable metrics into zero.
 | Video QA | `production-artifact-contract.js` previously BYTES_HASH_ONLY | Fake MP4, truncated video, audio-only, wrong container and missing decoder fail; real video decodes; review remains pending |
 | Persistence | New production review ledger | Restart, duplicate receipt and conflicting result; no silent overwrite; account-scoped reads |
 | Metrics | `metric-observation.js` is in-memory only | Future durable collector: duplicates/conflicts/restart/source hashes; real collection explicitly unverified |
+| Full content identity | Parent inventory: 074 identifies distinct trade, permit-rule and Luxshare articles across dates; 075 also repeats | Use full content_id + slug + body semantics + version; never merge or attach images by a three-digit suffix/folder alone. Inventory-semantic implementation remains future work |
+| QA revocation precedence | Parent inventory: 062 title suggests pass, latest QA revoked old mobile PASS | New QA revocation / MOBILE_READABILITY_RETEST_PENDING overrides title markers and historic PASS; no inferred approval. Add actual inventory integration regression before rollout |
 
 ## Archive Asset Resolver (user addition)
 
 Cold storage may primarily be ZIP; permanent loose files are not required.
-Reference v1: `{content_id, archive_file_id, member_path, sha256, project_id,
-account_id, archive_sha256, parts?}`. Archive IDs are opaque storage IDs, never
+Reference v1: `{content_id, archive_file_id, member_path, member_size, sha256, project_id,
+account_id, archive_size, archive_sha256, kind, parts}` plus schema/type. Archive IDs are opaque storage IDs, never
 platform media URLs. Existing loose-file reading remains a supported resolver.
 
 Flow: resolve authorized project/account binding → fetch exact archive/ordered
@@ -119,8 +121,21 @@ Synthetic acceptance cases: ZIP and multipart reassembly success; wrong account,
 missing part, checksum failure, zip-slip, symlink, duplicate member, ZIP bomb,
 CRC failure, cache expiry/lease/restart, unchanged loose-file path, failed decode
 does not mark READY, upload gets extracted media rather than ZIP URL, rollback
-restores old reference. Implementation is a subsequent package; no real Drive
-access is needed. Muse capability is being handled by the parent task.
+restores old reference. [Slice 02](v3-slice-02.md) implements these against synthetic
+ZIPs and the existing Review ledger. Real Drive transport and Publisher/Muse real
+asset consumption remain unverified. Muse capability is handled by the parent.
+
+Retention update (user 2026-10-22): protect at least the latest 20 original media
+files **per project/media library**. Use original media timestamps, never fresh
+archive or ledger timestamps. Protect all cutoff ties and the whole library when
+original times are uncertain. Prioritize only older videos for technical review;
+image/text media stay retained. A video requires matching real publication and
+readback evidence for every frozen target platform/account/content revision/job;
+missing, UNKNOWN, click-only and test-only evidence do not qualify. Newer failed
+readback overrides older success. Protected files never enter candidates.
+Permanent deletion remains globally paused, requires separate exact batch
+confirmation, and is not implemented. ZIP resolution alone grants no deletion
+eligibility. The pure synthetic policy tests do not authenticate actual evidence.
 
 ## Delivery sequence and evidence rules
 

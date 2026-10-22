@@ -112,6 +112,10 @@ UI evidence: [screenshot](evidence/v3-review-synthetic.png). Local raw evidence:
 
 ## Remaining work
 
+Historical boundary at the slice-01 commit. ZIP materialization, batch-budget
+corrections and additional isolation/transaction tests are now implemented in
+[slice 02](v3-slice-02.md); the original results above remain attributed to slice 01.
+
 Archive Asset Resolver has a complete design and adversarial acceptance-case
 matrix in the PRD, but no ZIP implementation/test execution in this package.
 No Drive download, share change, reference migration or deletion was attempted.

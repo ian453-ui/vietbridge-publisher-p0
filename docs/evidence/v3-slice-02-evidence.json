@@ -1,0 +1,57 @@
+{
+  "executed_date_utc": "2026-10-22",
+  "environment": "isolated cloud worktree",
+  "base_release": "4455a4b1faf40fedcd7020636999e165fa4a1386",
+  "previous_slice": "1c5682dc78934da571a2a546538cf04ee0357f27",
+  "scope": "synthetic and existing mocked-platform regression only",
+  "full_test_command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+  "full_run": {
+    "tests": 968,
+    "pass": 968,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "duration_ms": 62479.492664
+  },
+  "syntax": {
+    "javascript_syntax_files": 314,
+    "python_ast": "PASS",
+    "diff_check": "PASS"
+  },
+  "manual_archive_browser": {
+    "synthetic_only": true,
+    "archive_members": 10,
+    "videoPlayedToEnd": true,
+    "externalRequests": [],
+    "pageErrors": [],
+    "publish_allowed": false
+  },
+  "local_logs": [
+    {
+      "path": "/tmp/v3-slice02-accepted-full.log",
+      "sha256": "6d19e32d38b68cf34634bbdf91f945360d9877d21dd0388233fa10d6dd14f80f"
+    },
+    {
+      "path": "/tmp/v3-archive-browser-proof.json",
+      "sha256": "f52aac58c2b9435c0f98dd173db8457ecd9f6b35fc6da1637f307cdc4c2af578"
+    },
+    {
+      "path": "/tmp/v3-archive-demo-result.log",
+      "sha256": "12e19b2638bbde82e721d422053911fa3bab944179dedcbe6af82df7d1b1f135"
+    },
+    {
+      "path": "/tmp/v3-delayed-ui-accepted.log",
+      "sha256": "1db459841ba098529b521e05ae67af1b3b18066fa37b23f8b1b0cf5b521653e3"
+    },
+    {
+      "path": "/tmp/v3-archive-final-targeted.log",
+      "sha256": "e974b9887ffaa73108dbd564a5a2129962e2c5e0228fb160817cab1bef357552"
+    }
+  ],
+  "real_drive_transport": "NOT_IMPLEMENTED",
+  "publisher_muse_real_consumption": "LIVE_UNVERIFIED",
+  "real_publication_or_interaction": "NOT_PERFORMED",
+  "real_original_deletion": "NOT_PERFORMED",
+  "permanent_deletion_paused": true
+}

@@ -148,6 +148,11 @@ decoded frames / 100 MiB, with 5-second probe and 20-second decode timeouts.
 Decode uses a private copy of the exact hashed bytes, fixed container demuxer and
 file-only protocol. Timeouts fail, never partially accept. Conservative bounds may
 reject otherwise usable long/complex videos; do not relabel them validated.
+V3 slice 02 adds whole-batch metadata preflight (100 artifacts, eight videos,
+128 MiB) before bytes/decoders, a shared processing deadline and hard subprocess
+termination. The validated buffers are reused for receipt/BLOB persistence;
+one intake no longer reopens and decodes each video twice. See
+[slice 02 resource limits and archive acceptance](../docs/v3-slice-02.md).
 `playback_verified:false` and `browser_playback_verified:false` remain explicit:
 decode is not human viewing or universal browser/platform compatibility. SRT reports
 `video_alignment_verified:false`. No file-format check establishes producer identity.
