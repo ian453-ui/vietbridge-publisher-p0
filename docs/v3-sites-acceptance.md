@@ -1,6 +1,6 @@
 # Publisher V3 current user-visible acceptance matrix
 
-2026-10-22, slice 10. Formal target: owner-private ChatGPT Sites UI with cloud
+2026-10-22, slice 10 plus retained-client QA repair. Formal target: owner-private ChatGPT Sites UI with cloud
 services. Existing project `appgprj_6ad97a034fd08191a8399eeda10f048c` is registered,
 not deployed. The table below supersedes earlier slices' *current* status without
 rewriting their historical evidence. [Slice 10 evidence](v3-slice-10.md) identifies
@@ -22,7 +22,7 @@ for any external operation. A UI Tab is never business-function completion.
 | ZIP/parts/hot cache | Synthetic resolver, exact hash/member, lease, recovery and loose compatibility | Canonical body + multipart ZIP image now enters original decoded Review; corrupt ZIP invalidates old approval; extracted results persist as immutable objects consumed by plans | Resolver service and authenticated transport not hosted/integrated with Sites; actual user ZIP consumption unverified after 403 |
 | Retention/deletion | Per-library latest 20 originals protected; older videos need all-target genuine readback; image/text retained | No deletion route or grant | Actual inventory/evidence proof and separate exact batch approval; permanent deletion remains paused |
 | Review and human decisions | Native shared-admin approve/reject/audit retained | Async event/command ledger, explicit checklist/reason, reject/revoke, restart, replay defense and races executed; only fixture authority/provenance provider available | Official Site identity + existing admin resolution and trusted real source decision provider; owner is not auto-admin |
-| Change invalidation | Native exact version/body/media/account guards | Same fields plus atomic live scope/version/event/object/source-head checks; newer failed/missing/withdrawn source invalidates old approval; old plans show STALE_PREVIEW after read/rejection | Background immediate invalidation not implemented; DB triggers are not owner-tamper protection |
+| Change invalidation | Native exact version/body/media/account guards; client manifest QA withdrawal now overrides READY/title/PASS filenames in both original catalogue paths | Same fields plus atomic live scope/version/event/object/source-head checks; newer failed/missing/withdrawn source invalidates old approval; old plans show STALE_PREVIEW after read/rejection | Background immediate invalidation not implemented; DB triggers are not owner-tamper protection |
 | Approved media → upload preparation | Native Review/ZIP bytes to original upload/task freeze | Exact reviewed bytes → platform variant → existing content → frozen original DRAFT; SQL rollback/lost ack/duplicate preparation exercised | Actual upload worker/provider; content approval never grants publication permission |
 | Publish/unique submit/readback | Existing per-account native adapters, permits, quotas and executor retained | No HTTP execute route; closed async synthetic rehearsal on same frozen job demonstrates independent confirmation, unique attempt and readback | Async real permit/quota claim, account verification, authorized uploader/driver and actual independent readback |
 | UNKNOWN handling | UNKNOWN→RECONCILE_PENDING, reservation retained | Restart/lost response/missing object/readback unavailable only reconcile original intent; later rejection cannot cause resubmit | Real cloud executor/reconciler and operation-specific proof |
@@ -76,4 +76,8 @@ those gaps. Original `publisher-unified` stays unchanged and unmerged.
 
 Independent quality work continues against concrete inheritance defects while
 hosting is blocked. The latest package repaired the confirmed body-hash gap and
-source crash/QA invalidation paths; feature counts and new mock apps are not goals.
+source crash/QA invalidation paths. A follow-up [retained-client QA repair](v3-client-qa-repair.md) also closes the reproduced original library gap; feature counts and new mock apps are not goals.
+
+[Existing API configuration check](v3-api-availability-check.md) distinguishes
+retained app-token code from an actually available independent cloud endpoint.
+No real enterprise/real-estate target identity or publication is verified here.

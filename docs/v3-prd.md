@@ -5,6 +5,8 @@ versions, exact body/media and ZIP references to the existing persistent Review,
 with source-change invalidation and explicit crash reconciliation. Native loose
 body sync now enforces its declared SHA256. The [whole-product matrix](v3-sites-acceptance.md)
 is current; the formal Sites delivery and real-provider gaps remain explicit.
+The follow-up [client QA repair](v3-client-qa-repair.md) also fixes a reproduced
+withdrawal bypass in both retained native client catalogue paths.
 Historical test counts below are not this package's execution evidence.
 
 Baseline checked against GitHub on 2026-10-21 UTC: `publisher-unified` =

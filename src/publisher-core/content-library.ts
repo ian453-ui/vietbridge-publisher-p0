@@ -1,3 +1,4 @@
+import {clientManifestQa} from '../client-manifest-qa.js';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -125,7 +126,7 @@ export class ContentLibrary {
     const claimed = new Set<string>();
     for(const manifestPath of files.filter(path=>basename(path)==='publisher-manifest.json'&&path.includes('/clients/'))){
       const root=dirname(manifestPath);
-      let manifest:{status?:string;items?:Array<Record<string,unknown>>};
+      let manifest:{status?:string;qa_status?:unknown;items?:Array<Record<string,unknown>>};
       try{manifest=JSON.parse(readFileSync(manifestPath,'utf8'));}catch{continue;}
       for(const entry of manifest.items??[]){
         const articleId=String(entry.content_id??'');
@@ -139,16 +140,16 @@ export class ContentLibrary {
         const publicConflict=existsSync(publicPath)&&readFileSync(publicPath,'utf8')!==body+'\n';
         const media=(entry.primary_image?[entry.primary_image]:[entry.cover??entry.asset_cover_path,entry.infographic??entry.asset_infographic_path]).filter(Boolean).map(String);
         const safe=(name:string)=>{const path=resolve(root,name);return isWithin(path,root)&&existsSync(path)&&isWithin(realpathSync(path),realpathSync(root));};
-        const unresolvedAssets=media.filter(name=>!safe(name));
+        const unresolvedAssets=media.filter(name=>!safe(name)),qa=clientManifestQa(manifest,entry);
         const assets=media.filter(safe).map((name,index)=>{
           const path=realpathSync(resolve(root,name)),stat=statSync(path),sha256=mediaHashes.get(path);
-          return {assetId:stableAssetId(articleId,basename(path)),contentId:articleId,path,filename:basename(path),sourcePath:path,sourceModifiedTime:stat.mtimeMs,sizeBytes:stat.size,sha256,revision:sha256,qaState:'PASS' as const,role:index===0?'cover' as const:'gallery_image' as const,ordinal:index+1,sequence:index};
+          return {assetId:stableAssetId(articleId,basename(path)),contentId:articleId,path,filename:basename(path),sourcePath:path,sourceModifiedTime:stat.mtimeMs,sizeBytes:stat.size,sha256,revision:sha256,qaState:qa.assetState as 'PASS'|'FAIL'|'UNKNOWN',role:index===0?'cover' as const:'gallery_image' as const,ordinal:index+1,sequence:index};
         });
         let imageInvalid=false;if(entry.gpt_source_revision){try{for(const asset of assets)validateImage(readFileSync(asset.path),extname(asset.path).toLowerCase(),entry);}catch{imageInvalid=true;}}
         const approvedBytesChanged=entry.body_source_sha256&&entry.body_source_sha256!==createHash('sha256').update(source).digest('hex')||entry.primary_image_sha256&&entry.primary_image&&entry.primary_image_sha256!==assets[0]?.sha256;
-        if(hasPublicBody&&!this.readOnly&&!publicConflict&&!imageInvalid&&!approvedBytesChanged){mkdirSync(publicDir,{recursive:true});if(!existsSync(publicPath))writeFileSync(publicPath,body+'\n',{flag:'wx'});}
-        const blockingReasons=[...(imageInvalid?['APPROVED_IMAGE_INVALID']:[]),...(publicConflict||approvedBytesChanged?['APPROVED_BYTES_CHANGED']:[]),...(manifest.status!=='READY'||entry.status!=='READY'?['PACKAGE_QA_FAILED']:[]),...(!hasPublicBody?['PUBLIC_PAYLOAD_MISSING']:[]),...(!assets.some(asset=>asset.role==='cover')?['COVER_MISSING']:[]),...(unresolvedAssets.length?['ASSET_REFERENCE_UNRESOLVED']:[])];
-        const version='client-'+createHash('sha256').update(JSON.stringify([source,assets.map(asset=>asset.sha256),entry.status,manifest.status])).digest('hex').slice(0,12);
+        if(hasPublicBody&&!qa.blocked&&!this.readOnly&&!publicConflict&&!imageInvalid&&!approvedBytesChanged){mkdirSync(publicDir,{recursive:true});if(!existsSync(publicPath))writeFileSync(publicPath,body+'\n',{flag:'wx'});}
+        const blockingReasons=[...(qa.blocked?['PACKAGE_QA_FAILED']:[]),...(imageInvalid?['APPROVED_IMAGE_INVALID']:[]),...(publicConflict||approvedBytesChanged?['APPROVED_BYTES_CHANGED']:[]),...(manifest.status!=='READY'||entry.status!=='READY'?['PACKAGE_QA_FAILED']:[]),...(!hasPublicBody?['PUBLIC_PAYLOAD_MISSING']:[]),...(!assets.some(asset=>asset.role==='cover')?['COVER_MISSING']:[]),...(unresolvedAssets.length?['ASSET_REFERENCE_UNRESOLVED']:[])];
+        const version='client-'+createHash('sha256').update(JSON.stringify([source,assets.map(asset=>asset.sha256),entry.status,manifest.status,...(qa.explicit?[qa.states]:[])])).digest('hex').slice(0,12);
         packages.push({articleId,version,title:title||String(entry.title??articleId),contentType:'image_text',packageRoot:root,assets,payloads:hasPublicBody?{facebook:publicPath}:{},canonicalDocument:{contentId:articleId},variantAssets:{facebook:assets.map(asset=>asset.assetId)},readiness:blockingReasons.length?'BLOCKED':'READY',blockingReasons,blockingDetail:hasPublicBody?undefined:'客户资料包缺少已批准的 Facebook 正文',unresolvedAssets,duplicateCandidates:0,publishedPlatforms:published.get(articleId)??[],sourceEvidence:[manifestPath,document,...assets.map(a=>a.path)],canonicalSource:true});
         claimed.add(document);for(const asset of assets)claimed.add(asset.path);
       }

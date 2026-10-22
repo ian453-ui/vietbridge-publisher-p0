@@ -1,0 +1,45 @@
+{
+  "base": "653cecb327958140c590151ae317951173851272",
+  "synthetic_only": true,
+  "reproduced_before_fix": {
+    "expected": [
+      false,
+      "BLOCKED"
+    ],
+    "actual": [
+      true,
+      "READY"
+    ],
+    "node_exit_code": 1
+  },
+  "targeted_after_exit_code": 0,
+  "related_tests": 76,
+  "full_tests": 1114,
+  "full_passed": 1114,
+  "full_failed": 0,
+  "duration_ms": 108300.612288,
+  "syntax_files": 4,
+  "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+  "logs": {
+    "before": {
+      "path": "/tmp/v3-client-qa-before.log",
+      "sha256": "ca7a7027f9d1163b20bc5fc447efc13e06ef76214b29fc55c424113660158f56",
+      "summary": "✖ latest client QA withdrawal overrides READY/title/image PASS across both retained library paths (16.809679ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 614.631468\n\n✖ failing tests:\n\ntest at test/library.test.js:131:1\n✖ latest client QA withdrawal overrides READY/title/image PASS across both retained library paths (16.809679ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n    [\n  +   true,\n  +   'READY'\n  -   false,\n  -   'BLOCKED'\n    ]\n  \n      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/library.test.js:136:9)\n      at Test.runInAsyncScope (node:async_hooks:227:14)\n      at Test.run (node:internal/test_runner/test:1382:25)\n      at Test.start (node:internal/test_runner/test:1242:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [ true, 'READY' ],\n    expected: [ false, 'BLOCKED' ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n"
+    },
+    "after": {
+      "path": "/tmp/v3-client-qa-after.log",
+      "sha256": "e49e91b663ed0394660b395aaaea5f154ef041423eb130ec1365c74d4372546e",
+      "summary": "ℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 638.587677"
+    },
+    "related": {
+      "path": "/tmp/v3-client-qa-related.log",
+      "sha256": "c22a57ed107560e5ca015fad1c1d4a41dc74c0a3cdd73f166fac078b8c69a958",
+      "summary": "ℹ tests 76\nℹ suites 0\nℹ pass 76\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 21098.207486"
+    },
+    "full": {
+      "path": "/tmp/v3-client-qa-full.log",
+      "sha256": "7973c84222098e70f47177a8ff9f174da482e079a6465a680666d3ef41ebef18",
+      "summary": "ℹ tests 1114\nℹ suites 0\nℹ pass 1114\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 108300.612288"
+    }
+  }
+}
