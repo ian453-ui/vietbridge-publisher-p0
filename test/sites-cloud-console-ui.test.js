@@ -7,8 +7,12 @@ import {join} from 'node:path';
 import {chromium} from 'playwright-core';
 import {cloudD1Fixture} from './fixtures/sites-cloud-d1.js';
 import {createCloudAuthoringApi} from '../src/sites/cloud-authoring-api.js';
+import {seedSitesRecords,fileBucket,inspectedPacket} from './fixtures/sites-evidence.js';
+import {AsyncReviewStore} from '../src/sites/async-review-store.js';
+import {AsyncMetricStore} from '../src/sites/async-metric-store.js';
+import {metricPacket,metricSelector,metricNow} from './fixtures/synthetic-metrics.js';
 
-async function setup(t){
+async function setup(t,{evidence=false}={}){
  const root=mkdtempSync(join(tmpdir(),'v3-sites-console-')),db=cloudD1Fixture(join(root,'cloud.sqlite'));let api,origin;
  const files={'/':['cloud-console.html','text/html; charset=utf-8'],'/cloud-console.js':['cloud-console.js','text/javascript'],'/cloud-console.css':['cloud-console.css','text/css']};
  const server=createServer(async(req,res)=>{try{
@@ -18,7 +22,8 @@ async function setup(t){
  }catch(error){res.writeHead(500);res.end(JSON.stringify({error:error.message}));}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));origin='http://127.0.0.1:'+server.address().port;
  // Test-only fixed identity. No request header, body or cookie can choose it.
- api=createCloudAuthoringApi({db:db.db,origin,getTrustedIdentity:async()=>({userId:'synthetic-owner'})});
+ const bucket=evidence?fileBucket(join(root,'objects')):null;api=createCloudAuthoringApi({db:db.db,origin,bucket,getTrustedIdentity:async()=>({userId:'synthetic-owner'})});
+ if(evidence){const f=await seedSitesRecords(db),p=inspectedPacket(root,f.scope,{video:true}),reviews=new AsyncReviewStore(db.db,{bucket,inspectionProvider:{readInspection:async()=>p}});await reviews.intake({...f.scope,task_id:p.request.task_id,request_revision:1});const metrics=new AsyncMetricStore(db.db),id=(await metrics.registerTarget(f.target)).id,packet=metricPacket(f.target);await metrics.ingest(id,packet,{...f.scope,now:metricNow});const a=await metrics.beginCollection(id,metricSelector(packet),{...f.scope,now:metricNow+1000});await metrics.failCollection(a.id,{...f.scope,now:metricNow+2000});}
  t.after(async()=>{await new Promise(r=>server.close(r));db.close();rmSync(root,{recursive:true,force:true});});return {root,db,origin};
 }
 for(const [name,viewport] of [['desktop',{width:1440,height:1000}],['mobile',{width:390,height:844}]])test(name+' cloud console persists customer/account/content/platform/task with full preview and reload',{timeout:40000},async t=>{
@@ -33,6 +38,13 @@ for(const [name,viewport] of [['desktop',{width:1440,height:1000}],['mobile',{wi
   assert.equal(await page.locator('nav [data-tab]').count(),9);for(const tab of ['review','verification','groups','inbox','engagement','metrics']){await page.locator('[data-tab='+tab+']').click();assert.match(await page.locator('[data-panel='+tab+']').innerText(),/尚未|未接入|待接入|没有|不具备|未启用/);}
   await page.locator('[data-tab=tasks]').click();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));if(process.env.V3_SITES_EVIDENCE_DIR){mkdirSync(process.env.V3_SITES_EVIDENCE_DIR,{recursive:true});await page.screenshot({path:join(process.env.V3_SITES_EVIDENCE_DIR,name+'-cloud-tasks.png'),fullPage:true});}
   assert.deepEqual(outside,[]);assert.deepEqual(errors,[]);assert.equal(f.db.sql.prepare("SELECT count(*) n FROM publisher_jobs WHERE state<>'DRAFT'").get().n,0);
+ }finally{await browser?.close();}
+});
+
+for(const [name,viewport] of [['desktop',{width:1440,height:1000}],['mobile',{width:390,height:844}]])test(name+' cloud Review plays decoded snapshot and reads durable null metric without publication',{timeout:40000},async t=>{
+ const f=await setup(t,{evidence:true});let browser;try{browser=await chromium.launch({executablePath:process.env.PUBLISHER_TEST_BROWSER_PATH||'/usr/bin/chromium',headless:true});const context=await browser.newContext({viewport}),outside=[],errors=[];await context.route('**/*',r=>new URL(r.request().url()).origin===f.origin?r.continue():(outside.push(r.request().url()),r.abort()));const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(8000);await page.goto(f.origin);await page.locator('[data-review]').waitFor({state:'attached'});await page.locator('[data-tab=review]').click();await page.locator('[data-review]').click();await page.locator('#preview video').waitFor();await page.waitForFunction(()=>document.querySelector('#preview video')?.readyState>=2);assert.ok(await page.locator('#preview img').evaluate(img=>img.complete&&img.naturalWidth>0));await page.locator('#preview video').evaluate(async v=>{v.muted=true;await v.play();});await page.waitForFunction(()=>document.querySelector('#preview video')?.currentTime>0);await page.locator('#preview video').evaluate(v=>v.pause());await page.locator('[data-read-text]').click();await page.locator('#preview-body').getByText('正文结尾完整保留。',{exact:false}).waitFor();assert.match(await page.locator('#preview-body').innerText(),/不能批准或发布/);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1&&document.querySelector('#preview').scrollWidth<=document.querySelector('#preview').clientWidth+1));
+ if(process.env.V3_SITES_EVIDENCE_DIR){mkdirSync(process.env.V3_SITES_EVIDENCE_DIR,{recursive:true});await page.screenshot({path:join(process.env.V3_SITES_EVIDENCE_DIR,name+'-cloud-review.png'),fullPage:true});await page.locator('#preview video').scrollIntoViewIfNeeded();await page.screenshot({path:join(process.env.V3_SITES_EVIDENCE_DIR,name+'-cloud-video.png'),fullPage:true});}
+ await page.locator('#close-preview').click();await page.locator('[data-tab=metrics]').click();assert.match(await page.locator('#metrics').innerText(),/views · —/);assert.match(await page.locator('#metrics').innerText(),/COLLECTION_FAILED/);assert.match(await page.locator('#metrics').innerText(),/SYNTHETIC/);await page.locator('[data-metric]').click();await page.locator('#preview[open]').waitFor();await page.locator('#preview-body h3').getByText('原始观测历史 · 最多 20 条').waitFor();assert.match(await page.locator('#preview-body').innerText(),/"value": null/);await page.locator('#close-preview').click();if(process.env.V3_SITES_EVIDENCE_DIR)await page.screenshot({path:join(process.env.V3_SITES_EVIDENCE_DIR,name+'-cloud-metrics.png'),fullPage:true});await page.reload();await page.locator('[data-review]').waitFor({state:'attached'});assert.equal(f.db.sql.prepare("SELECT count(*) n FROM publisher_jobs WHERE state<>'DRAFT'").get().n,0);assert.deepEqual(outside,[]);assert.deepEqual(errors,[]);
  }finally{await browser?.close();}
 });
 

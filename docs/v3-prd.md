@@ -55,6 +55,12 @@ identity/build/D1 integration remains blocked by missing starter/helpers. The
 registered Site is still version 0, not a hosted delivery. See the
 [actual migration matrix](v3-slice-07.md); unsupported operations stay disabled.
 
+Slice 08 connects asynchronous Review snapshots, scoped object recovery, metric
+observations/history and their read UI. Native validator rules are shared rather
+than copied; native media decoding is consumed as an explicit server-side receipt.
+Trusted heavy-service transport, hosted identity/storage and async approval decisions
+remain unconnected. [Storage protocol and current acceptance](v3-slice-08.md).
+
 ## Source-backed architecture and reuse decisions
 
 Reviewed 2026-10-21; these are design references, not installed dependencies or

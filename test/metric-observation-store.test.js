@@ -90,3 +90,9 @@ test('legacy attempts with no recorded generation remain explicitly unknown unti
  const next=ledger.beginCollection(f.id,shape,{...f.scope,now:metricNow+1000});ledger.ingest(f.id,metricPacket(f.target,{value:120,at:new Date(metricNow+1000).toISOString()}),{...f.scope,attemptId:next.id,now:metricNow+1000});assert.equal(ledger.snapshot(receipt.series_id,f.scope).value,120);
  }finally{db.close();}
 });
+
+test('same observation timestamp from an older late generation remains history without overriding the current generation',t=>{
+ const f=fixture(t),at=s=>metricNow+s*1000,p=metricPacket(f.target,{value:200,at:new Date(at(12)).toISOString()}),shape=metricSelector(p),a=f.ledger.beginCollection(f.id,shape,{...f.scope,now:at(0)}),b=f.ledger.beginCollection(f.id,shape,{...f.scope,now:at(10)});
+ const r=f.ledger.ingest(f.id,p,{...f.scope,attemptId:b.id,now:at(12)});f.ledger.ingest(f.id,metricPacket(f.target,{value:90,at:p.observation.observed_at}),{...f.scope,attemptId:a.id,now:at(20)});
+ assert.equal(f.ledger.snapshot(r.series_id,f.scope).value,200);assert.equal(f.ledger.history(r.series_id,f.scope).entries.length,2);
+});

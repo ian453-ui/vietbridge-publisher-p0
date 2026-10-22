@@ -1,6 +1,6 @@
 # V3 formal target: private ChatGPT Sites + cloud processing
 
-Updated 2026-10-22, slice 07. The user requires the formal UI on ChatGPT Sites
+Updated 2026-10-22, slice 08. The user requires the formal UI on ChatGPT Sites
 and services in the cloud, independent of the Mac. Local Node demonstrations are
 only development tests. Existing V1/V2/Mac installations and unrelated sites remain
 untouched. No original-domain requirement exists.
@@ -26,15 +26,18 @@ migration, D1/R2 provisioning or deployment has been attempted. The expected URL
 is not proof of a working product. The unrelated OpenSky site was only identified
 in the read-only listing and was never modified.
 
-The Sites skill recovered and its main instructions, storage, identity,
-app-integration and local-preview references and starter README were read. Native
-creation followed those instructions. However, the executor does not have the
-plugin directory, `scripts/project-setup.mjs`, `scripts/site-workflow.mjs`,
-`install-dependencies.mjs`, `build-site.mjs`, or complete Vinext starter. Attempts
-to read required script/starter resources returned `failed to read skill resource`.
-A later main-skill read again returned **`skill package is not available`**; both
-skill catalogs then returned zero entries. These are missing workflow resources,
-not a rejected create/deploy permission request or an uncertain deployment.
+In slice 08 the **complete package address** again reads successfully, including
+main skill, troubleshooting, storage, identity and local preview. The current local
+alias is `c10`; the parent's older `c6` alias is not portable between tool catalogs.
+The prior package-unavailable read error is historical. After the successful
+reads, the tool catalog again reported no cloud skills; no helper recovery was
+observed. The document reads and executable availability are separate evidence.
+However, supported executable helpers and the complete starter are still missing
+from `/opt/codex`, `/workspace/.agents`, `/workspace/.codex` and `/workspace/sites`.
+Exact helper/auth resource reads return `failed to read skill resource`.
+[Slice 08](v3-slice-08.md) records the concrete search scope and installed plugin
+names. This is not a rejected creation/deployment permission request or an
+uncertain deployment. No helper was invented or downloaded around a denial.
 
 Instruction source:
 [Sites SKILL.md](skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/sites/SKILL.md)
@@ -59,9 +62,9 @@ to become available in this environment; then continue against the saved ID.
 | Sites-oriented UI | `cloud-console.html/css/js`: customer/account switching, nine inherited navigation destinations, complete content/platform preview, new immutable versions, multiple frozen tasks and reload | Official starter entry/assets wiring and hosted desktop/mobile tests; unsupported tabs explicitly say so |
 | Identity/API | Pure ESM `cloud-authoring-api.js`; server-only identity callback required; existing membership/read API reused; missing identity/bindings fail closed | Official `getChatGPTUser()` integration in the dispatch-owned server context; no browser-provided identity fallback |
 | Persistent authoring | Async D1-shaped SQL, atomic command batches, customer/account/version/frozen-task writes, original source/job projections | Real D1 binding, generated Drizzle schema/migrations and hosted rollback/concurrency validation |
-| Review/source/metrics | Original Node/SQLite implementations and all prior gates retained; current full regression passes | Async persistence port, exact identity/receipt transport and UI connection to the cloud authority boundary |
+| Review/source/metrics | Async Review snapshots, metric ledger, scoped media reads and UI now implemented; native validation and authority gates retained | Official D1 identity/bindings, trusted heavy/source transport and async human approval/revocation remain pending |
 | Heavy media | Bounded ZIP/hash/ffprobe/ffmpeg/Pillow implemented and tested in cloud development | A durable authorized cloud Linux service with authenticated receipt transport; no Mac fallback or native ffmpeg inside Workers |
-| Media objects | Original immutable BLOB/cache and lease checks retained | Actual R2 binding, scoped upload/read transport, object/SQL recovery and hosted media acceptance |
+| Media objects | Scoped DB intent → object put → hash readback → receipt commit/recovery implemented and fault-tested; no deletes | Actual R2 binding and transport/runtime acceptance; broader streaming/large-media handling |
 | Publishing/interactions | Existing per-account permits, quotas, idempotency and UNKNOWN reconciliation retained | Separate authorized official/API or cloud executor integrations; this Site has no execution routes |
 
 Current Sites instructions describe Workers with 128 MB memory and HTTP outbound
@@ -75,7 +78,8 @@ it does not keep business data in browser localStorage or static fixture JSON.
 Only selected customer/account preferences use localStorage. New manual content
 stays `MANUAL_UNVERIFIED`, account mappings stay `UNCONFIGURED`, and frozen tasks
 stay DRAFT with `publish_allowed:false`. Creating a mapping grants no platform
-access. Current lists are bounded to 200 items; pagination remains to implement.
+access. Authoring lists are bounded to 200 items; their pagination remains to implement.
+Review and metric APIs paginate in 20-entry pages; UI currently shows the first page.
 
 ## Resume path without rebuilding or weakening gates
 
@@ -93,12 +97,12 @@ access. Current lists are bounded to 200 items; pagination remains to implement.
 5. Verify hosted owner-only access, forged identity denial, customer/account scope,
    durable reload, duplicate commands, failure rollback and actual D1 reads on
    desktop/mobile. Only then report a working private URL.
-6. Port Review/metric persistence and connect the separately authorized cloud media
-   service. Keep real source verification, approval and publication authority
+6. Validate the implemented async Review/metric/object stores on actual bindings,
+   port authenticated approval decisions and connect the separately authorized cloud media service. Keep real source verification, approval and publication authority
    separate. Unsupported operations remain closed, even on a successful UI deploy.
 
-[Slice 07](v3-slice-07.md) supplies actual commands, failures, screenshots and the
-acceptance matrix. Native cloud-development regression remains intact; formal
+[Slice 08](v3-slice-08.md) supplies current commands, failures, screenshots and the
+acceptance matrix; slice 07 records the earlier registration/authoring increment. Native cloud-development regression remains intact; formal
 hosted V3 delivery remains incomplete. This is both a missing supported workflow
 and unfinished integration code, not a Mac availability issue.
 

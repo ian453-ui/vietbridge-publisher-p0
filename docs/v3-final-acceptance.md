@@ -15,6 +15,12 @@ The Site remains version 0: missing official starter/helpers block hosted identi
 D1 and build integration. This does not replace the original full-chain acceptance
 below or claim that previously implemented native features are already in Sites.
 
+[Slice 08](v3-slice-08.md) subsequently connects async Review/object/metric persistence
+and browser readback, with original validation retained and a separately reproduced
+same-timestamp collection-generation fix. Its exact current runs are recorded there.
+Sites remains registered but undeployed; this historical matrix does not certify
+hosted D1/R2, real producer transport or cloud approval execution.
+
 This records the first four slices. The subsequent [slice 05 business connection](v3-slice-05.md)
 implements approved synthetic Review/ZIP bytes → native content/platform/job/upload
 preparation and closed local simulated submission/readback. Its 1013-test regression

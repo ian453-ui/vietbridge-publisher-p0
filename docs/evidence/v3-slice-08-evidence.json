@@ -1,0 +1,276 @@
+{
+  "package": "08",
+  "base_commit": "9c5fd5486b9617553adc4988aeb98c75f0cf05fa",
+  "branch": "publisher-v3/cloud-slice-01",
+  "recorded_at": "2026-10-22T03:35:18.586973+00:00",
+  "environment": {
+    "PUBLISHER_TEST_BROWSER_PATH": "/usr/bin/chromium",
+    "PUBLISHER_TEST_FFMPEG_PATH": "/usr/bin/ffmpeg",
+    "V3_SITES_EVIDENCE_DIR": "/tmp/v3-sites-storage-evidence"
+  },
+  "runs": [
+    {
+      "log_path": "/tmp/v3-sites-storage-core-first.log",
+      "command": "node --test test/metric-observation.test.js test/sites-cloud-authoring.test.js",
+      "log_sha256": "355db22c283490eceb99609498089fab0752798b72501c9dba8cbd119e7d90b8",
+      "tests": 20,
+      "pass": 20,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 198.572959
+    },
+    {
+      "log_path": "/tmp/v3-sites-async-metrics-first.log",
+      "command": "node --test test/sites-async-metric-store.test.js",
+      "log_sha256": "a29e555c6ffe02d1242058427dc46cef251fad20a4a9c45fcd0e4513c77f4578",
+      "tests": 5,
+      "pass": 2,
+      "fail": 3,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 194.225973
+    },
+    {
+      "log_path": "/tmp/v3-sites-async-metrics-second.log",
+      "command": "node --test test/sites-async-metric-store.test.js",
+      "log_sha256": "369e9d0b1b7938ac73575955175bd6b1502299a91c8e44bdd8428d7c50288484",
+      "tests": 5,
+      "pass": 5,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 229.469408
+    },
+    {
+      "log_path": "/tmp/v3-sites-evidence-first.log",
+      "command": "node --test --test-concurrency=2 test/sites-async-review-store.test.js test/sites-async-metric-store.test.js",
+      "log_sha256": "714b51c7c0cf7947f1ee70c7d89366c7dcd813fdb95e4b13230ef3fe9a3f2b17",
+      "tests": 11,
+      "pass": 10,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 343.382923
+    },
+    {
+      "log_path": "/tmp/v3-sites-evidence-second.log",
+      "command": "node --test --test-concurrency=2 test/sites-async-review-store.test.js test/sites-async-metric-store.test.js test/sites-cloud-authoring.test.js",
+      "log_sha256": "bdd397f6d104538800ea58897a2f30d547fbe4b0a0bec0518dcce0a46c4117f2",
+      "tests": 19,
+      "pass": 19,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 561.762527
+    },
+    {
+      "log_path": "/tmp/v3-sites-storage-ui-first.log",
+      "command": "node --test --test-concurrency=2 test/sites-async-*.test.js test/sites-cloud-console-ui.test.js test/metric-observation.test.js",
+      "log_sha256": "aa5ab157a130781e730e6ceb8e0c299ea89715cbf985970e6efe33566a356325",
+      "tests": 28,
+      "pass": 26,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 7683.442595
+    },
+    {
+      "log_path": "/tmp/v3-sites-storage-targeted.log",
+      "command": "node --test --test-concurrency=2 test/sites-async-*.test.js test/sites-evidence-api.test.js test/sites-cloud-console-ui.test.js test/metric-observation.test.js",
+      "log_sha256": "cc0b7365bad2eafcd82bfd25e814ce8c54b946f35240915256e110cfa63a45fe",
+      "tests": 29,
+      "pass": 29,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 8452.803783
+    },
+    {
+      "log_path": "/tmp/v3-sites-storage-full.log",
+      "command": "node --test --test-concurrency=4 test/*.test.js",
+      "log_sha256": "e49b7ac3cd79e6f015c54c02ce7fd8faf3e5e73bda9d710795e7b34643a0aa97",
+      "tests": 1056,
+      "pass": 1056,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 108879.850912
+    },
+    {
+      "log_path": "/tmp/v3-metric-same-time-reproduction.log",
+      "command": "node --test --test-name-pattern='same observation timestamp' test/metric-observation-store.test.js",
+      "log_sha256": "399ec73c4ecce94679bc11ee267b3cf5e5e8a97b321c0f869030737f564b1746",
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 1020.186148
+    },
+    {
+      "log_path": "/tmp/v3-sites-storage-targeted-final.log",
+      "command": "node --test --test-concurrency=2 test/sites-async-*.test.js test/sites-evidence-api.test.js test/sites-cloud-console-ui.test.js test/metric-observation*.test.js",
+      "log_sha256": "4d09a2c2a20cc1a588178c24b4481a5dd5cc8c8926a3f0d5d14efa7cc326247b",
+      "tests": 46,
+      "pass": 46,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 14307.825051
+    },
+    {
+      "log_path": "/tmp/v3-sites-storage-full-final.log",
+      "command": "node --test --test-concurrency=4 test/*.test.js",
+      "log_sha256": "f20e81b2326d8d9463c5a063f3f890924a2baa9f3bfd14f48ebaa4eddeef1083",
+      "tests": 1059,
+      "pass": 1059,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 107165.055111
+    }
+  ],
+  "final_full": {
+    "log_path": "/tmp/v3-sites-storage-full-final.log",
+    "command": "node --test --test-concurrency=4 test/*.test.js",
+    "log_sha256": "f20e81b2326d8d9463c5a063f3f890924a2baa9f3bfd14f48ebaa4eddeef1083",
+    "tests": 1059,
+    "pass": 1059,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "duration_ms": 107165.055111
+  },
+  "checks": {
+    "syntax_files": [
+      "src/metric-observation-core.js",
+      "src/metric-observation-store.js",
+      "src/metric-observation.js",
+      "src/sites/async-metric-store.js",
+      "src/sites/async-review-store.js",
+      "src/sites/async-storage.js",
+      "src/sites/cloud-authoring-api.js",
+      "src/sites/cloud-console.js",
+      "src/sites/scoped-object-store.js",
+      "test/fixtures/sites-cloud-d1.js",
+      "test/fixtures/sites-evidence.js",
+      "test/metric-observation-store.test.js",
+      "test/sites-async-metric-store.test.js",
+      "test/sites-async-review-store.test.js",
+      "test/sites-cloud-console-ui.test.js",
+      "test/sites-evidence-api.test.js"
+    ],
+    "syntax_result": "PASS",
+    "server_module_graph": [
+      "src/metric-observation-core.js",
+      "src/sites/async-metric-store.js",
+      "src/sites/async-review-store.js",
+      "src/sites/async-storage.js",
+      "src/sites/cloud-authoring-api.js",
+      "src/sites/membership.js",
+      "src/sites/readonly-api.js",
+      "src/sites/scoped-object-store.js"
+    ],
+    "node_imports_in_server_graph": 0
+  },
+  "screenshots": [
+    {
+      "file": "docs/evidence/v3-slice-08/desktop-review.png",
+      "sha256": "a03310e1751249e46966bd0d79e740a118bc8b6cf26eed381b920c8960b67312",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "content": "Synthetic native inspection bytes and stored metric failure; loopback browser, not deployed Sites"
+    },
+    {
+      "file": "docs/evidence/v3-slice-08/desktop-video.png",
+      "sha256": "886b117cd856f794d47dc1d42e8227540bcde7dcaac8694ca54cc50e9bf43dd9",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "content": "Synthetic native inspection bytes and stored metric failure; loopback browser, not deployed Sites"
+    },
+    {
+      "file": "docs/evidence/v3-slice-08/desktop-metrics.png",
+      "sha256": "2526c23b14a4c4afbc98f291c031c8fd83326953ab70712e3ba410969bb757b4",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "content": "Synthetic native inspection bytes and stored metric failure; loopback browser, not deployed Sites"
+    },
+    {
+      "file": "docs/evidence/v3-slice-08/mobile-review.png",
+      "sha256": "eef50da436782b3d591a069116f2f5868421dc6ac11517732b6c98033760d654",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "content": "Synthetic native inspection bytes and stored metric failure; loopback browser, not deployed Sites"
+    },
+    {
+      "file": "docs/evidence/v3-slice-08/mobile-video.png",
+      "sha256": "d597ab8d80cefdf2ea53493df6b92b70d17e5a695f76f053e608cebf1f832325",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "content": "Synthetic native inspection bytes and stored metric failure; loopback browser, not deployed Sites"
+    },
+    {
+      "file": "docs/evidence/v3-slice-08/mobile-metrics.png",
+      "sha256": "aeaa8e4a7fd3ae08c57f13788b6e3ba861471dc51020c26ee855d9e5f26c3784",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "content": "Synthetic native inspection bytes and stored metric failure; loopback browser, not deployed Sites"
+    }
+  ],
+  "sites": {
+    "project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+    "version": 0,
+    "live_url": null,
+    "allowed_roles": [
+      "owner"
+    ],
+    "external_visitors": 0,
+    "recreated": false,
+    "source_pushed": false,
+    "deployment_attempted": false,
+    "d1_r2_provisioned": false,
+    "skill_full_locator_read": "SUCCESS this turn, including main and four references",
+    "subsequent_catalog": "No cloud skills currently available",
+    "helper_search_roots": [
+      "/opt/codex",
+      "/workspace/.agents",
+      "/workspace/.codex",
+      "/workspace/sites"
+    ],
+    "helper_resource_error": "failed to read skill resource",
+    "helper_resource_paths": [
+      "skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/scripts/project-setup.mjs",
+      "skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/sites/scripts/project-setup.mjs",
+      "skill://plugin_connector_1p_689987207de08191979cf68eca2941c6/sites/templates/vinext-starter/app/chatgpt-auth.ts"
+    ]
+  },
+  "limitations": [
+    "D1 interface tested using real file SQLite, not hosted D1.",
+    "R2 method fixture uses local files; actual R2 not provisioned or tested.",
+    "Only test code supplies an inspection provider and synthetic identity.",
+    "No async human approval/source transport or real metric collector enabled.",
+    "Earlier 1056 pass preceded the new same-timestamp native metric fix; final 1059 includes it.",
+    "No original deletion, real platform login/publication/message, credential provisioning or denied-download retry."
+  ],
+  "real_social_operations": 0,
+  "real_user_media_reads": 0,
+  "original_media_deletes": 0,
+  "prepared_source_smoke": {
+    "path": "/workspace/sites/publisher-v3/migration-source/sites/cloud-authoring-api.js",
+    "result": "PASS; imports all prepared dependencies; no binding/identity returns 503 SITES_RUNTIME_BINDING_REQUIRED",
+    "network_requests": 0
+  }
+}
