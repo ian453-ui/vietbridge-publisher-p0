@@ -367,3 +367,30 @@ export async function mountUnifiedPublisher({workspace,account,token,executionEn
   if(pendingLibrarySelection){select.disabled=true;root.querySelector('#unified-create').disabled=true;status.textContent='资料库选择已变更，请先选用勾选资料；不会使用旧稿建立任务。';}
   await loadJobs();
 }
+
+// Production inspection preview; retains the original approval gates.
+const reviewEscape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export const productionReviewView=()=>'<section class="panel"><h2>内容制作审核 · V3</h2><p>查看已保存的正文、媒体及解码结果。所有记录均待审核；事实、视觉、声音和字幕仍需人工核对，原资料库批准门禁继续有效。</p><div id="production-reviews" role="status">正在读取当前客户和账号…</div></section>';
+export async function mountProductionReview({workspace,accountId,fetcher=fetch}){
+ const node=document.getElementById('production-reviews');if(!node)return;
+ if(!workspace||!accountId){node.textContent='请先选择客户与发布账号。';return;}
+ const base='/api/production-reviews',scope=new URLSearchParams({workspace,accountId});
+ const read=async url=>{const response=await fetcher(url);if(!response.ok)throw Error('审核读取失败（'+response.status+'）');return response.json();};
+ try{
+  const {reviews}=await read(base+'?'+scope);if(!node.isConnected)return;
+  node.innerHTML=reviews.map(row=>`<details data-production-review="${reviewEscape(row.id)}"><summary>${reviewEscape(row.task_id)} · 请求版本 ${reviewEscape(row.request_revision)} · REVIEW_REQUIRED</summary><div>展开查看完整内容与媒体。</div></details>`).join('')||'<p>当前客户与账号暂无制作审核记录。</p>';
+  for(const details of node.querySelectorAll('details'))details.addEventListener('toggle',async()=>{
+   if(!details.open||details.dataset.loaded)return;const target=details.querySelector('div');target.textContent='读取中…';
+   try{
+    const id=details.dataset.productionReview,report=await read(base+'/'+id+'?'+scope);if(!details.isConnected)return;
+    target.innerHTML=report.items.map(item=>`<article><h3>${reviewEscape(item.source_id)} · 正文 ${item.content_revision} / 视觉 ${item.visual_revision}</h3>${item.artifacts.map(a=>{
+     const url=base+'/'+id+'/asset?'+scope+'&source='+encodeURIComponent(item.source_id)+'&artifact='+encodeURIComponent(a.artifact_id);
+     const media=a.kind==='video'?`<video controls preload="metadata" src="${reviewEscape(url)}" class="production-review-media"></video>`:a.kind==='cover'?`<img src="${reviewEscape(url)}" alt="待人工审核图片" class="production-review-media">`:`<pre data-review-text="${reviewEscape(url)}">读取正文中…</pre>`;
+     return `<section><h4>${reviewEscape(a.artifact_id)} · ${reviewEscape(a.kind)}</h4><p>${reviewEscape(a.validation.level)} · SHA256 ${reviewEscape(a.sha256)}</p>${a.kind==='video'?'<p>已全流解码；浏览器播放、音画质量和字幕对齐待人工验收。</p>':''}${media}</section>`;
+    }).join('')}</article>`).join('');
+    for(const pre of target.querySelectorAll('[data-review-text]')){const response=await fetcher(pre.dataset.reviewText);if(!response.ok)throw Error('正文读取失败');const text=await response.text();if(pre.isConnected)pre.textContent=text;}
+    details.dataset.loaded='true';
+   }catch(error){if(details.isConnected)target.textContent=error.message;}
+  });
+ }catch(error){if(node.isConnected)node.textContent=error.message;}
+}

@@ -21,7 +21,7 @@ production-package --request request.json --selections selections.json --root AR
 production-review --request request.json --result result.json --root ARTIFACT_ROOT [--receipt receipt.json]
 production-demo --out NEW_DIRECTORY
   非发布多产物：两篇独立知识稿/配图/平台文案＋脚本/字幕/视频；输出可复用 plan 与 selections 示例。
-  视频仅文件/哈希校验，不证明可播放；此模式不导入原 inbox。详见 handoff/production-artifacts.md。
+  视频执行 ffprobe 与全流解码，视觉/声音/字幕仍待人工审核；此模式不导入原 inbox。详见 handoff/production-artifacts.md。
 所有输出路径必须不存在，避免覆盖。文档：handoff/content-workbench.md`;
 function options(args,allowed){const out={};for(let i=0;i<args.length;i+=2){const key=args[i]?.slice(2);if(!args[i]?.startsWith('--')||!allowed.includes(key)||Object.hasOwn(out,key)||args[i+1]===undefined||args[i+1].startsWith('--'))throw Error('INVALID_ARGUMENTS');out[key]=args[i+1];}return out;}
 const save=(path,data)=>writeFileSync(path,data,{flag:'wx'});

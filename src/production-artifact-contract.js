@@ -3,6 +3,7 @@ import {readFileSync,realpathSync,statSync,openSync,fstatSync,closeSync,constant
 import {resolve,relative,isAbsolute,extname,sep} from 'node:path';
 import {validateGptTaskIdentity} from './gpt-content-contract.js';
 import {validateImage} from './image-validation.js';
+import {validateVideo} from './video-validation.js';
 
 const fail=code=>{throw Error(code);};
 const exact=(x,keys)=>{if(!x||typeof x!=='object'||Array.isArray(x)||Object.keys(x).length!==keys.length||keys.some(k=>!Object.hasOwn(x,k)))fail('INVALID_PRODUCTION_SHAPE');};
@@ -63,7 +64,7 @@ export function verifyProductionRequest(request){
  if(digest(p)!==request.request_fingerprint||request.assignment_mode!=='STICKY'||request.handoff_policy!=='USER_EXPLICIT_ONLY')fail('REQUEST_FINGERPRINT_MISMATCH');return request;
 }
 export const productionItemFingerprint=item=>digest(item);
-function localArtifact(root,path,kind){
+export function readProductionArtifact(root,path,kind,{includeBytes=false}={}){
  if(!text(path,500)||isAbsolute(path)||path.includes('\\')||path.split('/').some(x=>!x||x==='.'||x==='..'))fail('INVALID_ARTIFACT_PATH');
  const base=realpathSync(root),file=realpathSync(resolve(base,path)),rel=relative(base,file);
  if(!rel||rel==='..'||rel.startsWith('..'+sep)||isAbsolute(rel)||!statSync(base).isDirectory())fail('ARTIFACT_PATH_ESCAPE');
@@ -77,7 +78,7 @@ function localArtifact(root,path,kind){
  if(bytes.length<1||bytes.length>max)fail('INVALID_ARTIFACT_SIZE');
  const ext=extname(file).toLowerCase();let validation;
  if(kind==='cover'){validation={level:'IMAGE_DECODED',...validateImage(bytes,ext)};}
- else if(kind==='video'){if(!['.mp4','.mov','.webm'].includes(ext))fail('INVALID_VIDEO_EXTENSION');validation={level:'BYTES_HASH_ONLY',decoded:false,playback_verified:false,duration_verified:false};}
+ else if(kind==='video'){if(!['.mp4','.mov','.webm'].includes(ext))fail('INVALID_VIDEO_EXTENSION');validation=validateVideo(bytes,ext);}
  else{
   if(!({knowledge_article:['.md'],script:['.md','.txt'],subtitle:['.srt'],platform_payload:['.md','.txt']}[kind]||[]).includes(ext))fail('INVALID_TEXT_EXTENSION');
   let content;try{content=new TextDecoder('utf-8',{fatal:true}).decode(bytes);}catch{fail('INVALID_UTF_EIGHT');}
@@ -93,8 +94,9 @@ function localArtifact(root,path,kind){
    validation={level:'SRT_SYNTAX_VALIDATED',cue_count:blocks.length,video_alignment_verified:false};
   }else validation={level:'UTF8_TEXT_VALIDATED',facts_verified:false};
  }
- return {sha256:bytesHash(bytes),bytes:bytes.length,validation,fileIdentity:`${stat.dev}:${stat.ino}`};
+ return {sha256:bytesHash(bytes),bytes:bytes.length,validation,fileIdentity:`${stat.dev}:${stat.ino}`,...(includeBytes?{data:bytes,extension:ext}:{})};
 }
+const localArtifact=readProductionArtifact;
 const flags={publish_allowed:false,import_allowed:false,owner_changed:false,producer_authenticated:false};
 export function inspectProductionResult(request,result,{root,now=Date.now(),priorReceipt=null}={}){
  verifyProductionRequest(request);exact(result,resultKeys);

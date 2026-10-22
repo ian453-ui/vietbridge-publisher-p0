@@ -25,8 +25,9 @@ The demo contains **synthetic** `SYNTHETIC-KB-003`, `SYNTHETIC-KB-040` and
 It creates two knowledge Markdown files, separate cover files and separate FB
 text payloads; the third item contains script, SRT, one-second blue MP4 and cover.
 Existing test image decoding is reused. Local ffmpeg generates the demo video;
-no model API, network operation or fee is involved. ffmpeg is needed only for
-this demo, not for normal artifact inspection. A failed demo may leave a partial
+no model API, network operation or fee is involved. In V3, ffprobe and ffmpeg are
+also required for normal video inspection; unavailable decoders fail closed.
+A failed demo may leave a partial
 new directory; choose a new path, never overwrite existing artifacts.
 
 Outputs: `plan.json`, `selections.json`, `request.json`, `result.json`, `report.json`
@@ -136,12 +137,19 @@ unsigned correlation data, not an atomic delivery ledger or authenticated claim.
 | subtitle | Actual `.srt`, sequential cues, time syntax, increasing start/nonnegative duration | Translation, overlap choices, alignment with actual speech/video |
 | cover | Existing Pillow-backed image decoder, dimensions/format, actual byte hash | Visual/pixel quality, language accuracy and semantic fit |
 | platform_payload | Separate `.md`/`.txt`, actual hash and explicit sibling references | Platform limits/policy, account selection and publishing permission |
-| video | File containment, allowed `.mp4`/`.mov`/`.webm` extension, size, actual hash | **No decoder run:** codec, frames, duration, audio, playback, subtitle alignment |
+| video | Actual hash-bound bytes, ffprobe stream/container metadata, full ffmpeg A/V decode to EOF, duration agreement, bounded resources | Human visual/audio QA, browser/platform playback compatibility, subtitle alignment |
 
-Video explicitly reports `BYTES_HASH_ONLY`, `decoded:false`,
-`playback_verified:false`, `duration_verified:false`. A test intentionally supplies
-non-playable bytes under `.mp4` to prove this boundary is reported honestly, not
-accidentally advertised as video acceptance. SRT reports
+V3 replaces the old `BYTES_HASH_ONLY` boundary with `VIDEO_DECODED`, `decoded:true`,
+`duration_verified:true` after successful probing/full decode. The original fake
+MP4 now rejects; the regression was reproduced before repair. Decoder absence,
+truncation, audio-only and mismatched container reject. Validation accepts one
+video and at most one audio stream, at most 10 minutes / 3840×2160 pixels / 60,000
+decoded frames / 100 MiB, with 5-second probe and 20-second decode timeouts.
+Decode uses a private copy of the exact hashed bytes, fixed container demuxer and
+file-only protocol. Timeouts fail, never partially accept. Conservative bounds may
+reject otherwise usable long/complex videos; do not relabel them validated.
+`playback_verified:false` and `browser_playback_verified:false` remain explicit:
+decode is not human viewing or universal browser/platform compatibility. SRT reports
 `video_alignment_verified:false`. No file-format check establishes producer identity.
 
 ## Original task and enterprise boundaries
@@ -155,8 +163,10 @@ Production v2 does not call readGptDriveInbox/approveGptDriveItem or create READ
 entries. Enterprise formal-source handling and `Library.approveGpt` guards remain
 unchanged. A future approved adapter must independently verify the original
 source, account and review gates; this report alone cannot authorize import.
-No HTTP endpoint, permissions, registry, credential, model route or scheduler is
-added. This is a local production attachment, not a changed agent harness.
+V3 adds a pending inspection ledger and read-only HTTP preview protected by the
+existing application authentication. It adds no permission scope or producer
+authentication. The original maintenance wrapper remains unchanged and does not
+expose this new Review API. See [V3 acceptance](../docs/v3-slice-01.md).
 
 ## Regression cases and observed design corrections
 

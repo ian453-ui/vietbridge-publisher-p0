@@ -41,6 +41,21 @@ code copied into this branch:
 | [Meta Pages API](https://developers.facebook.com/documentation/pages-api/overview) | Official Page API, app/token permissions still required | Page publishing/readback adapter only where authorized |
 | [Meta v19 changelog](https://developers.facebook.com/docs/graph-api/changelog/version19.0/) | Groups API removed across versions 2024-04-22 | Do not invent a Groups API replacement; retained browser path is conditional on account/session/authorization evidence |
 
+Parent research supplied these pinned implementation references; design inference
+only, no copied code: [Postiz workflow c06abc3](https://github.com/gitroomhq/postiz-app/blob/c06abc3d786b8f719ced5716ccc70dd8a7251a05/apps/orchestrator/src/workflows/post-workflows/post.workflow.v1.1.2.ts)
+separates a single irreversible publish attempt from pending polling; missing
+heartbeat alone is never proof to retry. [Mixpost account job df57648](https://github.com/inovector/mixpost/blob/df57648b866310446703f5294350552b62735df5/src/Jobs/AccountPublishPostJob.php)
+suggests per-account/post queue isolation; Lite does not supply Pro multi-tenancy
+or approval features. [Chatwoot message a8487ab](https://github.com/chatwoot/chatwoot/blob/a8487abf5c5b54960f2375e8c613fe72711077fa/app/models/message.rb)
+suggests Account → Inbox → Conversation → Message with internal-note separation
+and human takeover. These are architecture choices for later packages.
+Every operation separately tracks IMPLEMENTED, ACCOUNT_AUTHORIZED and
+LIVE_VERIFIED. Page publishing does not unlock group messaging; draft writing
+does not imply public publication. TikTok remains outside the implemented slice;
+its [official sharing requirements](https://developers.tiktok.com/docs/en/content-sharing-guidelines)
+must be reviewed for creator/consent/privacy/audit restrictions before any adapter
+is enabled. No Messenger or Chinese-platform live API certification is claimed.
+
 Meta's blog fetch returned HTTP 429; the official changelog search result was
 available. No claim of newly certified Chinese-platform APIs: current
 `publisher-platforms.js`, `multiplatform-drivers.js`, capability facts and genuine

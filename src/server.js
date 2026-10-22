@@ -28,6 +28,7 @@ import {unifiedDrivers} from './unified-drivers.js';
 import {BrowserResources} from './browser-resources.js';
 import {ScanScheduler} from './scan-scheduler.js';
 import {ContentSync} from './content-sync.js';
+import {ProductionReviewStore} from './production-review-store.js';
 const root=dirname(fileURLToPath(import.meta.url));
 const execFileAsync=promisify(execFile);
 export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/Application Support/VietBridgeSocialOperatorV2'),'mock.sqlite'),options={}){
@@ -38,6 +39,7 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
  const store=new Store(dbPath,{seedDemo:!options.unified}),token=randomUUID(),facebook=new FacebookBrowser(store,{browserSkillBinding:options.browserSkillBinding,browserSkillClient:options.browserSkillClient,browserSkillGroupIds:options.scopeAuthorization?.approved_group_ids}),engagement=new FacebookEngagement(store),library=localExecution?new GroupLibrary(store,options.library):null,verifier=new PublicationVerifier(options.verifier);
  const access=cloud?new PublisherAccess(cloud):null;
  const unified=options.unified?new UnifiedPublisher(store):null;
+ const productionReviews=unified?new ProductionReviewStore(store.db):null;
  if(unified)unified.browserSkill=facebook.browserSkill;
  if(unified&&options.recoverStartup)unified.recoverAfterShutdown();
  const executionEnabled=options.executionEnabled===true;
@@ -78,6 +80,20 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
   const publisherContext=()=>publisher.context(url.searchParams.get('workspace')||'',url.searchParams.get('accountId')||'');
   const requestVerifier=()=>publisher?new PublicationVerifier({scoped:true,fetch:(path,init)=>publisher.fetch(publisherContext(),path,init)}):verifier;
   res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
+  if(productionReviews&&url.pathname.startsWith('/api/production-reviews')){
+   if(req.method!=='GET')return send(res,405,{error:'REVIEW_READ_ONLY'});
+   const workspace=url.searchParams.get('workspace'),account=url.searchParams.get('accountId');
+   try{
+    productionReviews.scope(workspace,account);
+    if(url.pathname==='/api/production-reviews')return send(res,200,{reviews:productionReviews.list(workspace,account)});
+    const match=url.pathname.match(/^\/api\/production-reviews\/([a-f0-9]{64})(\/asset)?$/);
+    if(!match)return send(res,404,{error:'REVIEW_NOT_FOUND'});
+    if(!match[2])return send(res,200,productionReviews.detail(workspace,account,match[1]));
+    const asset=productionReviews.asset(workspace,account,match[1],url.searchParams.get('source'),url.searchParams.get('artifact'));
+    res.setHeader('Content-Type',asset.mime);res.setHeader('Content-Length',asset.data.length);
+    res.setHeader('Content-Security-Policy',"default-src 'none'; sandbox");return res.end(Buffer.from(asset.data));
+   }catch(error){return send(res,error.message==='REVIEW_SCOPE_DENIED'?403:error.message==='REVIEW_NOT_FOUND'?404:409,{error:['REVIEW_SCOPE_DENIED','REVIEW_NOT_FOUND','REVIEW_STORAGE_CORRUPT'].includes(error.message)?error.message:'REVIEW_UNAVAILABLE'});}
+  }
   if(unified&&req.method==='GET'&&url.pathname==='/api/health')return send(res,200,{ok:true,version:'2.3.0-alpha.2',mode:'publisher-unified',head:/^[a-f0-9]{40}$/.test(process.env.PUBLISHER_BUILD_HEAD||'')?process.env.PUBLISHER_BUILD_HEAD:null,executionEnabled,pageExecutionEnabled:Boolean(options.pageExecution),scanSchedulerEnabled:Boolean(scheduler),persistent:true});
   if(unified&&req.method==='GET'&&url.pathname==='/api/automation/capabilities')return send(res,200,{...publisherAutomationCapabilities,scoped_execution:{supported:true,global_execution_enabled:executionEnabled,capability_path:'/api/unified/workspaces/<workspace>/jobs/<job_id>/execution-capability',grant_interface:executor?.scopedOperations?'existing task final confirmation':'local administration only',task_confirmation_enabled:Boolean(executor?.scopedOperations),requires_explicit_user_authorization:true},operations:{...publisherAutomationCapabilities.operations,submit_platform_task:{supported:executionEnabled,requires_explicit_user_authorization:true},submit_to_facebook:{supported:executionEnabled,reason:executionEnabled?'requires approved task and explicit submit action':'global submission disabled; consult the exact job execution-capability'}}});
   if(req.method==='GET'&&url.pathname==='/api/publisher-integration'){

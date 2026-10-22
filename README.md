@@ -1,3 +1,5 @@
+> V3 development branch: [PRD and inheritance matrix](docs/v3-prd.md) · [Slice 01 demo and executed acceptance](docs/v3-slice-01.md). This branch adds decoded-video validation and durable pending-review previews; it is not deployed or merged into the original release.
+
 # VietBridge Social Operator V2 — Mock Prototype
 
 Current: 2.1.0-alpha.1 for task `SMO-FB-GROUPS-20260913-002`. The previous abstract mock dashboard is no longer the default product direction.

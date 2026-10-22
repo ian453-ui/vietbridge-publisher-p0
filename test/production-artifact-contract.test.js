@@ -5,6 +5,8 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {createProductionRequest,packageProductionResult,inspectProductionResult,productionItemFingerprint} from '../src/production-artifact-contract.js';
+import {syntheticVideo} from './fixtures/synthetic-video.js';
+const videoFixture=syntheticVideo();
 const now=Date.parse('2026-10-20T12:00:00.000Z');
 const spec=(artifact_id,kind,references=[],platform=null)=>({artifact_id,kind,references,platform,language:'vi+zh'});
 function fixture(fn){const root=mkdtempSync(join(tmpdir(),'production-artifact-'));
@@ -13,7 +15,7 @@ function fixture(fn){const root=mkdtempSync(join(tmpdir(),'production-artifact-'
   items.push({source_id:'FIXTURE-VIDEO',content_revision:1,visual_revision:1,previous_revision:null,brief:'Synthetic script and video',source_refs:[],deliverables:[spec('script','script'),spec('subtitle','subtitle',['script']),spec('video','video',['script','subtitle'])]});
   const image=readFileSync(new URL('./fixtures/gpt-primary.png',import.meta.url)),selections=[];
   for(const item of items){mkdirSync(join(root,item.source_id));const files=[];for(const d of item.deliverables){const ext={article:'.md',cover:'.png',caption:'.txt',script:'.md',subtitle:'.srt',video:'.mp4'}[d.artifact_id],path=item.source_id+'/'+d.artifact_id+ext;
-   const bytes=d.kind==='cover'?image:d.kind==='subtitle'?'1\n00:00:00,000 --> 00:00:01,000\n合成字幕\n':d.kind==='video'?'Deliberately NOT a playable video: tests bytes-only boundary.':'Synthetic '+item.source_id+' '+d.kind+'\n';writeFileSync(join(root,path),bytes);files.push({artifact_id:d.artifact_id,path});}selections.push({source_id:item.source_id,files});}
+   const bytes=d.kind==='cover'?image:d.kind==='subtitle'?'1\n00:00:00,000 --> 00:00:01,000\n合成字幕\n':d.kind==='video'?videoFixture:'Synthetic '+item.source_id+' '+d.kind+'\n';writeFileSync(join(root,path),bytes);files.push({artifact_id:d.artifact_id,path});}selections.push({source_id:item.source_id,files});}
   const plan={schema_version:2,mode:'PRODUCTION_ARTIFACTS',task_id:'SYNTHETIC-PRODUCTION',request_revision:1,current_owner:'GPT',producer:'GPT',workspace:null,account_id:null,created_at:new Date(now-1000).toISOString(),deadline_at:new Date(now+60000).toISOString(),bridge_ref:{marker:'bridge-task:v1',protocol_version:'2.0',transport:'SLACK_FIRST',slack_channel_id:'C0C6PRGNGLQ',thread_ts:'1792490400.000001'},items};
   const request=createProductionRequest(plan),result=packageProductionResult(request,selections,{root,now});fn({root,plan,request,result,selections});
  }finally{rmSync(root,{recursive:true,force:true});}}
@@ -21,7 +23,7 @@ const inspect=f=>inspectProductionResult(f.request,f.result,{root:f.root,now});
 test('two knowledge items and script/subtitle/video retain independent fingerprints and never import/publish',()=>fixture(f=>{
  const before=JSON.stringify(f),r=inspect(f);assert.equal(r.status,'REVIEW_REQUIRED');assert.equal(r.structure,'VALIDATED');assert.equal(r.scope_status,'UNKNOWN');assert.equal(r.publish_allowed,false);assert.equal(r.import_allowed,false);assert.equal(r.owner_changed,false);assert.equal(r.items.length,3);assert.notEqual(r.items[0].item_fingerprint,r.items[1].item_fingerprint);assert.equal(JSON.stringify(f),before);
  assert.equal(r.items[0].artifacts.find(a=>a.kind==='cover').validation.level,'IMAGE_DECODED');assert.equal(r.items[2].artifacts.find(a=>a.kind==='subtitle').validation.video_alignment_verified,false);
- const video=r.items[2].artifacts.find(a=>a.kind==='video');assert.equal(video.validation.level,'BYTES_HASH_ONLY');assert.equal(video.validation.decoded,false);assert.equal(video.validation.playback_verified,false);
+ const video=r.items[2].artifacts.find(a=>a.kind==='video');assert.equal(video.validation.level,'VIDEO_DECODED');assert.equal(video.validation.decoded,true);assert.equal(video.validation.playback_verified,false);
 }));
 test('missing/extra items, missing artifacts and duplicate source/artifact IDs reject',()=>fixture(f=>{
  for(const mutate of [r=>r.items.pop(),r=>r.items.push(r.items[0]),r=>r.items[0]=r.items[1],r=>r.items[0].artifacts.pop(),r=>r.items[0].artifacts[0]=r.items[0].artifacts[1]]){const result=structuredClone(f.result);mutate(result);assert.throws(()=>inspect({...f,result}));}
@@ -89,4 +91,9 @@ test('descriptor identity checks reject a FIFO without waiting for a writer',()=
  writeFileSync(join(f.root,'request.json'),JSON.stringify(request));writeFileSync(join(f.root,'files.json'),JSON.stringify(f.selections));
  const r=spawnSync(process.execPath,[cli,'production-package','--request',join(f.root,'request.json'),'--selections',join(f.root,'files.json'),'--root',f.root,'--out',join(f.root,'out.json')],{encoding:'utf8',timeout:5000});
  assert.equal(r.error,undefined);assert.equal(r.status,1);assert.match(r.stderr,/INVALID_ARTIFACT_SIZE/);
+}));
+
+test('original fake MP4 is rejected by production packaging, not admitted as reviewable video',()=>fixture(f=>{
+ writeFileSync(join(f.root,'FIXTURE-VIDEO/video.mp4'),'Deliberately NOT a playable video: tests bytes-only boundary.');
+ assert.throws(()=>packageProductionResult(f.request,f.selections,{root:f.root,now}),/VIDEO_/);
 }));
