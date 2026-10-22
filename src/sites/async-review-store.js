@@ -13,7 +13,7 @@ export const CLOUD_REVIEW_LIMITS=Object.freeze({artifacts:32,bytes:32*1024*1024,
  */
 export class AsyncReviewStore extends AsyncStorage {
  constructor(db,{bucket,inspectionProvider=null,timeoutMs=5000,authorization=null}={}){super(db,{authorization});this.objects=bucket?new ScopedObjectStore(db,bucket,{timeoutMs,authorization}):null;this.provider=inspectionProvider;}
- async intake(reference){
+ async intake(reference,{commitStatements=[]}={}){
   exact(reference,['workspace','accountId','task_id','request_revision']);if(!text(reference.task_id)||!Number.isSafeInteger(reference.request_revision)||reference.request_revision<1)fail('REVIEW_REFERENCE_INVALID');await this.scope(reference.workspace,reference.accountId);
   if(!this.provider?.readInspection)fail('CLOUD_INSPECTOR_UNAVAILABLE');if(!this.objects)fail('R2_BINDING_REQUIRED');const deadline=performance.now()+CLOUD_REVIEW_LIMITS.wallMs;
   const packet=await bounded(this.provider.readInspection({...reference}),CLOUD_REVIEW_LIMITS.wallMs);
@@ -45,7 +45,8 @@ export class AsyncReviewStore extends AsyncStorage {
    this.statement("INSERT INTO sites_reviews VALUES(?,?,?,?,?,?,?,?,?,?,'REVIEW_REQUIRED',?) ON CONFLICT(task_id,request_revision) DO NOTHING",[request_fingerprint,request.task_id,request.request_revision,request.workspace,request.account_id,JSON.stringify(request),JSON.stringify(result),JSON.stringify(report),envelopeHash,resultHash,new Date().toISOString()]),
    this.guard('EXISTS(SELECT 1 FROM sites_reviews WHERE id=? AND envelope_hash=?)',[request_fingerprint,envelopeHash])];
   for(const a of references)statements.push(this.guard("EXISTS(SELECT 1 FROM sites_objects WHERE id=? AND workspace=? AND account_id=? AND state='READY')",[a.object_id,request.workspace,request.account_id]),this.statement('INSERT INTO sites_review_assets VALUES(?,?,?,?) ON CONFLICT(review_id,source_id,artifact_id) DO NOTHING',[request_fingerprint,a.source_id,a.artifact_id,a.object_id]));
-  await this.batch(statements);return {id:request_fingerprint,status:prior?.id===request_fingerprint?'DUPLICATE':'REVIEW_REQUIRED',...flags};
+  // Internal caller may bind lineage in this SAME transaction; never client SQL.
+  await this.batch([...statements,...commitStatements]);return {id:request_fingerprint,status:prior?.id===request_fingerprint?'DUPLICATE':'REVIEW_REQUIRED',...flags};
  }
  async list(workspace,accountId,{cursor=''}={}){await this.scope(workspace,accountId);if(cursor&&!/^[a-f0-9]{64}$/.test(cursor))fail('REVIEW_CURSOR_INVALID');const rows=await this.rows('SELECT id,task_id,request_revision,state,created_at FROM sites_reviews WHERE workspace=? AND account_id=? AND id>? ORDER BY id LIMIT 21',[workspace,accountId,cursor]);return {reviews:rows.slice(0,20),next_cursor:rows.length>20?rows[19].id:null,...flags};}
  async detail(workspace,accountId,id){

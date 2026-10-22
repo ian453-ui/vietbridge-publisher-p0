@@ -1,5 +1,5 @@
 import {sourceImportState} from './source-import-state.js';
-import {AsyncStorage,digest,fail} from './async-storage.js';
+import {AsyncStorage,digest,fail,authorizationGuard} from './async-storage.js';
 import {CLOUD_REVIEW_LIMITS,AsyncReviewStore} from './async-review-store.js';
 import {productionReviewChecks,requireProductionAdmin,validateProductionDecision,approvalIdentityFields} from '../production-approval-policy.js';
 import {publishingPlatforms} from '../publisher-platform-policy.js';
@@ -11,9 +11,9 @@ const flags={publish_allowed:false,import_allowed:false,source_gate_satisfied:fa
  * is promoted to admin. Binding rows and authorities are server dependencies;
  * the only current binding/authority provider is under test/fixtures. */
 export class AsyncApprovalStore extends AsyncStorage {
- constructor(db,options={}){super(db,options);this.reviews=new AsyncReviewStore(db,options);}
+ constructor(db,options={}){super(db,options);this.options=options;this.reviews=new AsyncReviewStore(db,options);}
  async latest(id){return this.one('SELECT * FROM sites_approval_events WHERE review_id=? ORDER BY sequence DESC LIMIT 1',[id]);}
- async subject(id,scope){
+ async subject(id,scope,{allowDerivation=true}={}){
   const detail=await this.reviews.detail(scope.workspace,scope.accountId,id),row=await this.one('SELECT * FROM sites_reviews WHERE id=?',[id]);
   const request=JSON.parse(row.request_json),result=JSON.parse(row.result_json),account=await this.scope(scope.workspace,scope.accountId);
   if(request.request_fingerprint!==id||request.task_id!==row.task_id||request.request_revision!==row.request_revision||request.workspace!==scope.workspace||request.account_id!==scope.accountId||await approvalDigest(result)!==row.result_fingerprint||result.request_fingerprint!==id||detail.report.receipt?.result_fingerprint!==row.result_fingerprint)fail('APPROVAL_STORAGE_CORRUPT');
@@ -33,9 +33,29 @@ export class AsyncApprovalStore extends AsyncStorage {
   if(detail.state==='SUPERSEDED')blocked='STALE_REVIEW_VERSION';
   const fingerprint=await approvalDigest({request_fingerprint:id,result_fingerprint:row.result_fingerprint,account_hash:accountHash,target_platforms:targets,artifacts:expected,source_refs:request.items.map(x=>({source_id:x.source_id,refs:x.source_refs}))});
   const source_import=await sourceImportState(this,id);if(source_import.blocked)blocked=source_import.blocked;
-  return {fingerprint,blocked,source_import,target_platforms:targets,provenance:b?.kind==='SYNTHETIC_FIXTURE'?'SYNTHETIC_FIXTURE':'UNVERIFIED',row,request,result,assets:detail.assets,account,binding:binding?.binding_json??null};
+  const derivation=await this.derivationSubject(id,scope,request,{allowDerivation,accountHash,platform:account.platform});if(derivation.blocked)blocked=derivation.blocked;
+  return {fingerprint,blocked,derivation,source_import,target_platforms:targets,provenance:b?.kind==='SYNTHETIC_FIXTURE'?'SYNTHETIC_FIXTURE':'UNVERIFIED',row,request,result,assets:detail.assets,account,binding:binding?.binding_json??null};
  }
- subjectGuards(s){return [...(s.source_import?.required?[this.guard("EXISTS(SELECT 1 FROM sites_source_heads WHERE source_key=? AND attempt_id=? AND source_revision=? AND descriptor_hash=? AND state='IMPORTED')",[s.source_import.source_key,s.source_import.attempt_id,s.source_import.source_revision,s.source_import.descriptor_hash])]:[this.guard('NOT EXISTS(SELECT 1 FROM sites_review_sources WHERE review_id=?)',[s.row.id])]),this.guard('EXISTS(SELECT 1 FROM sites_reviews WHERE id=? AND workspace=? AND account_id=? AND envelope_hash=? AND request_json=? AND result_json=? AND report_json=? AND request_revision=(SELECT max(request_revision) FROM sites_reviews WHERE task_id=?))',[s.row.id,s.row.workspace,s.row.account_id,s.row.envelope_hash,s.row.request_json,s.row.result_json,s.row.report_json,s.row.task_id]),this.guard('EXISTS(SELECT 1 FROM sites_approval_bindings WHERE review_id=? AND binding_json=?)',[s.row.id,s.binding]),this.guard('EXISTS(SELECT 1 FROM sites_account_details WHERE workspace=? AND account_id=? AND platform=? AND external_identity IS ?)',[s.row.workspace,s.row.account_id,s.account.platform,s.account.external_identity]),this.guard('(SELECT count(*) FROM sites_review_assets WHERE review_id=?)=?',[s.row.id,s.assets.length]),...s.assets.map(a=>this.guard("EXISTS(SELECT 1 FROM sites_review_assets a JOIN sites_objects o ON o.id=a.object_id WHERE a.review_id=? AND a.source_id=? AND a.artifact_id=? AND o.id=? AND o.sha256=? AND o.bytes=? AND o.mime=? AND o.state='READY' AND o.workspace=? AND o.account_id=?)",[s.row.id,a.source_id,a.artifact_id,a.object_id,a.sha256,a.bytes,a.mime,s.row.workspace,s.row.account_id]))];}
+ async derivationSubject(id,scope,request,{allowDerivation,accountHash,platform}){
+  const row=await this.one('SELECT * FROM sites_review_derivations WHERE review_id=?',[id]);
+  if(!row)return {blocked:request.task_id.startsWith('SYNTHETIC-TARGET-')?'APPROVAL_SOURCE_LINEAGE_MISSING':null};
+  if(!allowDerivation)return {blocked:'APPROVAL_SOURCE_CHAIN_UNSUPPORTED'};
+  try{
+   const lineage=JSON.parse(row.lineage_json);
+   if(request.task_id!=='SYNTHETIC-TARGET-'+await approvalDigest({lineage,target:scope.accountId,accountHash,platform})||lineage.workspace!==scope.workspace||lineage.source_account_id===scope.accountId||!this.authorization)fail('APPROVAL_SOURCE_LINEAGE_INVALID');
+   const authorization={...this.authorization,accountId:lineage.source_account_id},store=new AsyncApprovalStore(this.db,{...this.options,authorization});
+   const source=await store.subject(lineage.source_review_id,{workspace:scope.workspace,accountId:lineage.source_account_id},{allowDerivation:false}),latest=await store.latest(lineage.source_review_id);
+   const plan=await store.one('SELECT * FROM sites_upload_plans WHERE id=?',[lineage.source_plan_id]);
+   if(source.blocked||source.fingerprint!==lineage.source_subject||latest?.id!==lineage.source_event_id||latest.kind!=='CONTENT_APPROVED'||!plan||plan.workspace!==scope.workspace||plan.account_id!==lineage.source_account_id||plan.review_id!==lineage.source_review_id||plan.manifest_hash!==lineage.source_manifest_hash||plan.subject_fingerprint!==lineage.source_subject||plan.approval_event_id!==lineage.source_event_id)fail('APPROVAL_SOURCE_CHANGED');
+   return {row,lineage,store,source,authorization,blocked:null};
+  }catch{return {row,blocked:'APPROVAL_SOURCE_CHANGED'};}
+ }
+ derivationGuards(s){
+  const d=s.derivation;if(!d?.row)return [this.guard('NOT EXISTS(SELECT 1 FROM sites_review_derivations WHERE review_id=?)',[s.row.id])];
+  if(d.blocked||!d.source)fail('APPROVAL_SOURCE_CHANGED');const l=d.lineage;
+  return [this.guard('EXISTS(SELECT 1 FROM sites_review_derivations WHERE review_id=? AND lineage_json=?)',[s.row.id,d.row.lineage_json]),authorizationGuard(this.db,d.authorization),...d.store.subjectGuards(d.source),d.store.latestGuard(l.source_review_id,l.source_event_id),this.guard('EXISTS(SELECT 1 FROM sites_upload_plans WHERE id=? AND workspace=? AND account_id=? AND review_id=? AND manifest_hash=? AND subject_fingerprint=? AND approval_event_id=?)',[l.source_plan_id,l.workspace,l.source_account_id,l.source_review_id,l.source_manifest_hash,l.source_subject,l.source_event_id])];
+ }
+ subjectGuards(s){return [...this.derivationGuards(s),...(s.source_import?.required?[this.guard("EXISTS(SELECT 1 FROM sites_source_heads WHERE source_key=? AND attempt_id=? AND source_revision=? AND descriptor_hash=? AND state='IMPORTED')",[s.source_import.source_key,s.source_import.attempt_id,s.source_import.source_revision,s.source_import.descriptor_hash])]:[this.guard('NOT EXISTS(SELECT 1 FROM sites_review_sources WHERE review_id=?)',[s.row.id])]),this.guard('EXISTS(SELECT 1 FROM sites_reviews WHERE id=? AND workspace=? AND account_id=? AND envelope_hash=? AND request_json=? AND result_json=? AND report_json=? AND request_revision=(SELECT max(request_revision) FROM sites_reviews WHERE task_id=?))',[s.row.id,s.row.workspace,s.row.account_id,s.row.envelope_hash,s.row.request_json,s.row.result_json,s.row.report_json,s.row.task_id]),this.guard('EXISTS(SELECT 1 FROM sites_approval_bindings WHERE review_id=? AND binding_json=?)',[s.row.id,s.binding]),this.guard('EXISTS(SELECT 1 FROM sites_account_details WHERE workspace=? AND account_id=? AND platform=? AND external_identity IS ?)',[s.row.workspace,s.row.account_id,s.account.platform,s.account.external_identity]),this.guard('(SELECT count(*) FROM sites_review_assets WHERE review_id=?)=?',[s.row.id,s.assets.length]),...s.assets.map(a=>this.guard("EXISTS(SELECT 1 FROM sites_review_assets a JOIN sites_objects o ON o.id=a.object_id WHERE a.review_id=? AND a.source_id=? AND a.artifact_id=? AND o.id=? AND o.sha256=? AND o.bytes=? AND o.mime=? AND o.state='READY' AND o.workspace=? AND o.account_id=?)",[s.row.id,a.source_id,a.artifact_id,a.object_id,a.sha256,a.bytes,a.mime,s.row.workspace,s.row.account_id]))];}
  latestGuard(id,eventId){return this.guard('(SELECT id FROM sites_approval_events WHERE review_id=? ORDER BY sequence DESC LIMIT 1) IS ?',[id,eventId]);}
  eventStatement(id,fingerprint,kind,actor,reason,checks,eventId=crypto.randomUUID()){return {eventId,statement:this.statement('INSERT INTO sites_approval_events(id,review_id,subject_fingerprint,kind,actor_id,reason,checks_json,created_at) VALUES(?,?,?,?,?,?,?,?)',[eventId,id,fingerprint,kind,actor,reason,JSON.stringify(checks),new Date().toISOString()])};}
  async view(id,scope,{admin=false}={}){

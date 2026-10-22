@@ -1,0 +1,28 @@
+✖ shared reviewed media creates a fresh target-account review, never inherits approval (170.042881ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 278.762248
+
+✖ failing tests:
+
+test at test/sites-target-review.test.js:7:1
+✖ shared reviewed media creates a fresh target-account review, never inherits approval (170.042881ms)
+  AssertionError [ERR_ASSERTION]: {"error":"OPERATION_UNAVAILABLE","executionEnabled":false,"publish_allowed":false,"source_gate_satisfied":false,"media_processing":"CLOUD_SERVICE_NOT_CONNECTED","producer_authenticated":false}
+
+  404 !== 200
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-target-review.test.js:8:150)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 404,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

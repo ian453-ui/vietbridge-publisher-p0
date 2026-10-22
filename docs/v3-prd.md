@@ -1,6 +1,11 @@
 # Publisher V3 — PRD / architecture / acceptance plan
 
-Current update: [shared source handoff](v3-shared-content-handoff.md) restores
+Current update: [independent target Review](v3-target-review-handoff.md) closes
+shared reviewed media → fresh target-bound PENDING Review → explicit human
+approval → original frozen platform task. Source validity remains a transaction
+dependency; original approval is not copied. Real providers default closed.
+
+Previous update: [shared source handoff](v3-shared-content-handoff.md) restores
 same-client source browsing, independent preview of existing platform variants
 and explicit account-bound DRAFT creation. Review/permits do not move with a shared
 source. The [three-round inheritance review](v3-inheritance-review-20261022.md)

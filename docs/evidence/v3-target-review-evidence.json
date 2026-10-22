@@ -1,0 +1,88 @@
+{
+  "recorded_at": "2026-10-22T16:50:58.772994+00:00",
+  "base_commit": "c984226e1ee962311fb01ff94844c5c9b5a2f4a1",
+  "branch": "publisher-v3/cloud-slice-01",
+  "site_project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+  "deployment": "NOT_DEPLOYED_BY_THIS_PACKAGE",
+  "execution": "selected cloud workspace, synthetic identities/providers and generated media, SQLite behind async D1 shape, file-backed object bucket and loopback Chromium",
+  "failures_before": [
+    {
+      "command": "node --test test/sites-target-review.test.js",
+      "result": "1 failed; new target route returned 404 OPERATION_UNAVAILABLE",
+      "log": "v3-target-review-before.log"
+    },
+    {
+      "command": "node --test --test-name-pattern='committed derivation receipt' test/sites-target-review.test.js",
+      "result": "1 failed; committed retry rejected with APPROVAL_TARGET_PROVIDER_UNAVAILABLE after source withdrawal",
+      "log": "v3-target-review-receipt-before.log"
+    }
+  ],
+  "final_runs": [
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/workspace/sites/publisher-v3/target-review-evidence-20261022 node --test test/sites-target-review.test.js test/sites-cloud-console-ui.test.js",
+      "passed": 44,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 38350.671637,
+      "detail": "21 target-review cases + 23 console UI cases",
+      "log": "v3-target-review-focused.log"
+    },
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+      "passed": 1224,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 138953.627274,
+      "summary": "v3-target-review-full-summary.log",
+      "full_log": "/tmp/v3-target-full.log"
+    }
+  ],
+  "source_sha256": {
+    "src/sites/async-approval-store.js": "c6ab86119934ca8f78bcaa6dd03304148cf0e5682a307f7dfbf0464b687aeec9",
+    "src/sites/async-review-store.js": "d909395b7d81bf58393f4b21c70f3bf169873b3f48dc0a1a75062d5f9daec110",
+    "src/sites/async-target-review.js": "c31c1f9abc878dc4250723b9c46b3cc446427b3472d500960685a9cdcdc69904",
+    "src/sites/async-upload-plans.js": "239518bf768239ca1506ef1a39656c505eeea42b5f424decf82b6a7772f5b85d",
+    "src/sites/cloud-authoring-api.js": "cfcebfb165be7074584a9a42432546b0694711ca8aac5fa95a4ff73250b5cc7a",
+    "src/sites/cloud-console.js": "be7c37d31b59f51a3784c89409d46fe8f858ec8c64bd68c292f2f6b44c1ff6bc",
+    "src/sites/migrations/0008_target_review_candidate.sql": "01be74cb0ebc17f8bdf78a9d7a276144caed1d2fd7a60ba164c589cbec97ca1f",
+    "test/fixtures/sites-cloud-d1.js": "5d007d5d14d829ac10e8fb5db53bb6e314193973ee38ab0b2bc7d92e52f3a061",
+    "test/fixtures/sites-target-review.js": "68ca18739f16e94ab1aa509306070947808dc2255c5b3e573e0b6836a85e7dbc",
+    "test/sites-cloud-console-ui.test.js": "e51fdaeb5eb31b50e9da4af4e88708f5bc9843620fe91a707b82b8a0b2929974",
+    "test/sites-target-review.test.js": "d9b739effbbd012a3825e533d3cf163174cb0cf6cfd3ee0a5e8f20e6cd22d3ce"
+  },
+  "screenshots": [
+    {
+      "path": "/workspace/sites/publisher-v3/target-review-evidence-20261022/desktop-target-review-plan.png",
+      "sha256": "38bd8bb6c9e8869e2fcbcad1391516861438ea9cda8afdfbfd10f817af3d6403",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "path": "/workspace/sites/publisher-v3/target-review-evidence-20261022/mobile-target-review-plan.png",
+      "sha256": "cd880326035bf3323aaccb25c8936ec724a78052cadd337a5edadea10ad44f59",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  ],
+  "review": "gpt-6-astra read-only design/implementation and final review, not independent test rerun; receipt-ordering issue reproduced and fixed",
+  "not_verified": [
+    "hosted Sites identity/D1/R2",
+    "real producer/source/admin/target binding providers",
+    "real authorized social upload/submit/readback",
+    "real Drive sample consumption",
+    "physical phone",
+    "cloud heavy decode service"
+  ],
+  "real_posts": 0,
+  "real_messages": 0,
+  "credentials_created_or_read": false,
+  "denied_downloads_retried": false,
+  "next_code_gap": "multi-platform variant editor via existing variants map and immutable versions; assessed, not implemented",
+  "log_normalization": "Committed logs trim trailing blank-line whitespace only; original raw logs remain under /tmp."
+}

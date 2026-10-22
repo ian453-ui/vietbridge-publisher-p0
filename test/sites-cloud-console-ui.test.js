@@ -12,12 +12,16 @@ import {canonicalFixture} from './fixtures/canonical-source.js';
 import {AsyncReviewStore} from '../src/sites/async-review-store.js';
 import {AsyncMetricStore} from '../src/sites/async-metric-store.js';
 import {seedCloudApproval,syntheticAdmin} from './fixtures/sites-approval.js';
+import {syntheticTargetProvider} from './fixtures/sites-target-review.js';
+import {AsyncApprovalStore} from '../src/sites/async-approval-store.js';
+import {AsyncUploadPlans} from '../src/sites/async-upload-plans.js';
+import {approvalCommand} from './fixtures/sites-approval.js';
 import {metricPacket,metricSelector,metricNow} from './fixtures/synthetic-metrics.js';
 
 
 async function boundedGate(gate){let timer;try{await Promise.race([gate,new Promise(r=>{timer=setTimeout(r,10000);})]);}finally{clearTimeout(timer);}}
 
-async function setup(t,{evidence=false,approval=false,canonical=false}={}){
+async function setup(t,{evidence=false,approval=false,canonical=false,targetReview=false}={}){
  const root=mkdtempSync(join(tmpdir(),'v3-sites-console-')),db=cloudD1Fixture(join(root,'cloud.sqlite'));let api,origin;
  const files={'/':['cloud-console.html','text/html; charset=utf-8'],'/cloud-console.js':['cloud-console.js','text/javascript'],'/cloud-console.css':['cloud-console.css','text/css']};
  const server=createServer(async(req,res)=>{try{
@@ -28,9 +32,9 @@ async function setup(t,{evidence=false,approval=false,canonical=false}={}){
  await new Promise(r=>server.listen(0,'127.0.0.1',r));origin='http://127.0.0.1:'+server.address().port;
  // Test-only fixed identity. No request header, body or cookie can choose it.
  let source=null,bucket=evidence?fileBucket(join(root,'objects')):null;if(canonical){const scope=await seedSitesRecords(db);source=await canonicalFixture(t,{existing:{root,path:join(root,'cloud.sqlite'),f:db,...scope},slug:'贸易与许可-074'});bucket=source.bucket;await source.imports.import(source.reference());await seedCloudApproval(db,source.state.packet,source.scope);}
- api=createCloudAuthoringApi({db:db.db,origin,bucket,resolveApprovalAuthority:approval?async()=>syntheticAdmin:null,getTrustedIdentity:async()=>({userId:'synthetic-owner'})});
+ api=createCloudAuthoringApi({db:db.db,origin,bucket,resolveApprovalAuthority:approval?async()=>syntheticAdmin:null,targetReviewProvider:targetReview?syntheticTargetProvider(db.db):null,getTrustedIdentity:async()=>({userId:'synthetic-owner'})});
  if(evidence){const f=await seedSitesRecords(db),p=inspectedPacket(root,f.scope,{video:true,platformPayload:approval}),reviews=new AsyncReviewStore(db.db,{bucket,inspectionProvider:{readInspection:async()=>p}});await reviews.intake({...f.scope,task_id:p.request.task_id,request_revision:1});if(approval)await seedCloudApproval(db,p,f.scope);const metrics=new AsyncMetricStore(db.db),id=(await metrics.registerTarget(f.target)).id,packet=metricPacket(f.target);await metrics.ingest(id,packet,{...f.scope,now:metricNow});const a=await metrics.beginCollection(id,metricSelector(packet),{...f.scope,now:metricNow+1000});await metrics.failCollection(a.id,{...f.scope,now:metricNow+2000});}
- t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));db.close();rmSync(root,{recursive:true,force:true});});return {root,db,origin,source};
+ t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));db.close();rmSync(root,{recursive:true,force:true});});return {root,db,origin,source,bucket};
 }
 for(const [name,viewport] of [['desktop',{width:1440,height:1000}],['mobile',{width:390,height:844}]])test(name+' cloud console persists customer/account/content/platform/task with full preview and reload',{timeout:40000},async t=>{
  const f=await setup(t);let browser;
@@ -162,4 +166,26 @@ for(const [name,viewport] of [['desktop',{width:1440,height:1000}],['mobile',{wi
   f.source.advance(m=>{m.qa_status='MOBILE_READABILITY_RETEST_PENDING';});assert.equal((await f.source.imports.import(f.source.reference())).status,'QA_BLOCKED');await page.reload();await page.locator('[data-tab=review]').click();await page.locator('[data-review]').click();await page.locator('#approval-state').filter({hasText:'REVOKED'}).waitFor();assert.match(await page.locator('#canonical-source').innerText(),/MOBILE_READABILITY_RETEST_PENDING/);assert.match(await page.locator('#canonical-source').innerText(),/快照版本 1 \/ 当前来源版本 2/);assert.equal(await page.locator('[data-decision=APPROVE]').count(),0);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1&&document.querySelector('#preview').scrollWidth<=document.querySelector('#preview').clientWidth+1));
   if(process.env.V3_SITES_EVIDENCE_DIR)await page.screenshot({path:join(process.env.V3_SITES_EVIDENCE_DIR,name+'-canonical-qa-withdrawn.png'),fullPage:true});assert.deepEqual(outside,[]);assert.deepEqual(errors,[]);assert.equal(f.db.sql.prepare("SELECT count(*) n FROM publisher_jobs WHERE state<>'DRAFT'").get().n,0);
  }finally{await browser?.close();}
+});
+
+
+async function sharedReviewUi(t){
+ const f=await setup(t,{evidence:true,approval:true,targetReview:true}),row=f.db.sql.prepare('SELECT * FROM sites_reviews').get(),scope={workspace:row.workspace,accountId:row.account_id},options={bucket:f.bucket,authorization:{userId:'synthetic-owner',...scope}},approvals=new AsyncApprovalStore(f.db.db,options);
+ const a=await approvals.decide(row.id,approvalCommand(await approvals.view(row.id,scope)),scope,{authority:syntheticAdmin}),p=await new AsyncUploadPlans(f.db.db,options).prepare(row.id,{expected_subject:a.approval.subject_fingerprint,expected_event_id:a.event_id,source_id:JSON.parse(row.request_json).items[0].source_id,payload_artifact_id:'platform'},scope,{authority:syntheticAdmin});
+ const res=await fetch(f.origin+'/api/sites/workspaces/'+row.workspace+'/accounts',{method:'POST',headers:{origin:f.origin,'Content-Type':'application/json'},body:JSON.stringify({command_id:crypto.randomUUID(),display_name:'独立目标账号 B',platform:'facebook',external_identity:'SYNTHETIC-TARGET-B'})});assert.equal(res.status,200);const b=(await res.json()).id;
+ return {...f,w:row.workspace,a:row.account_id,b,p,sourceId:row.id,oldEvents:f.db.sql.prepare('SELECT * FROM sites_approval_events WHERE review_id=?').all(row.id)};
+}
+for(const [name,viewport] of [['desktop',{width:1440,height:1000}],['mobile',{width:390,height:844}]])test(name+' shared media -> independent target Review -> explicit approval -> frozen target media survives reload',{timeout:40000},async t=>{
+ const f=await sharedReviewUi(t),page=await draftBrowser(t,f,viewport);await page.locator('[data-tab=content]').click();await page.locator('#target-account').selectOption(f.b);const card=page.locator('[data-content="'+f.p.content_id+'"]');await card.waitFor();await card.locator('[data-preview]').click();await page.locator('#request-target-review').click();await page.locator('#approval-state').filter({hasText:'PENDING'}).waitFor();assert.match(await page.locator('#preview-body').innerText(),/审核目标：独立目标账号 B/);assert.equal(f.db.sql.prepare('SELECT count(*) n FROM sites_approval_events WHERE review_id<>?').get(f.sourceId).n,0);
+ await page.waitForFunction(()=>document.querySelector('#preview video')?.readyState>=2);await page.locator('#preview video').evaluate(async v=>{v.muted=true;await v.play();});await page.waitForFunction(()=>document.querySelector('#preview video')?.currentTime>0);await page.locator('#preview video').evaluate(v=>v.pause());
+ for(const check of await page.locator('[data-check]').all())await check.check();await page.locator('#approval-reason').fill('为独立目标 B 重新检查并批准合成内容');await page.locator('[data-decision=APPROVE]').click();await page.locator('#prepare-plan').waitFor();await page.locator('#prepare-plan').click();await page.locator('#plan-state').filter({hasText:'UPLOAD_PREVIEW_ONLY'}).waitFor();assert.match(await page.locator('#preview-body').innerText(),/来源审核账号：独立目标账号 B/);await page.waitForFunction(()=>document.querySelector('#preview video')?.readyState>=2);
+ assert.deepEqual(f.db.sql.prepare('SELECT * FROM sites_approval_events WHERE review_id=?').all(f.sourceId),f.oldEvents);assert.equal(f.db.sql.prepare('SELECT count(*) n FROM sites_upload_plans WHERE account_id=?').get(f.b).n,1);assert.equal(f.db.sql.prepare("SELECT count(*) n FROM publisher_jobs WHERE state<>'DRAFT'").get().n,0);
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1&&document.querySelector('#preview').scrollWidth<=document.querySelector('#preview').clientWidth+1));if(process.env.V3_SITES_EVIDENCE_DIR){mkdirSync(process.env.V3_SITES_EVIDENCE_DIR,{recursive:true});await page.screenshot({path:join(process.env.V3_SITES_EVIDENCE_DIR,name+'-target-review-plan.png'),fullPage:true});}
+ await page.reload();await page.locator('[data-tab=tasks]').click();await page.locator('[data-task-preview]').click();await page.locator('#plan-state').filter({hasText:'UPLOAD_PREVIEW_ONLY'}).waitFor();assert.match(await page.locator('#preview-body').innerText(),/独立目标账号 B/);
+});
+
+test('late target review creation response cannot switch back from another account or reopen preview',{timeout:40000},async t=>{
+ const f=await sharedReviewUi(t),page=await draftBrowser(t,f);await page.locator('[data-tab=content]').click();await page.locator('#target-account').selectOption(f.b);await page.locator('[data-content="'+f.p.content_id+'"] [data-preview]').click();await page.locator('#request-target-review').waitFor();
+ let release,started;const gate=new Promise(r=>{release=r;}),held=new Promise(r=>{started=r;});t.after(()=>release());await page.route(/\/retarget\?accountId=/,async route=>{const response=await route.fetch();assert.equal(response.status(),200);started();await boundedGate(gate);await route.fulfill({response});});await page.locator('#request-target-review').click();await held;await page.locator('#close-preview').click();await page.locator('#account').selectOption(f.a);await page.locator('#new-content').click();await fillDraft(page,'SOURCE-A');
+ const reply=page.waitForResponse(r=>r.url().includes('/retarget?'));release();await reply;await page.waitForTimeout(150);assert.equal(await page.locator('#account').inputValue(),f.a);assert.equal(await page.locator('#preview').evaluate(d=>d.open),false);assert.equal(await page.locator('#content-form [name=body]').inputValue(),'SOURCE-A 完整正文');assert.equal(f.db.sql.prepare('SELECT count(*) n FROM sites_reviews WHERE account_id=?').get(f.b).n,1);
 });

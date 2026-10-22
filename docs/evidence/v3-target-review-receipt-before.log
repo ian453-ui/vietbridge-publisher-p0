@@ -1,0 +1,20 @@
+✖ committed derivation receipt survives source rejection and missing provider; membership still required (225.494104ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 350.754356
+
+✖ failing tests:
+
+test at test/sites-target-review.test.js:85:1
+✖ committed derivation receipt survives source rejection and missing provider; membership still required (225.494104ms)
+  Error: APPROVAL_TARGET_PROVIDER_UNAVAILABLE
+      at fail (file:///workspace/publisher-v3/src/sites/async-storage.js:2:32)
+      at AsyncTargetReview.create (file:///workspace/publisher-v3/src/sites/async-target-review.js:18:40)
+      at async TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-target-review.test.js:87:14)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)

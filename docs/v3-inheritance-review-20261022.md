@@ -6,6 +6,11 @@ different read-only reviews. The implementing agent ran the commands below.
 Astra did not independently rerun those commands. The full-suite count is a
 regression result, **not** completion of the operational product.
 
+Follow-up status: [shared catalogue restoration](v3-shared-content-handoff.md) and
+[independent target Review](v3-target-review-handoff.md) close the concrete
+shared-read/platform-selection/target-review gaps. The table below includes these
+updates; the three-round execution logs below remain historical.
+
 ## Round 1 — actual source inheritance
 
 All three baselines were read; old checkouts/services were not modified or run.
@@ -34,8 +39,8 @@ not automatically become callable from Sites.
 | Switch customers/accounts | V2 scoped accounts; unified client | Runnable exact owner/membership filtering and per-scope content/tasks. This package fixes unsaved-draft bleed and old save responses clearing the new account's draft | Hosted identity/D1 still unverified; shared admin is not independent tenant RBAC |
 | Multiple tasks and immutable versions | V1 task queue; V2 unified executor | Runnable frozen independent DRAFT snapshots and idempotent creation | Actual execution is a separate missing integration |
 | Original Tabs | Unified `client.js` navigation | Nine Sites destinations; native navigation retained | Groups/Inbox/engagement/verification descriptions are not working business screens |
-| Shared client content → choose account | Actual V2 `unified-publisher.js:162–174`, content selected by workspace | **Regressed in Sites:** `cloud-authoring-api.js` filters `sites_contents` by account. A second account cannot browse the shared client catalogue | Code needed: workspace source catalogue, then explicit account-specific draft/approval/task; do not broaden approval ownership |
-| Independent platform selection | Actual V1 `web-ui.ts:12,13,37`; unified `unified-client.js` | **Regressed in Sites:** editor follows selected account and saves only that platform variant | Code needed: browse explicit platform variants without implicit target selection; exact target still required to freeze/execute |
+| Shared client content → choose account | Actual V2 `unified-publisher.js:162–174`, content selected by workspace | Repaired: workspace catalogue and explicit account draft; shared reviewed media can create a fresh target-specific PENDING review, never transfer old approval | Same-platform one-hop synthetic provider acceptance; real provider/hosted wiring still needed |
+| Independent platform selection | Actual V1 `web-ui.ts:12,13,37`; unified `unified-client.js` | Repaired independent preview of existing platform variants with explicit target before freezing; editor still saves only selected account platform | Multi-variant editor remains missing; exact target approval/permit still required |
 | Read full body and images/video | V1 `web-ui.ts:37`; unified preview | Runnable full text; Review decoded media; approved plan media and original task preview. This package fixes stale/closed preview replacement | Registered real source transport and hosted media service still missing; text-only manual entry is not a media upload UI |
 | Upload new DOCX/image or select bulk source items | V1 `web-ui.ts:13,20,22,28` | Native route retained. Sites manual authoring + canonical contract import exist | Sites user-facing file replacement/bulk selection workflow is missing code, not merely missing token |
 | Production handoff | Unified production request/result contracts | Synthetic exact request/source/result binding → stored inspection → Review works | Real producer orchestration and trusted delivery missing; no content production repeated in this package |
@@ -128,8 +133,9 @@ content only. They are not physical-device, Safari or hosted Sites acceptance.
 
 ## Remaining priorities and exact environment boundary
 
-1. **Code inheritance:** restore client-shared source browsing, explicit platform
-   variants and account selection, then bulk selection/file replacement. Preserve
+1. **Code inheritance:** shared browsing, platform selection and new target Review
+   are now implemented in bounded follow-ups. Next add multi-variant editing,
+   then bulk selection/file replacement. Preserve
    account-specific approval and frozen version identity. This can be developed
    independently and is not blocked solely by credentials or deployment.
 2. **Formal cloud delivery:** keep Site `appgprj_6ad97a034fd08191a8399eeda10f048c`.

@@ -1,11 +1,11 @@
 # Publisher V3 current user-visible acceptance matrix
 
-2026-10-22, after shared client source/platform/target restoration. Formal target: owner-private ChatGPT Sites UI with cloud
+2026-10-22, after independent target-account Review handoff. Formal target: owner-private ChatGPT Sites UI with cloud
 services. Existing project `appgprj_6ad97a034fd08191a8399eeda10f048c` is registered,
 not deployed. The [dispatch withdrawal repair](v3-dispatch-approval-repair.md)
 reproduced and closes content rejection/source-QA changes after intent: dispatch
 now rechecks them atomically while prior committed results remain reconcilable.
-[Shared handoff evidence](v3-shared-content-handoff.md) records the latest bounded implementation. The table below supersedes earlier slices' *current* status without
+[Target Review evidence](v3-target-review-handoff.md) records the latest bounded implementation. [Shared catalogue handoff](v3-shared-content-handoff.md) records the preceding restoration. The table below supersedes earlier slices' *current* status without
 rewriting their historical evidence. [Slice 13 evidence](v3-slice-13.md) identifies
 that earlier run; [current source-backed comparison](v3-inheritance-review-20261022.md)
 separately identifies actual V1, actual V2 and the unified baseline, with current
@@ -27,6 +27,7 @@ for any external operation. A UI Tab is never business-function completion.
 | Video/image QA | Real bounded ffprobe/full decode/Pillow; bad MP4 regressions | Accepts exact server inspection receipt and bytes; browser playback exercised | Durable cloud heavy service; cannot execute native ffmpeg in Workers; factual/aesthetic/subtitle QA remains human |
 | ZIP/parts/hot cache | Synthetic resolver, exact hash/member, lease, recovery and loose compatibility | Canonical body + multipart ZIP image now enters original decoded Review; corrupt ZIP invalidates old approval; extracted results persist as immutable objects consumed by plans | Resolver service and authenticated transport not hosted/integrated with Sites; actual user ZIP consumption unverified after 403 |
 | Retention/deletion | Per-library latest 20 originals protected; older videos need all-target genuine readback; image/text retained | No deletion route or grant | Actual inventory/evidence proof and separate exact batch approval; permanent deletion remains paused |
+| Shared media → new target Review | Source-scoped approval remains private to original account | New same-platform target receives its own PENDING task/request/media namespace and decisions; source-change dependency checked during approval/prepare/dispatch. Duplicate/lost-ack/restart/UNKNOWN and desktop/mobile paths executed | Real trusted target/source/admin provider and hosted acceptance; one hop only, no platform translation; no approval or permit transfer |
 | Review and human decisions | Native shared-admin approve/reject/audit retained | Async event/command ledger, explicit checklist/reason, reject/revoke, restart, replay defense and races executed; only fixture authority/provenance provider available | Official Site identity + existing admin resolution and trusted real source decision provider; owner is not auto-admin |
 | Change invalidation | Native exact version/body/media/account guards; client manifest QA withdrawal now overrides READY/title/PASS filenames in both original catalogue paths | Same fields plus atomic live scope/version/event/object/source-head checks; newer failed/missing/withdrawn source invalidates old approval; old plans show STALE_PREVIEW after read/rejection | Background immediate invalidation not implemented; DB triggers are not owner-tamper protection |
 | Approved media → upload preparation | Native Review/ZIP bytes to original upload/task freeze | Exact reviewed bytes → platform variant → existing content → frozen original DRAFT; SQL rollback/lost ack/duplicate preparation exercised | Actual upload worker/provider; content approval never grants publication permission |
