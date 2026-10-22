@@ -371,7 +371,7 @@ export async function mountUnifiedPublisher({workspace,account,token,executionEn
 // Production inspection preview; retains the original approval gates.
 const reviewEscape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const productionReviewView=()=>'<section class="panel"><h2>内容制作审核 · V3</h2><p>查看已保存的正文、媒体及解码结果。所有记录均待审核；事实、视觉、声音和字幕仍需人工核对，原资料库批准门禁继续有效。</p><div id="production-reviews" role="status">正在读取当前客户和账号…</div></section><section class="panel"><h2>指标观测与来源</h2><p>按账号、帖子、定义与时间窗分别显示。合成测试和离线待核证据不代表真实平台指标；采集失败不会沿用旧值。</p><div id="metric-observations" role="status">选择客户与账号后读取。</div></section>';
-export async function mountProductionReview({workspace,accountId,fetcher=fetch}){
+export async function mountProductionReview({workspace,accountId,token,fetcher=fetch}){
  void mountMetricObservations({workspace,accountId,fetcher});
  const node=document.getElementById('production-reviews');if(!node)return;
  if(!workspace||!accountId){node.textContent='请先选择客户与发布账号。';return;}
@@ -390,10 +390,35 @@ export async function mountProductionReview({workspace,accountId,fetcher=fetch})
      return `<section><h4>${reviewEscape(a.artifact_id)} · ${reviewEscape(a.kind)}</h4><p>${reviewEscape(a.validation.level)} · SHA256 ${reviewEscape(a.sha256)}</p>${a.kind==='video'?'<p>已全流解码；浏览器播放、音画质量和字幕对齐待人工验收。</p>':''}${media}</section>`;
     }).join('')}</article>`).join('');
     for(const pre of target.querySelectorAll('[data-review-text]')){const response=await fetcher(pre.dataset.reviewText);if(!response.ok)throw Error('正文读取失败');const text=await response.text();if(pre.isConnected)pre.textContent=text;}
+    if(details.isConnected&&report.approval)mountProductionDecision(details,target,report.approval,{base,scope,token,fetcher,read});
     details.dataset.loaded='true';
    }catch(error){if(details.isConnected)target.textContent=error.message;}
   });
  }catch(error){if(node.isConnected)node.textContent=error.message;}
+}
+
+function mountProductionDecision(details,target,initial,{base,scope,token,fetcher,read}){
+ const section=document.createElement('section');section.dataset.productionApproval='';target.append(section);
+ const labels={PENDING:'此版本待人工决定',CONTENT_APPROVED:'此版本内容已批准 · 不授权发布',CONTENT_REJECTED:'此版本内容已拒绝',REVOKED:'旧批准已撤销 · 需要重新审核',BLOCKED:'审批入口未开放'};
+ const checks={CONTENT_FACTS:'已核对正文事实和来源',VISUAL_QA:'已检查图像文字、布局与正文的一致性',VIDEO_PLAYBACK_AND_SUBTITLE_ALIGNMENT:'已检查视频音画与字幕（如有）',ORIGINAL_SOURCE_REVIEW:'已核对原始资料；原资料库批准门禁仍需独立满足'};
+ const path=base+'/'+details.dataset.productionReview+'?'+scope;
+ async function refresh(){const report=await read(path);if(details.isConnected)render(report.approval);}
+ function render(approval){
+  section.innerHTML=`<h3>人工内容决定</h3><p data-approval-state="${reviewEscape(approval.state)}">${reviewEscape(labels[approval.state]||approval.state)}</p><p>${approval.provenance==='SYNTHETIC_FIXTURE'?'合成制作方流程验收；不是真实制作方认证。':'真实制作方认证不可用，批准保持禁用。'} 原内容审核与各账号发布授权仍独立保留。</p><p>目标平台：${reviewEscape(approval.target_platforms.join('、')||'未知')}${approval.blocked_reason?' · '+reviewEscape(approval.blocked_reason):''}</p><div data-approval-controls></div><button type="button" data-approval-refresh>刷新审批状态</button><p data-approval-notice role="status"></p><details><summary>审批审计（${approval.history.length}${approval.history_truncated?'+':''} 条）</summary>${approval.history.map(e=>`<p>${reviewEscape(e.created_at)} · ${reviewEscape(e.kind)} · ${reviewEscape(e.actor_id==='SYSTEM_VALIDATOR'?'系统失效检查':'已认证管理员')} · ${reviewEscape(e.reason)}</p>`).join('')||'<p>尚无审批事件。</p>'}</details>`;
+  const notice=section.querySelector('[data-approval-notice]');section.querySelector('[data-approval-refresh]').onclick=()=>refresh().catch(error=>{if(section.isConnected)notice.textContent=error.message;});
+  if(!approval.can_decide||!token)return;
+  const controls=section.querySelector('[data-approval-controls]');controls.innerHTML=Object.entries(checks).map(([key,label])=>`<label><input type="checkbox" data-production-check="${key}">${label}</label>`).join('')+'<label>审批说明（拒绝时必填）<textarea data-approval-reason maxlength="1000"></textarea></label><label><input type="checkbox" data-content-only>确认只决定此冻结内容版本，不授权发布或导入</label><button type="button" data-production-decide="APPROVE" disabled>批准此合成版本</button><button type="button" data-production-decide="REJECT" disabled>拒绝此合成版本</button>';
+  const values=()=>Object.fromEntries([...controls.querySelectorAll('[data-production-check]')].map(x=>[x.dataset.productionCheck,x.checked]));let busy=false;
+  const update=()=>{const confirmed=controls.querySelector('[data-content-only]').checked,reason=controls.querySelector('[data-approval-reason]').value.trim();for(const button of controls.querySelectorAll('[data-production-decide]'))button.disabled=busy||!confirmed||(button.dataset.productionDecide==='APPROVE'?!Object.values(values()).every(Boolean):!reason);};
+  controls.addEventListener('input',update);controls.addEventListener('change',update);
+  for(const button of controls.querySelectorAll('[data-production-decide]'))button.onclick=async()=>{
+   if(busy||!details.isConnected)return;busy=true;update();notice.textContent='正在保存此版本决定…';
+   const command={command_id:crypto.randomUUID(),decision:button.dataset.productionDecide,expected_subject:approval.subject_fingerprint,expected_event_id:approval.latest_event_id,reason:controls.querySelector('[data-approval-reason]').value.trim(),checks:values(),confirmation:'CONTENT_ONLY'};
+   try{const response=await fetcher(base+'/'+details.dataset.productionReview+'/decision?'+scope,{method:'POST',headers:{'Content-Type':'application/json','X-Local-Token':token},body:JSON.stringify(command)}),receipt=await response.json();if(!response.ok)throw Error(receipt.error||'审批未接受');await refresh();if(section.isConnected)section.querySelector('[data-approval-notice]').textContent='决定已保存并回读；没有创建发布任务。';}
+   catch(error){if(section.isConnected)notice.textContent=error.message+'；请刷新审批状态后再决定。';}
+  };
+ }
+ render(initial);
 }
 
 async function mountMetricObservations({workspace,accountId,fetcher}){

@@ -93,7 +93,8 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
     const raw=metricObservations.evidence(match[2],scope);res.setHeader('Content-Type','application/octet-stream');res.setHeader('Content-Disposition','attachment; filename="metric-evidence.bin"');res.setHeader('Content-Security-Policy',"default-src 'none'; sandbox");return res.end(Buffer.from(raw.data));
    }catch(error){return send(res,error.message==='METRIC_SCOPE_DENIED'?403:error.message==='METRIC_NOT_FOUND'?404:409,{error:['METRIC_SCOPE_DENIED','METRIC_NOT_FOUND','METRIC_STORAGE_CORRUPT'].includes(error.message)?error.message:'METRIC_UNAVAILABLE'});}
   }
-  if(productionReviews&&url.pathname.startsWith('/api/production-reviews')){
+  const productionDecision=productionReviews&&url.pathname.match(/^\/api\/production-reviews\/([a-f0-9]{64})\/decision$/);
+  if(productionReviews&&url.pathname.startsWith('/api/production-reviews')&&!(req.method==='POST'&&productionDecision)){
    if(req.method!=='GET')return send(res,405,{error:'REVIEW_READ_ONLY'});
    const workspace=url.searchParams.get('workspace'),account=url.searchParams.get('accountId');
    try{
@@ -101,7 +102,7 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
     if(url.pathname==='/api/production-reviews')return send(res,200,{reviews:productionReviews.list(workspace,account)});
     const match=url.pathname.match(/^\/api\/production-reviews\/([a-f0-9]{64})(\/asset)?$/);
     if(!match)return send(res,404,{error:'REVIEW_NOT_FOUND'});
-    if(!match[2])return send(res,200,productionReviews.detail(workspace,account,match[1]));
+    if(!match[2])return send(res,200,{...productionReviews.detail(workspace,account,match[1]),approval:productionReviews.approvals.view(match[1],{workspace,accountId:account},{admin:principal?.type==='admin'})});
     const asset=productionReviews.asset(workspace,account,match[1],url.searchParams.get('source'),url.searchParams.get('artifact'));
     res.setHeader('Content-Type',asset.mime);res.setHeader('Content-Length',asset.data.length);
     res.setHeader('Content-Security-Policy',"default-src 'none'; sandbox");return res.end(Buffer.from(asset.data));
@@ -158,6 +159,11 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
    if((principal?.type!=='app'&&(req.headers.origin!==origin||req.headers['x-local-token']!==token)||principal?.type==='app'&&req.headers.origin&&req.headers.origin!==origin)||!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(req.headers['content-type']||''))throw Error('本地请求验证失败，请刷新页面');
    const input=await readRequestJson(req);
    options.requestGuard?.({method:req.method,url,input,principal});
+   if(productionDecision){
+    if(principal?.type!=='admin')return send(res,403,{error:'APPROVAL_ADMIN_REQUIRED'});
+    const authority={kind:'EXISTING_ADMIN',actor_id:'admin:'+createHash('sha256').update(access.data.user).digest('hex')};
+    return send(res,200,productionReviews.approvals.decide(productionDecision[1],input,{workspace:url.searchParams.get('workspace'),accountId:url.searchParams.get('accountId')},{authority}));
+   }
    const scoped=executor?.scopedOperations||interactiveScoped;
    const groupCapability=url.pathname.match(/^\/api\/workspaces\/([^/]+)\/group-jobs\/([^/]+)\/execution-capability$/),interactionCapability=url.pathname.match(/^\/api\/workspaces\/([^/]+)\/proactive\/posts\/([^/]+)\/execution-capability$/);
    if(groupCapability||interactionCapability){const m=groupCapability||interactionCapability;if(!scoped||decodeURIComponent(m[1])!==scoped.policy.workspace)return send(res,409,{error:'SCOPED_OPERATION_UNAVAILABLE'});return send(res,200,scoped.capability(groupCapability?'GROUP':'INTERACTION',decodeURIComponent(m[2]),input.reply_body));}

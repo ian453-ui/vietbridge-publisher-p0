@@ -1,0 +1,76 @@
+{
+  "executed_date_utc": "2026-10-22",
+  "base_release": "4455a4b1faf40fedcd7020636999e165fa4a1386",
+  "previous_slice": "b1f04edcba7b6232aa4a5aa2fe7f5f57553a00e8",
+  "metric_followup": "4f69e11",
+  "full_run": {
+    "tests": 997,
+    "pass": 997,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "duration_ms": 73692.305578
+  },
+  "final_ui_after_css": {
+    "tests": 3,
+    "pass": 3,
+    "fail": 0,
+    "skipped": 0,
+    "duration_ms": 6449.964519
+  },
+  "metric_counterexamples": {
+    "before_fix": "BOTH_REPRODUCED_FAILING",
+    "after_fix_tests": 25,
+    "after_fix_pass": 25,
+    "restart_and_legacy_ordering_included": true
+  },
+  "scope": "synthetic production/admin fixtures and inherited mocked platform regression only",
+  "syntax": {
+    "javascript_syntax_files": 328,
+    "python_ast": "PASS",
+    "diff_check": "PASS"
+  },
+  "browser": {
+    "existing_login_flow": true,
+    "explicit_approve_and_reject": true,
+    "durable_get_readback": true,
+    "reload_preserved_rejection": true,
+    "delayed_customer_response_isolated": true,
+    "approval_decision_events": 3,
+    "publisher_jobs": 0,
+    "external_requests": 0,
+    "page_errors": 0
+  },
+  "live_producer_authentication": "UNAVAILABLE_APPROVAL_DISABLED",
+  "content_approval_is_publication_authority": false,
+  "real_sample_proxy_denial_retries": 0,
+  "real_credentials_permissions_security_changes": "NOT_PERFORMED",
+  "real_publication_interaction_deletion": "NOT_PERFORMED",
+  "local_logs": [
+    {
+      "path": "/tmp/v3-slice04-full.log",
+      "sha256": "70e61c50b70179858dd1d478cd41dfb241af6af710fd6b1c0f556317b18545a5"
+    },
+    {
+      "path": "/tmp/v3-metric-generation-before.log",
+      "sha256": "3777696c84904105621de9e6d57a1ec191980e2935aac80ca2a226c2246c0125"
+    },
+    {
+      "path": "/tmp/v3-metric-generation-accepted.log",
+      "sha256": "24ee264fceb3e64631bce9543313fdad29a41cdb49517b8b0b45ca7b3284cc68"
+    },
+    {
+      "path": "/tmp/v3-approval-targeted-accepted.log",
+      "sha256": "6c04f02b05f6ac85117378a96e11e43545da706d8bf7d4c5bc8ca4f61449546b"
+    },
+    {
+      "path": "/tmp/v3-approval-ui-final.log",
+      "sha256": "3c81452c36a09bec9b8f299b6c13c58dcfe5b0bf592b93cb3389dfc22c0aa1cd"
+    },
+    {
+      "path": "/tmp/v3-approval-demo-result.log",
+      "sha256": "62ae16fc300d1eebbbea167fa72f0ba8ddb5ec4aef9bfb2c26a55291dd4b1a28"
+    }
+  ]
+}

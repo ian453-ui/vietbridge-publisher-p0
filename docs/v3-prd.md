@@ -27,6 +27,13 @@ approval remain separate. No new publication authority or synthetic-to-live
 conversion is introduced. Persist before showing success; a process restart must
 retain the exact scope, revision, hash and pending state.
 
+Slice 04 adds a separate content-decision ledger and explicit administrator UI
+flow, verified only with synthetic producer fixtures. Real producer identity is
+not authenticated by the existing contract, so real-source approval remains
+disabled. No content decision satisfies original-library approval or publication
+authorization. Version/hash/account/target changes invalidate earlier decisions;
+see [implemented boundary and executed acceptance](v3-slice-04.md).
+
 ## Source-backed architecture and reuse decisions
 
 Reviewed 2026-10-21; these are design references, not installed dependencies or
@@ -79,6 +86,7 @@ incompatible windows/definitions or turn unavailable metrics into zero.
 | Customers, accounts, tab navigation, multiple tasks | `src/client.js`, `store.js`, `unified-client.js`, `unified-publisher.js` | Existing tabs and context remain; test two clients/accounts; no cross-context stale view |
 | Full content, media previews, platform variants | `library.js`, `gpt-drive-inbox.js`, `unified-client.js`, `legacy-p0/` | Keep existing routes and fixtures; add review without removing library paths |
 | Review gates / enterprise source restrictions | `library.js`, `gpt-content-contract.js` | Valid production receipt never calls approve/import/create job |
+| Content decision transport | Existing `PublisherAccess`, requestGuard and production review snapshots | Synthetic-only authenticated admin approve/reject, immutable receipts/audit, revision/identity invalidation; no new app scope or live producer authorization |
 | Unknown publication | `unified-executor.js`, `publication-verifier.js` | UNKNOWN remains RECONCILE_PENDING; normal retry cannot submit again |
 | WeChat Channels | `publisher-platforms.js`, `multiplatform-drivers.js` | PUBLISHED_ID_PENDING retained; no fabricated public ID |
 | Identity | `unified-publisher.js`, `publisher-access.js` | Cross-project/account identity cannot overwrite; app token scope unchanged |

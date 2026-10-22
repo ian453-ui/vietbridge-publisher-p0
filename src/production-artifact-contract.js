@@ -64,6 +64,7 @@ export function verifyProductionRequest(request){
  if(digest(p)!==request.request_fingerprint||request.assignment_mode!=='STICKY'||request.handoff_policy!=='USER_EXPLICIT_ONLY')fail('REQUEST_FINGERPRINT_MISMATCH');return request;
 }
 export const productionItemFingerprint=item=>digest(item);
+export const productionResultFingerprint=result=>digest(result);
 export const PRODUCTION_BATCH_LIMITS=Object.freeze({bytes:128*1024*1024,artifacts:100,videos:8,wallMs:30000});
 function validateArtifactBytes(bytes,ext,kind,deadlineAt){
  const remaining=()=>{const left=Math.floor(deadlineAt-performance.now());if(left<1)fail('ARTIFACT_BATCH_TIME_LIMIT');return Math.min(5000,left);};remaining();

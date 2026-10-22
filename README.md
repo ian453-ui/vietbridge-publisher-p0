@@ -1,4 +1,4 @@
-> V3 development branch: [PRD and inheritance matrix](docs/v3-prd.md) · [Slice 01 video/review](docs/v3-slice-01.md) · [Slice 02 ZIP acceptance](docs/v3-slice-02.md) · [Slice 03 metric ledger and offline import](docs/v3-slice-03.md). This branch adds decoded-video validation, durable pending review, scoped ZIP materialization and metric evidence history; it is not deployed or merged into the original release.
+> V3 development branch: [PRD and inheritance matrix](docs/v3-prd.md) · [Slice 01 video/review](docs/v3-slice-01.md) · [Slice 02 ZIP](docs/v3-slice-02.md) · [Slice 03 metrics/offline intake](docs/v3-slice-03.md) · [Slice 04 content decisions](docs/v3-slice-04.md). This branch adds decoded-video validation, scoped ZIP/metric history and synthetic content-decision acceptance; live producer approval stays disabled. It is not deployed or merged into the original release.
 
 # VietBridge Social Operator V2 — Mock Prototype
 

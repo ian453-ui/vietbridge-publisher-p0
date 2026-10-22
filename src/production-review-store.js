@@ -1,11 +1,12 @@
 import {createHash} from 'node:crypto';
 import {createProductionRequest,inspectProductionPackage} from './production-artifact-contract.js';
+import {ProductionApprovalStore} from './production-approval-store.js';
 
 const fail=code=>{throw Error(code);};
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const mime=ext=>({'.mp4':'video/mp4','.mov':'video/quicktime','.webm':'video/webm','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp'}[ext]||'text/plain; charset=utf-8');
 
-/** Pending inspection ledger. No approval/import/publish transitions exist here. */
+/** Immutable inspection ledger; separate content decisions never authorize import/publish. */
 export class ProductionReviewStore {
  constructor(db){
   this.db=db;
@@ -20,6 +21,7 @@ export class ProductionReviewStore {
     review_id TEXT NOT NULL, source_id TEXT NOT NULL, artifact_id TEXT NOT NULL,
     mime TEXT NOT NULL, sha256 TEXT NOT NULL, data BLOB NOT NULL,
     PRIMARY KEY(review_id,source_id,artifact_id));`);
+  this.approvals=new ProductionApprovalStore(db);
  }
  scope(workspace,account){
   if(typeof workspace!=='string'||!workspace||typeof account!=='string'||!account||!this.db.prepare('SELECT 1 FROM facebook_accounts WHERE workspace=? AND id=?').get(workspace,account))fail('REVIEW_SCOPE_DENIED');
@@ -42,8 +44,10 @@ export class ProductionReviewStore {
     }
    }
    this.db.prepare('INSERT INTO production_reviews VALUES(?,?,?,?,?,?,?,?,?)').run(id,request.task_id,request.request_revision,request.workspace,request.account_id,JSON.stringify(request),report.receipt.result_fingerprint,JSON.stringify(report),new Date(now).toISOString());
+   this.db.prepare('INSERT INTO production_review_envelopes VALUES(?,?,?)').run(id,JSON.stringify(result),digest(JSON.stringify(report)));
    const insert=this.db.prepare('INSERT INTO production_review_assets VALUES(?,?,?,?,?,?)');
    for(const a of assets)insert.run(id,a.source,a.id,a.mime,a.sha256,a.data);
+   this.approvals.invalidateTask(request.task_id,id,now);
    this.db.exec('COMMIT');return {status:'REVIEW_REQUIRED',id,publish_allowed:false,import_allowed:false};
   }catch(error){this.db.exec('ROLLBACK');throw error;}
  }
