@@ -1,0 +1,20 @@
+✖ later edit invalidates prior new Review/approval/freeze while old creation receipt survives; latest version can reenter (274.158247ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 393.888231
+
+✖ failing tests:
+
+test at test/sites-variant-review.test.js:36:1
+✖ later edit invalidates prior new Review/approval/freeze while old creation receipt survives; latest version can reenter (274.158247ms)
+  Error: ITEM_REVISION_CONFLICT
+      at fail (file:///workspace/publisher-v3/src/production-artifact-contract.js:8:25)
+      at createProductionRequest (file:///workspace/publisher-v3/src/production-artifact-contract.js:56:164)
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-variant-review.test.js:38:744)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)

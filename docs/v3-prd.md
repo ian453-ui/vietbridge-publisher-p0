@@ -1,6 +1,11 @@
 # Publisher V3 — PRD / architecture / acceptance plan
 
-Current update: [independent target Review](v3-target-review-handoff.md) closes
+Current update: [edited reviewed copy](v3-edited-review-handoff.md) now reenters
+fresh media inspection and independent PENDING Review before explicit approval
+and a new frozen task. Original media and history remain; no approval is copied.
+The real inspector is unavailable by default.
+
+Previous update: [independent target Review](v3-target-review-handoff.md) closes
 shared reviewed media → fresh target-bound PENDING Review → explicit human
 approval → original frozen platform task. Source validity remains a transaction
 dependency; original approval is not copied. Real providers default closed.
@@ -251,5 +256,9 @@ platform text never falls back. Reviewed media retains its source fingerprint,
 requires existing admin authority for editing, and loses its prior approval in
 the same transaction. Edited media cannot bypass fresh inspection through manual
 freeze. Historical committed approval/preparation/submission facts remain visible.
-Fresh inspection/Review for edited payloads and cross-platform media adaptation
-remain implementation work; content approval still does not authorize publication.
+[Fresh inspection/Review](v3-edited-review-handoff.md) is now connected for an
+ordinary original Review on its existing platform, with fresh native decode in
+synthetic tests, independent approval and atomic lineage guards. Cross-platform
+media adaptation, derived-chain edits and original bulk/file input remain code
+gaps. Real inspector transport remains absent; content approval does not authorize
+publication.

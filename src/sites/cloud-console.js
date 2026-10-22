@@ -78,17 +78,18 @@ $('#content-form').onsubmit=async event=>{
  finally{draft.pending=false;if(editorKey===key)paintDraft();}
 };
 $('#variant-close').onclick=detachVariant;
-$('#variant-form').addEventListener('input',stashVariant);
+$('#variant-form').addEventListener('input',()=>{stashVariant();const d=variantDrafts.get(variantKey);if(d){const v=d.base.content.variants[d.platform];$('#variant-review').disabled=Boolean(!d.base.can_request_review||d.pending||d.command||d.rebasing||d.reviewPending||d.reviewCommand||!v||d.values.title.trim()!==v.title||d.values.body.trim()!==v.body);}});
 $('#variant-platform').onchange=()=>{if(!variantContext)return;stashVariant();selectVariant($('#variant-platform').value);};
 $('#variant-preview').onclick=()=>{stashVariant();const d=variantDrafts.get(variantKey);if(d)previewVariant(d.base,d.values);};
 $('#variant-rebase').onclick=rebaseVariant;
+$('#variant-review').onclick=requestVariantReview;
 $('#variant-form').onsubmit=saveVariant;
 await refresh();
 
 function evidencePath(resource,id){return '/api/sites/workspaces/'+state.workspace+'/'+resource+'/'+id+'?accountId='+encodeURIComponent(state.account);}
 function sourceSummary(source){if(!source)return '';const s=source.summary;return '<section id="canonical-source"><h3>来源与版本</h3><p>'+escape(s.content_id)+' · '+escape(s.slug)+'</p><p>快照版本 '+escape(source.source_revision)+' / 当前来源版本 '+escape(source.current_revision)+' · '+escape(source.state)+'</p><p>最新 QA：'+escape(s.qa_status)+' · '+escape(source.blocked_reason||'素材已校验，仍需独立人工审核')+'</p><p>来源记录不代表制作方认证或发布授权。</p></section>';}
 async function showReview(id){const current=beginPreview(),generation=state.generation,workspace=state.workspace,account=state.account;try{const [review,approval]=await Promise.all([api(evidencePath('reviews',id)),api(evidencePath('reviews',id+'/approval'))]);if(!current())return;const assetPath=a=>'/api/sites/workspaces/'+workspace+'/reviews/'+id+'/assets/'+encodeURIComponent(a.source_id)+'/'+encodeURIComponent(a.artifact_id)+'?accountId='+encodeURIComponent(account);
- $('#preview-title').textContent='制作素材快照';$('#preview-body').innerHTML='<p>审核目标：'+escape(state.accounts.find(a=>a.account_id===account)?.display_name||account)+' · '+escape(platformNames[state.accounts.find(a=>a.account_id===account)?.platform]||'')+'</p><h3>'+escape(review.task_id)+'</h3><p>'+escape(approval.state)+' · '+(approval.can_decide?'仅限合成素材内容审核 · 不授予发布许可':escape(approval.blocked_reason||'来源或管理员未接入')+' · 不能批准或发布')+'</p>'+sourceSummary(review.source_import)+review.assets.map(a=>'<section class="review-asset"><p>'+escape(a.source_id)+' / '+escape(a.artifact_id)+' · '+escape(a.state)+'</p>'+(a.mime.startsWith('image/')?'<img alt="已入账的素材快照" src="'+escape(assetPath(a))+'">':a.mime.startsWith('video/')?'<video controls preload="metadata" src="'+escape(assetPath(a))+'"></video>':'<button data-read-text="'+escape(assetPath(a))+'">读取完整文本</button>')+'<code>SHA256 '+escape(a.sha256)+'</code></section>').join('')+'<details><summary>制作检查回执</summary><pre>'+escape(JSON.stringify(review.report,null,2))+'</pre></details>';
+ $('#preview-title').textContent='制作素材快照';$('#preview-body').innerHTML='<p>审核目标：'+escape(state.accounts.find(a=>a.account_id===account)?.display_name||account)+' · '+escape(platformNames[state.accounts.find(a=>a.account_id===account)?.platform]||'')+'</p><h3>'+escape(review.task_id)+'</h3><p>'+escape(approval.state)+' · '+(approval.can_decide?'仅限合成素材内容审核 · 不授予发布许可':escape(approval.blocked_reason||'来源或管理员未接入')+' · 不能批准或发布')+'</p>'+sourceSummary(review.source_import)+(review.edit_source?'<section id="edited-source"><h3>编辑版本 '+escape(review.edit_source.content_revision)+' · 独立审核</h3><p>旧批准不复用；原媒体已重新校验，仍须人工检查内容和画面是否一致。</p><h3>'+escape(review.edit_source.payload.title)+'</h3><pre>'+escape(review.edit_source.payload.body)+'</pre></section>':'')+review.assets.map(a=>'<section class="review-asset"><p>'+escape(a.source_id)+' / '+escape(a.artifact_id)+' · '+escape(a.state)+'</p>'+(a.mime.startsWith('image/')?'<img alt="已入账的素材快照" src="'+escape(assetPath(a))+'">':a.mime.startsWith('video/')?'<video controls preload="metadata" src="'+escape(assetPath(a))+'"></video>':'<button data-read-text="'+escape(assetPath(a))+'">读取完整文本</button>')+'<code>SHA256 '+escape(a.sha256)+'</code></section>').join('')+'<details><summary>制作检查回执</summary><pre>'+escape(JSON.stringify(review.report,null,2))+'</pre></details>';
  for(const button of document.querySelectorAll('[data-read-text]'))button.onclick=async()=>{try{const response=await fetch(button.dataset.readText,{credentials:'same-origin'});if(!response.ok)throw Error('素材读取失败');const value=await response.text();if(!current()||!button.isConnected)return;const pre=document.createElement('pre');pre.textContent=value;button.replaceWith(pre);}catch(error){if(current())status(error.message,true);}};
  mountApproval(id,approval,{generation,workspace,account,current});$('#preview').showModal();}catch(error){if(current())status(error.message+'；素材状态未变更为可发布。',true);}}
 async function showMetric(id){const current=beginPreview();try{const history=await api(evidencePath('metrics',id+'/history'));if(!current())return;$('#preview-title').textContent='指标观测历史';$('#preview-body').innerHTML='<h3>原始观测历史 · 最多 20 条</h3><p>来源、定义与窗口独立保留。不可用值为 null，不回退旧值。</p><pre>'+escape(JSON.stringify(history,null,2))+'</pre>';$('#preview').showModal();}catch(error){if(current())status(error.message,true);}}
@@ -125,15 +126,16 @@ function mountTargetReview(plan,source){
 
 
 function variantPath(workspace,id,viewer){return '/api/sites/workspaces/'+workspace+'/contents/'+id+'/variants?accountId='+encodeURIComponent(viewer);}
-function stashVariant(){const d=variantDrafts.get(variantKey);if(d&&!d.pending&&!d.command)d.values={title:$('#variant-title').value,body:$('#variant-body').value};}
+function stashVariant(){const d=variantDrafts.get(variantKey);if(d&&!d.pending&&!d.command&&!d.reviewPending&&!d.reviewCommand)d.values={title:$('#variant-title').value,body:$('#variant-body').value};}
 function detachVariant(){stashVariant();variantContext=null;variantKey=null;++variantEpoch;$('#variant-form').hidden=true;}
 function variantCurrent(key,epoch){return key===variantKey&&epoch===variantEpoch&&variantContext?.workspace===state.workspace&&variantContext?.viewer===state.account&&!$('#variant-form').hidden;}
 function paintVariant(){
  const d=variantDrafts.get(variantKey);if(!d)return;const c=d.base.content,p=d.platform;$('#variant-form').hidden=false;$('#variant-platform').value=p;$('#variant-title').value=d.values.title;$('#variant-body').value=d.values.body;
  $('#variant-source').textContent='来源账号：'+(state.accounts.find(a=>a.account_id===c.account_id)?.display_name||c.account_id)+' · '+c.content_id+' / '+c.slug+' · 基础版本 '+c.revision+' · '+platformNames[p];
  $('#variant-status').textContent=d.message||(d.base.requires_new_inspection?'保留原媒体绑定；文字变更将撤销相关批准，编辑稿必须重新校验与审核。':d.base.content.variants[p]?'独立编辑此平台；其他平台不会被覆盖。':'此平台尚无明确稿件，请填写；不会借用其他平台正文。');
- for(const el of [$('#variant-title'),$('#variant-body')])el.readOnly=Boolean(d.pending||d.command||d.rebasing);
- $('#variant-save').disabled=Boolean(d.pending||d.rebasing);$('#variant-save').textContent=d.command?'使用原命令核对保存结果':'保存此平台新版本';$('#variant-rebase').disabled=Boolean(d.pending||d.command||d.rebasing);
+ for(const el of [$('#variant-title'),$('#variant-body')])el.readOnly=Boolean(d.pending||d.command||d.rebasing||d.reviewPending||d.reviewCommand);
+ $('#variant-save').disabled=Boolean(d.pending||d.rebasing||d.reviewPending||d.reviewCommand);$('#variant-save').textContent=d.command?'使用原命令核对保存结果':'保存此平台新版本';$('#variant-rebase').disabled=Boolean(d.pending||d.command||d.rebasing||d.reviewPending||d.reviewCommand);
+ const v=c.variants[p],dirty=!v||d.values.title.trim()!==v.title||d.values.body.trim()!==v.body;$('#variant-review').hidden=!d.base.requires_new_inspection;$('#variant-review').disabled=Boolean(d.pending||d.command||d.rebasing||d.reviewPending||dirty||!d.reviewCommand&&!d.base.can_request_review);$('#variant-review').textContent=d.reviewCommand?'使用原命令回读新审核':'重新校验并创建独立审核';
 }
 function selectVariant(platform){
  if(!variantContext)return;const key=JSON.stringify([variantContext.workspace,variantContext.viewer,variantContext.base.source.root_content_id,platform]);
@@ -145,7 +147,7 @@ async function openVariant(id,platform){
  try{const base=await api(variantPath(workspace,id,viewer));if(epoch!==variantEpoch||workspace!==state.workspace||viewer!==state.account)return;variantContext={workspace,viewer,base};selectVariant(platform);$('#variant-form').scrollIntoView({behavior:'smooth'});}catch(error){if(epoch===variantEpoch)status(error.message,true);}
 }
 async function rebaseVariant(){
- stashVariant();const key=variantKey,epoch=variantEpoch,d=variantDrafts.get(key),context=variantContext;if(!d||d.pending||d.command||d.rebasing)return;
+ stashVariant();const key=variantKey,epoch=variantEpoch,d=variantDrafts.get(key),context=variantContext;if(!d||d.pending||d.command||d.rebasing||d.reviewPending||d.reviewCommand)return;
  const base=d.base;d.rebasing=true;paintVariant();
  try{const current=await api(variantPath(context.workspace,base.content.id,context.viewer)),latest=current.latest.id===base.content.id?current:await api(variantPath(context.workspace,current.latest.id,context.viewer));
   if(!variantCurrent(key,epoch)||d.pending||d.command||d.base!==base)return;if(latest.source.root_content_id!==base.source.root_content_id)throw Error('来源版本已改变，请从新来源重新打开编辑');d.base=latest;variantContext.base=latest;d.message='已读取最新基础版本，保留当前平台的未保存文字。请核对再保存。';
@@ -153,7 +155,7 @@ async function rebaseVariant(){
  finally{d.rebasing=false;if(key===variantKey&&variantContext?.workspace===state.workspace&&variantContext?.viewer===state.account)paintVariant();}
 }
 async function saveVariant(event){
- event.preventDefault();stashVariant();const key=variantKey,epoch=variantEpoch,d=variantDrafts.get(key),context=variantContext;if(!d||d.pending||d.rebasing)return;
+ event.preventDefault();stashVariant();const key=variantKey,epoch=variantEpoch,d=variantDrafts.get(key),context=variantContext;if(!d||d.pending||d.rebasing||d.reviewPending||d.reviewCommand)return;
  if(!d.command){d.command=crypto.randomUUID();d.submittedBaseId=d.base.content.id;d.submitted={command_id:d.command,expected_payload_hash:d.base.content.payload_hash,expected_source_binding:d.base.source_binding_hash,platform:d.platform,title:d.values.title.trim(),body:d.values.body.trim()};}
  d.pending=true;paintVariant();
  try{const r=await api(variantPath(context.workspace,d.submittedBaseId,context.viewer),d.submitted);d.message='已保存独立平台版本 '+r.revision+'；未上传或发布。';
@@ -169,5 +171,15 @@ async function saveVariant(event){
 function previewVariant(view,payload){
  preview(payload,view.content.body,view.content.payload_hash);if(!view.source.source_plan_id)return;
  const section=document.createElement('section');section.innerHTML='<p>原版本媒体仅供核对；当前编辑稿尚未通过新检查与审核。</p>'+view.source.media.map(a=>{const path='/api/sites/workspaces/'+view.content.workspace+'/reviews/'+view.source.source_review_id+'/assets/'+encodeURIComponent(a.source_id)+'/'+encodeURIComponent(a.artifact_id)+'?accountId='+encodeURIComponent(view.content.account_id);return '<section class="review-asset">'+(a.mime.startsWith('video/')?'<video controls preload="metadata" src="'+escape(path)+'"></video>':'<img alt="原版本媒体，编辑稿待重新审核" src="'+escape(path)+'">')+'<code>SHA256 '+escape(a.sha256)+'</code></section>';}).join('');$('#preview-body').append(section);
+}
+async function requestVariantReview(){
+ stashVariant();const key=variantKey,epoch=variantEpoch,d=variantDrafts.get(key),context=variantContext;if(!d||$('#variant-review').disabled)return;
+ const generation=state.generation,viewEpoch=previewEpoch,current=()=>variantCurrent(key,epoch)&&generation===state.generation&&viewEpoch===previewEpoch;
+ if(!d.reviewCommand){d.reviewCommand=crypto.randomUUID();d.reviewSubmitted={id:d.base.content.id,input:{command_id:d.reviewCommand,expected_payload_hash:d.base.content.payload_hash,expected_source_binding:d.base.source_binding_hash}};}
+ d.reviewPending=true;paintVariant();
+ try{const r=await api('/api/sites/workspaces/'+context.workspace+'/contents/'+d.reviewSubmitted.id+'/review?accountId='+encodeURIComponent(context.viewer),d.reviewSubmitted.input);d.reviewCommand=null;d.reviewSubmitted=null;d.message='新版本校验已入账，等待独立人工审核；未授予发布许可。';
+  if(current()){const loading=loadScope(),g=state.generation,v=previewEpoch;await loading;if(g!==state.generation||v!==previewEpoch||!variantCurrent(key,epoch))return;tab('review');await showReview(r.id);}
+ }catch(error){if(/^(VARIANT_VERSION_CONFLICT|VARIANT_REVIEW_(INPUT_INVALID|VERSION_CHANGED|SOURCE_CHANGED|EDIT_REQUIRED|REQUEST_EXPIRED|SCOPE_DENIED|INSPECTOR_UNAVAILABLE))$/.test(error.message)){d.reviewCommand=null;d.reviewSubmitted=null;}d.message=error.message+(d.reviewCommand?'；保留原命令，请明确回读审核结果，不自动重试。':'；未生成可批准的新版本。');}
+ finally{d.reviewPending=false;if(key===variantKey&&variantContext?.workspace===context.workspace&&variantContext?.viewer===context.viewer&&!$('#variant-form').hidden)paintVariant();}
 }
 async function showEditedContent(id){const current=beginPreview(),workspace=state.workspace,viewer=state.account,platform=state.previewPlatform;try{const v=await api(variantPath(workspace,id,viewer));if(!current())return;previewVariant(v,v.content.variants[platform]);}catch(error){if(current())status(error.message,true);}}

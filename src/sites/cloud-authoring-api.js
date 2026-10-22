@@ -3,6 +3,7 @@ import {createSitesScopeResolver} from './membership.js';
 import {AsyncReviewStore} from './async-review-store.js';
 import {AsyncApprovalStore} from './async-approval-store.js';
 import {AsyncVariantEdits} from './async-variant-edits.js';
+import {AsyncVariantReview} from './async-variant-review.js';
 import {AsyncTargetReview} from './async-target-review.js';
 import {AsyncUploadPlans} from './async-upload-plans.js';
 import {requireProductionAdmin} from '../production-approval-policy.js';
@@ -33,7 +34,7 @@ async function readInput(request){
  * Only server-resolved existing admins can decide/prepare synthetic review snapshots.
  * Publication, upload, credential and interaction routes stay shut.
  */
-export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=null,resolveApprovalAuthority=null,targetReviewProvider=null,now=()=>new Date().toISOString()}={}){
+export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=null,resolveApprovalAuthority=null,targetReviewProvider=null,variantInspectionProvider=null,now=()=>new Date().toISOString()}={}){
  const statement=(sql,args=[])=>db.prepare(sql).bind(...args);
  async function rows(sql,args=[]){const result=await statement(sql,args).all();if(result.success===false||!Array.isArray(result.results))fail('STORAGE_UNAVAILABLE',503);return result.results;}
  async function one(sql,args=[]){return (await rows(sql,args))[0]||null;}
@@ -61,11 +62,19 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
    const identity=await getTrustedIdentity(request);if(!identity||!text(identity.userId,300))fail('IDENTITY_REQUIRED',401);const userId=identity.userId;
    if(url.pathname.startsWith('/api/unified/'))return createSitesReadonlyApi({db,origin,resolveScope:createSitesScopeResolver({db,getTrustedIdentity:async()=>identity})})(request);
    if(!['GET','POST'].includes(request.method))fail('METHOD_NOT_ALLOWED',405);
+   const revisedReview=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/contents\/([a-f0-9-]{36})\/review$/);
+   if(revisedReview){
+    const [,workspace,id]=revisedReview,accountId=url.searchParams.get('accountId'),scope={workspace,accountId};await account(userId,workspace,accountId);
+    if(request.method!=='POST')fail('METHOD_NOT_ALLOWED',405);if(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site')fail('ORIGIN_DENIED',403);
+    const authority=typeof resolveApprovalAuthority==='function'?await resolveApprovalAuthority(request,identity,scope):null;
+    return response(200,await new AsyncVariantReview(db,{bucket,variantInspectionProvider,authorization:{userId,workspace,accountId}}).create(id,await readInput(request),scope,{authority}));
+   }
    const editRoute=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/contents\/([a-f0-9-]{36})\/variants$/);
    if(editRoute){
     const [,workspace,id]=editRoute,accountId=url.searchParams.get('accountId'),scope={workspace,accountId};await account(userId,workspace,accountId);
     const edits=new AsyncVariantEdits(db,{bucket,authorization:{userId,workspace,accountId}});
-    if(request.method==='GET')return response(200,await edits.view(id,scope));
+    if(request.method==='GET'){const view=await edits.view(id,scope);let admin=false;try{requireProductionAdmin(typeof resolveApprovalAuthority==='function'?await resolveApprovalAuthority(request,identity,scope):null);admin=true;}catch{}
+     return response(200,{...view,can_request_review:admin&&!!variantInspectionProvider?.inspectVariant&&view.content.account_id===accountId&&view.latest.id===id&&!!await one('SELECT 1 FROM sites_content_edits WHERE content_id=? AND source_plan_id IS NOT NULL',[id])});}
     if(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site')fail('ORIGIN_DENIED',403);
     const input=await readInput(request),source=await edits.source(id,scope),authority=typeof resolveApprovalAuthority==='function'?await resolveApprovalAuthority(request,identity,{workspace,accountId:source.row.account_id}):null;
     return response(200,await edits.save(id,input,scope,{authority}));
@@ -100,7 +109,7 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
     if(source){const asset=await store.asset(workspace,accountId,id,decodeURIComponent(source),decodeURIComponent(artifact));return new Response(asset.data,{headers:{'Content-Type':asset.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Length':String(asset.data.byteLength)}});}
     return response(200,id?await store.detail(workspace,accountId,id):await store.list(workspace,accountId,{cursor:url.searchParams.get('cursor')||''}));
    }
-   if(request.method==='GET'&&url.pathname==='/api/sites/capabilities')return response(200,{...flags,mode:'SITES_CLOUD_AUTHORING',persistence:'D1',content_status:'MANUAL_UNVERIFIED',platforms:cloudPlatforms,implemented:['workspace_create','account_mapping_create','content_version_create','task_freeze','scoped_persistent_reads','review_snapshot_reads','metric_ledger_reads','content_decision_receipts','approved_platform_preparation','workspace_source_catalogue','explicit_platform_target_freeze','independent_target_review','single_platform_revision_edit'],unavailable:['real_producer_transport','media_decode','archive_resolve','real_admin_approval_provider','external_upload','publish','group_post','reply','direct_message','live_metrics']});
+   if(request.method==='GET'&&url.pathname==='/api/sites/capabilities')return response(200,{...flags,mode:'SITES_CLOUD_AUTHORING',persistence:'D1',content_status:'MANUAL_UNVERIFIED',platforms:cloudPlatforms,implemented:['workspace_create','account_mapping_create','content_version_create','task_freeze','scoped_persistent_reads','review_snapshot_reads','metric_ledger_reads','content_decision_receipts','approved_platform_preparation','workspace_source_catalogue','explicit_platform_target_freeze','independent_target_review','single_platform_revision_edit','edited_version_inspection_review'],unavailable:['real_producer_transport','media_decode','archive_resolve','real_admin_approval_provider','external_upload','publish','group_post','reply','direct_message','live_metrics']});
    if(request.method==='GET'&&url.pathname==='/api/sites/workspaces')return response(200,{workspaces:await rows('SELECT id,name,created_at FROM sites_workspaces WHERE owner_user_id=? ORDER BY created_at,id LIMIT 200',[userId]),...flags});
    if(request.method==='POST'){
     if(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site')fail('ORIGIN_DENIED',403);

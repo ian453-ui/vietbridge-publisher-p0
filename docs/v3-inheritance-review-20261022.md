@@ -41,7 +41,7 @@ not automatically become callable from Sites.
 | Multiple tasks and immutable versions | V1 task queue; V2 unified executor | Runnable frozen independent DRAFT snapshots and idempotent creation | Actual execution is a separate missing integration |
 | Original Tabs | Unified `client.js` navigation | Nine Sites destinations; native navigation retained | Groups/Inbox/engagement/verification descriptions are not working business screens |
 | Shared client content → choose account | Actual V2 `unified-publisher.js:162–174`, content selected by workspace | Repaired: workspace catalogue and explicit account draft; shared reviewed media can create a fresh target-specific PENDING review, never transfer old approval | Same-platform one-hop synthetic provider acceptance; real provider/hosted wiring still needed |
-| Independent platform selection/edit | Actual V1 `web-ui.ts:12,13,37`; V2 `unified-publisher.js:124–181` immutable payload/task overrides | Independent full preview and single-platform text revision; other variants retained, explicit conflict/rebase, unsaved platform/scope switching and command recovery tested | Edited reviewed media needs fresh inspection/Review; current text editing only on its existing plan platform. Exact target approval/permit still required |
+| Independent platform selection/edit | Actual V1 `web-ui.ts:12,13,37`; V2 `unified-publisher.js:124–181` immutable payload/task overrides | Independent full preview and single-platform text revision; other variants retained, explicit conflict/rebase, unsaved platform/scope switching and command recovery tested | Ordinary original reviewed media now reenters fresh inspection/independent Review on its existing plan platform; derived chains/cross-platform media and real inspector wiring remain missing. Exact target approval/permit still required |
 | Read full body and images/video | V1 `web-ui.ts:37`; unified preview | Runnable full text; Review decoded media; approved plan media and original task preview. This package fixes stale/closed preview replacement | Registered real source transport and hosted media service still missing; text-only manual entry is not a media upload UI |
 | Upload new DOCX/image or select bulk source items | V1 `web-ui.ts:13,20,22,28` | Native route retained. Sites manual authoring + canonical contract import exist | Sites user-facing file replacement/bulk selection workflow is missing code, not merely missing token |
 | Production handoff | Unified production request/result contracts | Synthetic exact request/source/result binding → stored inspection → Review works | Real producer orchestration and trusted delivery missing; no content production repeated in this package |
@@ -136,7 +136,9 @@ content only. They are not physical-device, Safari or hosted Sites acceptance.
 
 1. **Code inheritance:** shared browsing, platform selection and new target Review
    and independent platform text editing are now implemented in bounded follow-ups.
-   Next connect edited payloads to fresh inspection/Review, then bulk selection/file replacement. Preserve
+   [Edited Review handoff](v3-edited-review-handoff.md) now closes fresh inspection
+   and independent approval on the ordinary original platform. Bulk selection/file
+   replacement and cross-platform/derived media edits remain implementation gaps. Preserve
    account-specific approval and frozen version identity. This can be developed
    independently and is not blocked solely by credentials or deployment.
 2. **Formal cloud delivery:** keep Site `appgprj_6ad97a034fd08191a8399eeda10f048c`.

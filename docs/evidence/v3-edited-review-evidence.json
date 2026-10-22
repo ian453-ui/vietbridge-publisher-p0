@@ -1,0 +1,234 @@
+{
+  "base_commit": "068b30cdb24563cfbf0281be3331deea71dfa0f8",
+  "branch": "publisher-v3/cloud-slice-01",
+  "site_project_id": "appgprj_6ad97a034fd08191a8399eeda10f048c",
+  "deployment": "NOT_DEPLOYED_BY_THIS_PACKAGE",
+  "execution": "same selected cloud workspace; generated media, test-only native decoder/authority and SQLite under async D1 shape, file-backed bucket and loopback Chromium; no external platform verification",
+  "failures_before": [
+    {
+      "command": "node --test test/sites-variant-review.test.js",
+      "result": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 0,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 299.878702
+      },
+      "log": "v3-edited-review-api-before.log",
+      "sha256": "02c4025003291010c90a21b93ce45ebc257df7f5d06e6c9be1d7aaae108f730d",
+      "original_path": "/tmp/v3-variant-review-before.log",
+      "original_sha256": "e28d6590d4855abb4726084a9c282339e06b8eab853a83c1afe12326dda30b55",
+      "reason": "Baseline: edited version has no Review handoff; 404 OPERATION_UNAVAILABLE"
+    },
+    {
+      "command": "node --test --test-name-pattern='later edit invalidates' test/sites-variant-review.test.js",
+      "result": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 0,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 393.888231
+      },
+      "log": "v3-edited-review-chain-before.log",
+      "sha256": "4304f2b0b6c9a70711ba5183cdc4dc05957a934d585aece0858712c3d91aabcd",
+      "original_path": "/tmp/v3-variant-review-chain-before.log",
+      "original_sha256": "4304f2b0b6c9a70711ba5183cdc4dc05957a934d585aece0858712c3d91aabcd",
+      "reason": "First implementation: consecutive request revisions fail native ITEM_REVISION_CONFLICT"
+    },
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/workspace/sites/publisher-v3/variant-review-evidence-20261022 node --test --test-name-pattern='edited media ->|late new edited Review|lost new edited Review' test/sites-cloud-console-ui.test.js",
+      "result": {
+        "tests": 4,
+        "suites": 0,
+        "pass": 3,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 7874.059644
+      },
+      "log": "v3-edited-review-ui-before.log",
+      "sha256": "0e5a7d0e1b13c3c970ede1d541c2ef5824e48c07e9fa1df196bc0d5baaec6066",
+      "original_path": "/tmp/v3-variant-review-ui-first.log",
+      "original_sha256": "c17039da11c7ca028438c0996dcc82901e714f9003287249dcf73206e59ac463",
+      "reason": "Mobile 390px: long task heading overflows dialog/document; other three tests pass"
+    }
+  ],
+  "exact_rechecks": [
+    {
+      "command": "node --test --test-name-pattern='later edit invalidates' test/sites-variant-review.test.js",
+      "result": {
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 456.928953
+      },
+      "log": "v3-edited-review-chain-after.log",
+      "sha256": "7f695ee7cb5d6f64d78eef112264207f26e7ea335076f251056c5ef0a4a27eeb",
+      "original_path": "/tmp/v3-variant-review-chain-after.log",
+      "original_sha256": "7f695ee7cb5d6f64d78eef112264207f26e7ea335076f251056c5ef0a4a27eeb"
+    },
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/workspace/sites/publisher-v3/variant-review-evidence-20261022 node --test --test-name-pattern='edited media ->|late new edited Review|lost new edited Review' test/sites-cloud-console-ui.test.js",
+      "result": {
+        "tests": 4,
+        "suites": 0,
+        "pass": 4,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 9903.785505
+      },
+      "log": "v3-edited-review-ui-after.log",
+      "sha256": "0d649892826ef8c67400010cb914b0501d69161ee58ca14c041a321eb0e47c9f",
+      "original_path": "/tmp/v3-variant-review-ui-after.log",
+      "original_sha256": "0d649892826ef8c67400010cb914b0501d69161ee58ca14c041a321eb0e47c9f"
+    }
+  ],
+  "final_runs": [
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg V3_SITES_EVIDENCE_DIR=/workspace/sites/publisher-v3/variant-review-evidence-20261022 node --test --test-concurrency=2 test/sites-variant-review.test.js test/sites-variant-edits.test.js test/sites-target-review.test.js test/sites-async-approval.test.js test/sites-async-review-store.test.js test/sites-async-upload-plans.test.js test/sites-async-synthetic-executor.test.js test/sites-cloud-console-ui.test.js",
+      "result": {
+        "tests": 145,
+        "suites": 0,
+        "pass": 145,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 60837.35538
+      },
+      "log": "v3-edited-review-focused.log",
+      "sha256": "752f18d35680d2239646dcdddea3b2ad9326cc9b77d0139bff14383ebd35fae4",
+      "original_path": "/tmp/v3-variant-review-focused.log",
+      "original_sha256": "752f18d35680d2239646dcdddea3b2ad9326cc9b77d0139bff14383ebd35fae4"
+    },
+    {
+      "command": "PUBLISHER_TEST_BROWSER_PATH=/usr/bin/chromium PUBLISHER_TEST_FFMPEG_PATH=/usr/bin/ffmpeg node --test --test-concurrency=4 test/*.test.js",
+      "result": {
+        "tests": 1283,
+        "suites": 0,
+        "pass": 1283,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 154561.894132
+      },
+      "summary": "v3-edited-review-full-summary.log",
+      "summary_sha256": "029d7b2ce8b03bbb00978d09dd1fb880c2658d27c512037563a74fa513f10185",
+      "full_log": "/tmp/v3-variant-review-full.log",
+      "full_log_sha256": "c0a30f2fa5d6b82a4ee1e87839f6cf2c6046c661ea971d9c71a106c5f2f0ccd2"
+    }
+  ],
+  "source_sha256": {
+    "src/sites/async-variant-review.js": "a2458f840a1ee3cfd82e949828943b3c6daa6dc3b73ff990ecff5c4c15b83c73",
+    "src/sites/async-approval-store.js": "33d9e3a0cd5972edf58fb93869022c300958ae195be002a5077a7eef9db0dcbb",
+    "src/sites/async-review-store.js": "24d3f5003cf43b53cc7c5ff98a795af9351e835fac67098b07d78d054fc4408e",
+    "src/sites/async-upload-plans.js": "a6122fdc286953fb83f754cfdcbb4c93ba7dae7f07a1821f68eff8896609cda6",
+    "src/sites/cloud-authoring-api.js": "1e9771fbd41e7e26f3a820bb592709c10fa5759b1898fd590e375301bacef2d3",
+    "src/sites/cloud-console.css": "dbc31322202e67c576837ef3de5f10b291073b31eb568da0424844ee7c223467",
+    "src/sites/cloud-console.html": "1260dfe86ea8eade3c3680cd1625effdfb054f2ad96baccb24792292b4744985",
+    "src/sites/cloud-console.js": "a2b5642bc71a8eb0b447929efa67d604a620218a459fe5dbc2771f3495b6bda6",
+    "src/sites/migrations/0010_variant_review_candidate.sql": "4114df13875173a4bb0d77332e7c2c93073c8d1d1d2c838f0b80c0b33befa2cd",
+    "test/fixtures/sites-cloud-d1.js": "70484b94b7257a0e4776bcdf9d4d912928e6248977765facf6585a4311a63e28",
+    "test/fixtures/sites-variant-inspector.js": "4f803c2f2cb393e22b7e4e5ced20e1d23395c82b2725738ed5074693fa52f6e5",
+    "test/fixtures/sites-variant-review.js": "ec6530b15c3125f7fdaec82e06c7898ab925d898b3bbc1a2016d3a6fbcedd745",
+    "test/sites-variant-review.test.js": "1aea9b126d676142d4660dc3792355fc9e8fc6847cb3295cdd96c599af96c40c",
+    "test/sites-cloud-console-ui.test.js": "8c774516153c77e7aa997495c73098e9065752bb6b0dcaef0186639e8451f2c3"
+  },
+  "screenshots": [
+    {
+      "path": "/workspace/sites/publisher-v3/variant-review-evidence-20261022/desktop-edited-review-frozen.png",
+      "sha256": "47a0b4f88b1bfbb963956c6d8779bd3c2c70269f3fa02f2777516e1ec7e9aa88",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image_pixels": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "path": "/workspace/sites/publisher-v3/variant-review-evidence-20261022/desktop-edited-review-pending.png",
+      "sha256": "c674afb5373b2198d5fc1c6ccba1d0232ce2287ee148da9a95b94b8465c84cb8",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image_pixels": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "path": "/workspace/sites/publisher-v3/variant-review-evidence-20261022/mobile-edited-review-frozen.png",
+      "sha256": "056474492e5afe21690e4d27017eaf2a1d26b443894403ec26be6df7560e04f3",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "image_pixels": {
+        "width": 390,
+        "height": 1250
+      }
+    },
+    {
+      "path": "/workspace/sites/publisher-v3/variant-review-evidence-20261022/mobile-edited-review-pending.png",
+      "sha256": "c9ad4767387136dd4a9ee4c5375ff63f920146fb276920132ec438db744c6ae9",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "image_pixels": {
+        "width": 390,
+        "height": 1272
+      }
+    }
+  ],
+  "review": "gpt-6-astra read-only review found preceding-item fingerprint defect; implementer reproduced and fixed; follow-up found no further definite P0/P1/P2. Astra did not rerun tests. Implementer fixed reproduced mobile width regression.",
+  "intermediate_runs_not_final": [
+    {
+      "log": "/tmp/v3-variant-review-core.log",
+      "result": "4/4 initial core"
+    },
+    {
+      "log": "/tmp/v3-variant-review-negative.log",
+      "result": "23/24; one fixture supplied 12 values to 11-column source-head insert; fixed test placeholder"
+    },
+    {
+      "log": "/tmp/v3-variant-review-focused-api.log",
+      "result": "24/24 before native priorRequest regression and final withdrawal tests"
+    }
+  ],
+  "not_verified": [
+    "hosted Sites identity/D1/R2 and deployment",
+    "cloud heavy decoder/inspector provider",
+    "real source/producer/admin/permit/upload/submit/readback providers",
+    "real Drive sample consumption",
+    "physical phone or Safari"
+  ],
+  "remaining_code_gaps": [
+    "cross-platform inspected media adaptation and chained derived edits",
+    "original bulk-selection/file replacement",
+    "cloud group/Inbox/reply/takeover workflows and live metric feedback"
+  ],
+  "real_posts": 0,
+  "real_messages": 0,
+  "credentials_created_or_read": false,
+  "denied_downloads_retried": false,
+  "log_normalization": "Committed copies trim trailing line whitespace only; raw logs retained under /tmp; full-run summary and full raw hash archived separately.",
+  "recorded_at": "2026-10-22T17:54:13.432982+00:00"
+}

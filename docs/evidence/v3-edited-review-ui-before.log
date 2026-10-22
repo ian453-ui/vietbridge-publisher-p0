@@ -1,0 +1,31 @@
+✔ desktop edited media -> fresh decode -> independent Review -> explicit approval -> exact frozen new copy survives reload (2503.870031ms)
+✖ mobile edited media -> fresh decode -> independent Review -> explicit approval -> exact frozen new copy survives reload (1624.427436ms)
+✔ late new edited Review response cannot reopen under another account (1762.320526ms)
+✔ lost new edited Review acknowledgement retains exact request and explicit retry does not inspect/create twice (1607.263594ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 3
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7874.059644
+
+✖ failing tests:
+
+test at test/sites-cloud-console-ui.test.js:248:103
+✖ mobile edited media -> fresh decode -> independent Review -> explicit approval -> exact frozen new copy survives reload (1624.427436ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1&&document.querySelector('#preview').scrollWidth<=document.querySelector('#preview').clientWidth+1))
+
+      at TestContext.<anonymous> (file:///workspace/publisher-v3/test/sites-cloud-console-ui.test.js:249:913)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

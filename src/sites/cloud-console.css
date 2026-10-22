@@ -9,3 +9,4 @@ nav button:hover,nav button[aria-current]{background:#e2f0eb;color:#09574d}
 #canonical-source{overflow-wrap:anywhere;border-left:3px solid #178575;padding:8px 12px;margin:16px 0;background:#f3f7f6}
 
 #variant-form{overflow-wrap:anywhere}
+#preview-body>h3{overflow-wrap:anywhere}
