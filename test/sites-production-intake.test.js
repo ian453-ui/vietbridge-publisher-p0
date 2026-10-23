@@ -31,6 +31,18 @@ test('workspace-scoped event receipt is idempotent; same URL can still start a n
  assert.equal(f.sql.prepare('SELECT count(*) n FROM sites_production_jobs').get().n,2);
 });
 
+test('a duplicate event binds its new command to the exact normalized request and original result',async t=>{
+ const f=setup(t),w=await workspace(f,'Synthetic duplicate receipt'),original=lead({event_id:'source-event-1'}),first=await f.call(base(w)+'/leads',original);assert.equal(first.status,200);
+ const command=crypto.randomUUID(),replay={...original,command_id:command,url:'https://example.org/article?id=092&utm_campaign=replay'};
+ f.fault=1;const rolledBack=await f.call(base(w)+'/leads',replay);assert.equal(rolledBack.status,409);f.fault=-1;assert.equal(f.sql.prepare('SELECT count(*) n FROM sites_production_commands WHERE command_id=?').get(command).n,0);
+ const sameEvent=await f.call(base(w)+'/leads',replay);assert.equal(sameEvent.status,200);assert.equal(sameEvent.body.job.id,first.body.job.id);
+ assert.equal(f.sql.prepare('SELECT count(*) n FROM sites_production_commands WHERE command_id=? AND lead_id=? AND applied=1').get(command,first.body.job.lead_id).n,1);
+ assert.equal((await f.call(base(w)+'/leads',{...replay,url:'https://example.org/article?id=092&utm_medium=another'})).body.job.id,first.body.job.id);
+ const changedEvent=await f.call(base(w)+'/leads',{...replay,event_id:'source-event-2'});assert.equal(changedEvent.status,409);assert.equal(changedEvent.body.error,'COMMAND_CONFLICT');
+ assert.equal((await f.call(base(w)+'/leads',replay)).body.job.id,first.body.job.id);
+ assert.equal(f.sql.prepare('SELECT count(*) n FROM sites_production_leads').get().n,1);
+});
+
 test('manual lead and pause/resume/cancel use durable exact commands and forbid handoff',async t=>{
  const f=setup(t),w=await workspace(f,'Synthetic A'),input=lead({source_kind:'MANUAL',url:null,title:'Manual synthetic tip',brief:'No verified source.\nSecond line remains a tip, not an instruction.',event_id:'manual-1'}),created=await f.call(base(w)+'/leads',input);assert.equal(created.status,200,JSON.stringify(created.body));const id=created.body.job.id;assert.equal(created.body.job.brief,input.brief);
  const check=await f.call(base(w)+'/jobs/'+id+'/handoff-check');assert.equal(check.status,200);assert.equal(check.body.eligible,false);assert.ok(check.body.blockers.includes('IMAGE_MISSING'));
@@ -57,6 +69,7 @@ test('lost create acknowledgement, failed atomic batch, owner change and origin 
 test('concurrent duplicate events and a restarted D1-shaped reader preserve one lead',async t=>{
  const f=setup(t),w=await workspace(f,'Synthetic A'),input=lead({event_id:'webhook-event-42',connector_id:'AUTHORIZED_TEST_EVENT'});
  const [a,b]=await Promise.all([f.call(base(w)+'/leads',input),f.call(base(w)+'/leads',{...input,command_id:crypto.randomUUID()})]);assert.equal(a.status,200,JSON.stringify(a.body));assert.equal(b.status,200,JSON.stringify(b.body));assert.equal(a.body.job.id,b.body.job.id);assert.equal(f.sql.prepare('SELECT count(*) n FROM sites_production_leads').get().n,1);
+ assert.equal(f.sql.prepare("SELECT count(*) n FROM sites_production_commands WHERE kind='CREATE' AND applied=1").get().n,2);
  const reopened=cloudD1Fixture(f.path,{initialize:false});t.after(()=>reopened.close());const read=await reopened.call(base(w)+'/jobs/'+a.body.job.id);assert.equal(read.status,200);assert.equal(read.body.job.event_id,'webhook-event-42');assert.equal(read.body.job.state,'WAITING_PROVIDER');
 });
 

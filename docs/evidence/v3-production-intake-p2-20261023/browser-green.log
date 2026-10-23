@@ -1,0 +1,12 @@
+✔ mobile production lead persists, stays in workspace, and never presents a generated article (1399.720324ms)
+✔ known invalid production URL can be corrected without losing the workspace draft (910.9686ms)
+✔ lost production HTTP acknowledgement keeps the exact command until same-page readback (953.615197ms)
+✔ late production list response cannot restore another customer’s lead (966.532126ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4595.879812

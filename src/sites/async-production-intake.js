@@ -56,11 +56,11 @@ export class AsyncProductionIntake {
   await this.scope();if(input.parent_lead_id&&!await this.one('SELECT 1 FROM sites_production_leads WHERE workspace=? AND id=?',[this.workspace,input.parent_lead_id]))fail('PARENT_LEAD_NOT_FOUND',404);
   const eventHash=await sha256(JSON.stringify({source_kind:input.source_kind,canonical_url:canonical,title:input.title,brief:input.brief,parent_lead_id:input.parent_lead_id}));
   const sourceHash=await sha256(JSON.stringify(canonical?{url:canonical}:{title:input.title.toLocaleLowerCase(),brief:input.brief.toLocaleLowerCase()}));
-  const commandHash=await sha256(JSON.stringify({workspace:this.workspace,...input,canonical_url:canonical}));
+  const commandHash=await sha256(JSON.stringify({workspace:this.workspace,command_id:input.command_id,source_kind:input.source_kind,canonical_url:canonical,title:input.title,brief:input.brief,connector_id:input.connector_id,event_id:input.event_id,parent_lead_id:input.parent_lead_id}));
   const prior=await this.one('SELECT * FROM sites_production_commands WHERE owner_user_id=? AND command_id=?',[this.userId,input.command_id]);
   if(prior)return this.createReceipt(prior,commandHash,true);
   const duplicateEvent=await this.one('SELECT l.id,l.event_hash,j.id AS job_id FROM sites_production_leads l JOIN sites_production_jobs j ON j.workspace=l.workspace AND j.lead_id=l.id WHERE l.workspace=? AND l.connector_id=? AND l.event_id=?',[this.workspace,input.connector_id,input.event_id]);
-  if(duplicateEvent){if(duplicateEvent.event_hash!==eventHash)fail('PRODUCTION_EVENT_CONFLICT');return {job:await this.job(duplicateEvent.job_id),duplicate:true,duplicate_candidates:await this.duplicates(duplicateEvent.id),publish_allowed:false};}
+  if(duplicateEvent){if(duplicateEvent.event_hash!==eventHash)fail('PRODUCTION_EVENT_CONFLICT');return this.recordDuplicateEvent(input,commandHash,eventHash);}
   const leadId=crypto.randomUUID(),jobId=crypto.randomUUID(),at=this.now(),winner=' FROM sites_production_commands c WHERE c.owner_user_id=? AND c.command_id=? AND c.command_hash=? AND c.lead_id=? AND c.applied=0',key=[this.userId,input.command_id,commandHash,leadId];
   try{await this.batch([
    this.statement("INSERT INTO sites_production_commands(owner_user_id,command_id,kind,command_hash,lead_id,job_id,applied,result_revision,result_state,created_at) VALUES(?,?,'CREATE',?,?,?,0,NULL,NULL,?) ON CONFLICT(owner_user_id,command_id) DO NOTHING",[this.userId,input.command_id,commandHash,leadId,jobId,at]),
@@ -70,10 +70,14 @@ export class AsyncProductionIntake {
   ]);}catch(error){
    if(error.message==='SCOPE_DENIED')throw error;
    const existing=await this.one('SELECT l.id,l.event_hash,j.id AS job_id FROM sites_production_leads l JOIN sites_production_jobs j ON j.workspace=l.workspace AND j.lead_id=l.id WHERE l.workspace=? AND l.connector_id=? AND l.event_id=?',[this.workspace,input.connector_id,input.event_id]);
-   if(existing){if(existing.event_hash!==eventHash)fail('PRODUCTION_EVENT_CONFLICT');return {job:await this.job(existing.job_id),duplicate:true,duplicate_candidates:await this.duplicates(existing.id),publish_allowed:false};}
+   if(existing){if(existing.event_hash!==eventHash)fail('PRODUCTION_EVENT_CONFLICT');return this.recordDuplicateEvent(input,commandHash,eventHash);}
    throw error;
   }
   const receipt=await this.one('SELECT * FROM sites_production_commands WHERE owner_user_id=? AND command_id=?',[this.userId,input.command_id]);return this.createReceipt(receipt,commandHash,false);
+ }
+ async recordDuplicateEvent(input,hash,eventHash){
+  await this.batch([this.statement("INSERT INTO sites_production_commands(owner_user_id,command_id,kind,command_hash,lead_id,job_id,applied,result_revision,result_state,created_at) SELECT ?,?,'CREATE',?,l.id,j.id,1,1,'WAITING_PROVIDER',? FROM sites_production_leads l JOIN sites_production_jobs j ON j.workspace=l.workspace AND j.lead_id=l.id WHERE l.workspace=? AND l.connector_id=? AND l.event_id=? AND l.event_hash=? ON CONFLICT(owner_user_id,command_id) DO NOTHING",[this.userId,input.command_id,hash,this.now(),this.workspace,input.connector_id,input.event_id,eventHash])]);
+  const receipt=await this.one('SELECT * FROM sites_production_commands WHERE owner_user_id=? AND command_id=?',[this.userId,input.command_id]);return this.createReceipt(receipt,hash,true);
  }
  async createReceipt(receipt,hash,duplicate){if(!receipt||receipt.kind!=='CREATE'||receipt.command_hash!==hash)fail('COMMAND_CONFLICT');if(receipt.applied!==1)fail('COMMAND_OUTCOME_UNKNOWN');const job=await this.job(receipt.job_id);if(job.lead_id!==receipt.lead_id)fail('COMMAND_OUTCOME_UNKNOWN');return {job,duplicate,duplicate_candidates:await this.duplicates(receipt.lead_id),publish_allowed:false};}
  async action(id,input){

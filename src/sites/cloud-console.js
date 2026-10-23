@@ -256,7 +256,7 @@ $('#production-form').onsubmit=async event=>{
  if(draft.submitted&&draft.submitted!==encoded){$('#production-form-status').textContent='原保存结果待核对；不能改变原命令的线索内容。请先刷新读取。';return;}
  draft.submitted=encoded;button.disabled=true;$('#production-form-status').textContent='正在持久保存…';
  try{const result=await api('/api/sites/workspaces/'+workspace+'/production/leads',payload);productionDrafts.delete(workspace);if(workspace===state.workspace&&generation===state.generation){form.reset();syncProductionKind();$('#production-form-status').textContent=(result.duplicate?'相同事件已回读原线索：':'线索已回读：')+result.job.id+(result.duplicate_candidates.length?'；发现 '+result.duplicate_candidates.length+' 个同源候选，本次保留独立线索。':'。')+'模型未配置，尚无正文或图片。';await loadProduction(generation,workspace);}}
- catch(error){if(workspace===state.workspace&&generation===state.generation)$('#production-form-status').textContent=error.message+'；原命令保留，请先刷新回读，不自动新建。';}
+ catch(error){if(error.status===400){draft.command=null;draft.submitted=null;}if(workspace===state.workspace&&generation===state.generation)$('#production-form-status').textContent=error.message+(error.status===400?'；请修正输入后保存。':'；原命令保留，请先刷新回读，不自动新建。');}
  finally{if(workspace===state.workspace&&generation===state.generation)button.disabled=false;}
 };
 $('#production-more').onclick=()=>{if(state.productionCursor&&!state.productionLoading)void loadProduction(state.generation,state.workspace,state.productionCursor);};
