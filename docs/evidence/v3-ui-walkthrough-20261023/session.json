@@ -1,0 +1,19 @@
+{
+  "started_at": "2026-10-23T02:38:43.339Z",
+  "origin": "http://127.0.0.1:46083",
+  "root": "/tmp/v3-user-walkthrough-xOPiSb",
+  "ids": {
+    "w": "9cc9bba6-657f-4331-9807-a2c1107012f4",
+    "w2": "a4cc4d49-bbc1-4407-bc95-20eb28551848",
+    "a": "5fbc19c8-00e3-4703-b9d8-72bc00510d56",
+    "b": "046b5883-b77d-401d-a647-90beec38a612",
+    "x": "ce27625b-41b3-4d54-9ffc-3be312982ce5",
+    "c": "92cb5a07-41ab-447f-a237-3c60987393c6",
+    "manual": "ac9f3c65-623d-4264-9983-f00603f3c719",
+    "missing": "d885bbbb-7fc4-496b-8517-24963410edee",
+    "review": "0920811f075fa6647c8a591d0b3e985014e30dfaacd92cfda507489d3a3fe811"
+  },
+  "synthetic_identity": true,
+  "real_login_verified": false,
+  "production_data_used": false
+}

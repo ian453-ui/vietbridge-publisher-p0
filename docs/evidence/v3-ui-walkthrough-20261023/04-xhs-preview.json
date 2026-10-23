@@ -1,0 +1,24 @@
+{
+  "name": "04-xhs-preview",
+  "at": "2026-10-23T02:42:59.452Z",
+  "url": "http://127.0.0.1:46083/",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "workspace": "9cc9bba6-657f-4331-9807-a2c1107012f4",
+  "account": "5fbc19c8-00e3-4703-b9d8-72bc00510d56",
+  "platform": "xiaohongshu",
+  "status": "已读取客户共享内容；任务、制作快照和指标按当前账号分别回读。",
+  "body": "【隔离合成验收】模拟服务器身份与假账号；不是正式登录，不会真实发布。\nVietBridge Publisher V3\n云端内容与任务工作台\n客户\n请选择\n【合成验收】客户 A\n【合成验收】空客户 B\n审核 / 任务账号\n请选择\n【假账号】Facebook A1\n【假账号】Facebook A2\n【假账号】小红书 A3\n刷新\n内容与预览\n发布任务\n制作审核\n发布检查\nFacebook 群组\nFacebook Inbox\n主动搜索与回复\n指标与迭代\n账号与授权\n\nPUBLISHER / V3\n\n内容与预览\n草稿工作区 · 真实发布未启用\n\n已读取客户共享内容；任务、制作快照和指标按当前账号分别回读。\n\n客户共享内容版本\n编写内容\n\n每次读取最多 200 个版本。完整内容 ID、slug、版本与正文摘要共同识别素材。三位尾号不会用于合并。同客户可浏览共享来源；任务、审核与历史分别绑定明确账号。此处录入保持 MANUAL_UNVERIFIED。\n\n独立预览平台\nFacebook\n小红书\n微信公众号\n微信视频号\n明确目标账号\n请选择\n【假账号】小红书 A3\n\n可先预览 小红书；冻结前请明确选择该平台的目标账号。没有平台稿时不会借用其他文案。\n\n选择前 20 项\n清空选择\n已选 0 / 20\n逐项预检\n冻结可用草稿\n\n先明确平台和目标账号，再逐项预检。批量仅冻结草稿；已审媒体复用原任务，改稿须独立审核。不会预留执行额度、上传或发布。\n\n选择此版本\n待来源核验 · v1\n【合成】同尾号不同日期 074\n\nSYNTHETIC-20261022-074 / qa-other-date\n\n来源账号：【假账号】Facebook A1\n\n11 字符 · 小红书 · 明确平台稿\n\nSHA256 aeb178a8e2bbc2e745db4f5a38a540f575a0f7d065c1d3f9d19186d53aa7e6ee\n完整平台预览冻结草稿任务编辑所选平台\n选择此版本\n待来源核验 · v1\n【合成】留学材料清单 074\n\nSYNTHETIC-20261023-074 / qa-study\n\n来源账号：【假账号】Facebook A1\n\n31 字符 · 小红书 · 明确平台稿\n\nSHA256 020840e84f2e605388314246e780cb0330f47fb6970ca4d9d8042af1f786d8b1\n完整平台预览冻结草稿任务编辑所选平台\n完整平台预览\n关闭\n【合成】仅小红书稿\n待核验 · 不授权发布\n【合成】不能代替 Facebook 稿。\n原完整正文\n\naeb178a8e2bbc2e745db4f5a38a540f575a0f7d065c1d3f9d19186d53aa7e6ee",
+  "overflow": {
+    "width": 1440,
+    "document": 1440,
+    "dialog": {
+      "scroll": 798,
+      "client": 798
+    }
+  },
+  "outside": [],
+  "errors": []
+}

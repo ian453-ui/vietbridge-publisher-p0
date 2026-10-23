@@ -1,0 +1,23 @@
+{
+  "jobs": [
+    {
+      "account_id": "046b5883-b77d-401d-a647-90beec38a612",
+      "state": "UNKNOWN",
+      "n": 1
+    },
+    {
+      "account_id": "5fbc19c8-00e3-4703-b9d8-72bc00510d56",
+      "state": "DRAFT",
+      "n": 1
+    }
+  ],
+  "approvals": [
+    {
+      "kind": "CONTENT_APPROVED",
+      "n": 1
+    }
+  ],
+  "outside": [],
+  "errors": [],
+  "final_at": "2026-10-23T02:50:17.755Z"
+}

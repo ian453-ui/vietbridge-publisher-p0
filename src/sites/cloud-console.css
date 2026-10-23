@@ -12,3 +12,5 @@ nav button:hover,nav button[aria-current]{background:#e2f0eb;color:#09574d}
 #preview-body>h3{overflow-wrap:anywhere}
 
 .batch-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:18px 0}.batch-pick{display:flex;flex-direction:row;align-items:center;gap:10px;min-height:44px}.batch-pick input{width:20px;height:20px;margin:0}#batch-results article{padding:12px;margin:10px 0;border:1px solid #cbd5e1;border-radius:10px;overflow-wrap:anywhere}
+.content-search{max-width:440px;margin:18px 0 8px}.content-search input{width:100%}
+#scope-status{margin:0;padding:9px 4vw;background:#e5efed;color:#173336;font-size:13px;overflow-wrap:anywhere}

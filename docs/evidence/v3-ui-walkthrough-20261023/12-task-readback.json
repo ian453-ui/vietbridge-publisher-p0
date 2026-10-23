@@ -1,0 +1,24 @@
+{
+  "name": "12-task-readback",
+  "at": "2026-10-23T02:44:11.195Z",
+  "url": "http://127.0.0.1:46083/",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "workspace": "9cc9bba6-657f-4331-9807-a2c1107012f4",
+  "account": "046b5883-b77d-401d-a647-90beec38a612",
+  "platform": "facebook",
+  "status": "逐项预检完成；冻结时仍会重新核验版本、账号和权限。",
+  "body": "【隔离合成验收】模拟服务器身份与假账号；不是正式登录，不会真实发布。\nVietBridge Publisher V3\n云端内容与任务工作台\n客户\n请选择\n【合成验收】客户 A\n【合成验收】空客户 B\n审核 / 任务账号\n请选择\n【假账号】Facebook A1\n【假账号】Facebook A2\n【假账号】小红书 A3\n刷新\n内容与预览\n发布任务\n制作审核\n发布检查\nFacebook 群组\nFacebook Inbox\n主动搜索与回复\n指标与迭代\n账号与授权\n\nPUBLISHER / V3\n\n发布任务\n草稿工作区 · 真实发布未启用\n\n逐项预检完成；冻结时仍会重新核验版本、账号和权限。\n\n冻结任务\n\n每次读取最多 200 个任务。任务保留原内容版本、账号、平台和摘要。UNKNOWN 只能进入既有对账路径，不能重置后再次提交。\n\nDRAFT\n【合成】Facebook 材料清单 · 修改\n\nFacebook · SYNTHETIC-20261023-074 / qa-study · v2\n\nc908ca710a8bffb2a96ca56711e30108bca3ee469b8f9591fb9ca089c097d34d\n\n无发布权限 · 原尝试：尚未执行\n\n查看冻结内容\n完整平台预览\n关闭\n【合成】Facebook 材料清单 · 修改\n待核验 · 不授权发布\n【合成】Facebook 编辑后完整正文。\n末段完整保留。\n\nc908ca710a8bffb2a96ca56711e30108bca3ee469b8f9591fb9ca089c097d34d",
+  "overflow": {
+    "width": 1440,
+    "document": 1440,
+    "dialog": {
+      "scroll": 798,
+      "client": 798
+    }
+  },
+  "outside": [],
+  "errors": []
+}
