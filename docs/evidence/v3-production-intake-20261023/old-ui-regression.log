@@ -1,0 +1,14 @@
+✔ desktop cloud console persists customer/account/content/platform/task with full preview and reload (2156.526144ms)
+✔ mobile cloud console persists customer/account/content/platform/task with full preview and reload (1761.528479ms)
+✔ desktop independent platform editor preserves drafts, explicitly rebases conflict and keeps other copy (1682.827807ms)
+✔ mobile independent platform editor preserves drafts, explicitly rebases conflict and keeps other copy (1650.763738ms)
+✔ desktop batch select mixed copies -> preflight -> per-item frozen receipts and clear (1359.864009ms)
+✔ mobile batch select mixed copies -> preflight -> per-item frozen receipts and clear (1336.169904ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10421.709976

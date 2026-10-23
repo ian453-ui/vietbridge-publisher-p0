@@ -9,6 +9,7 @@ import {AsyncUploadPlans} from './async-upload-plans.js';
 import {requireProductionAdmin} from '../production-approval-policy.js';
 import {AsyncMetricStore} from './async-metric-store.js';
 import {authorizationGuard,authorizationChanged} from './async-storage.js';
+import {AsyncProductionIntake} from './async-production-intake.js';
 
 export const cloudPlatforms=Object.freeze(['facebook','xiaohongshu','wechat_official_account','wechat_channels']);
 const flags=Object.freeze({executionEnabled:false,publish_allowed:false,source_gate_satisfied:false,media_processing:'CLOUD_SERVICE_NOT_CONNECTED',producer_authenticated:false});
@@ -142,7 +143,7 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
     if(source){const asset=await store.asset(workspace,accountId,id,decodeURIComponent(source),decodeURIComponent(artifact));return new Response(asset.data,{headers:{'Content-Type':asset.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Length':String(asset.data.byteLength)}});}
     return response(200,id?await store.detail(workspace,accountId,id):await store.list(workspace,accountId,{cursor:url.searchParams.get('cursor')||''}));
    }
-   if(request.method==='GET'&&url.pathname==='/api/sites/capabilities')return response(200,{...flags,mode:'SITES_CLOUD_AUTHORING',persistence:'D1',content_status:'MANUAL_UNVERIFIED',platforms:cloudPlatforms,implemented:['workspace_create','account_mapping_create','content_version_create','task_freeze','scoped_persistent_reads','review_snapshot_reads','metric_ledger_reads','content_decision_receipts','approved_platform_preparation','workspace_source_catalogue','explicit_platform_target_freeze','independent_target_review','single_platform_revision_edit','edited_version_inspection_review','bounded_batch_selection_preflight'],unavailable:['real_producer_transport','media_decode','archive_resolve','real_admin_approval_provider','external_upload','publish','group_post','reply','direct_message','live_metrics']});
+   if(request.method==='GET'&&url.pathname==='/api/sites/capabilities')return response(200,{...flags,mode:'SITES_CLOUD_AUTHORING',persistence:'D1',content_status:'MANUAL_UNVERIFIED',platforms:cloudPlatforms,implemented:['workspace_create','account_mapping_create','content_version_create','task_freeze','scoped_persistent_reads','review_snapshot_reads','metric_ledger_reads','content_decision_receipts','approved_platform_preparation','workspace_source_catalogue','explicit_platform_target_freeze','independent_target_review','single_platform_revision_edit','edited_version_inspection_review','bounded_batch_selection_preflight','production_lead_intake','production_job_pause_resume_cancel','production_handoff_gate'],unavailable:['real_producer_transport','production_model_provider','production_image_provider','media_decode','archive_resolve','real_admin_approval_provider','external_upload','publish','group_post','reply','direct_message','live_metrics']});
    if(request.method==='GET'&&url.pathname==='/api/sites/workspaces')return response(200,{workspaces:await rows('SELECT id,name,created_at FROM sites_workspaces WHERE owner_user_id=? ORDER BY created_at,id LIMIT 200',[userId]),...flags});
    if(request.method==='POST'){
     if(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site')fail('ORIGIN_DENIED',403);
@@ -150,6 +151,18 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
      const input=await readInput(request);exact(input,['command_id','name']);if(!text(input.name,120))fail('INVALID_NAME',400);
      const result=await command(userId,'WORKSPACE',input,(c,at)=>[statement('INSERT INTO sites_workspaces(id,owner_user_id,name,created_at) SELECT c.entity_id,c.owner_user_id,?,?'+winning+' ON CONFLICT(id) DO NOTHING',[input.name,at,...bound(c)])]);return response(200,{workspace_id:result.id,...result,...flags});
     }
+   }
+   const production=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/production\/(leads|jobs)(?:\/([a-f0-9-]{36})(?:\/(actions|handoff-check|handoff))?)?$/);
+   if(production){
+    const [,workspace,resource,id,action]=production,store=new AsyncProductionIntake(db,{userId,workspace,now});await store.scope();
+    if(request.method==='POST'&&(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site'))fail('ORIGIN_DENIED',403);
+    if(resource==='leads'&&!id&&request.method==='POST')return response(200,await store.create(await readInput(request)));
+    if(resource==='jobs'&&!id&&request.method==='GET')return response(200,await store.list({cursor:url.searchParams.get('cursor')||''}));
+    if(resource==='jobs'&&id&&request.method==='GET'&&!action)return response(200,{job:await store.job(id),publish_allowed:false});
+    if(resource==='jobs'&&id&&action==='actions'&&request.method==='POST')return response(200,await store.action(id,await readInput(request)));
+    if(resource==='jobs'&&id&&action==='handoff-check'&&request.method==='GET')return response(200,await store.handoffCheck(id));
+    if(resource==='jobs'&&id&&action==='handoff'&&request.method==='POST'){await store.handoffCheck(id);fail('PRODUCTION_HANDOFF_BLOCKED');}
+    fail('METHOD_NOT_ALLOWED',405);
    }
    const match=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/(accounts|contents|catalogue|tasks|task-preflight)$/);if(!match)fail('OPERATION_UNAVAILABLE',404);
    const [,workspace,resource]=match;await owned(userId,workspace);

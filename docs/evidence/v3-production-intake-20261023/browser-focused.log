@@ -1,0 +1,10 @@
+✔ mobile production lead persists, stays in workspace, and never presents a generated article (1463.377977ms)
+✔ late production list response cannot restore another customer’s lead (970.888105ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2797.874654

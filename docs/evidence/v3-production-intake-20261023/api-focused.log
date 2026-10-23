@@ -1,0 +1,14 @@
+✔ lead URL normalization is identity-only and blocks local/credential URLs without fetching (3.109534ms)
+✔ workspace-scoped event receipt is idempotent; same URL can still start a new lineage (77.783842ms)
+✔ manual lead and pause/resume/cancel use durable exact commands and forbid handoff (27.664318ms)
+✔ lost create acknowledgement, failed atomic batch, owner change and origin guard fail closed (16.293334ms)
+✔ concurrent duplicate events and a restarted D1-shaped reader preserve one lead (13.940249ms)
+✔ failed state transition rolls back receipt and remains resumable with the same command (18.110994ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 285.360401
