@@ -1,0 +1,19 @@
+{
+  "started_at": "2026-10-23T03:02:22.137Z",
+  "origin": "http://127.0.0.1:37173",
+  "root": "/tmp/v3-user-walkthrough-cWEJbG",
+  "ids": {
+    "w": "ba039ed8-04b5-4db8-ba32-6d54e092c1ff",
+    "w2": "14c54233-288e-4181-b2e5-739fd5624f6a",
+    "a": "9134515e-6087-4b26-bfef-c7f041f38a63",
+    "b": "2c846dcf-c535-4f0c-a93e-ccc6d44be640",
+    "x": "1a561724-676d-417b-98a7-92fdc4393d8e",
+    "c": "c6695759-d698-498d-b507-a5d812be8d96",
+    "manual": "9befc2bc-cb11-422c-9bec-807abe1ec884",
+    "missing": "c7f4c230-35ac-47ac-9686-74eab40ddfb8",
+    "review": "e3b0d79691cf74cda122120bdefa5dcf86b316a83deb96cb0e39f01bfc4fcd4a"
+  },
+  "synthetic_identity": true,
+  "real_login_verified": false,
+  "production_data_used": false
+}

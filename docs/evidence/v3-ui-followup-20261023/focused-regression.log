@@ -1,0 +1,14 @@
+✔ desktop shared client source previews independent platforms and freezes only the explicitly selected account (2393.48945ms)
+✔ mobile shared client source previews independent platforms and freezes only the explicitly selected account (1634.874379ms)
+✔ desktop Review human approval -> media preparation -> original content/task preview -> revoke -> reload (3167.74623ms)
+✔ mobile Review human approval -> media preparation -> original content/task preview -> revoke -> reload (2848.462109ms)
+✔ desktop Worker document, assets and persistent API use one scoped application (1766.779348ms)
+✔ mobile Worker document, assets and persistent API use one scoped application (1555.586401ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10454.329855

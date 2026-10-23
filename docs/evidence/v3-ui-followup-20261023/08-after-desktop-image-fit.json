@@ -1,0 +1,24 @@
+{
+  "name": "08-after-desktop-image-fit",
+  "at": "2026-10-23T03:07:28.217Z",
+  "url": "http://127.0.0.1:37173/",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "workspace": "ba039ed8-04b5-4db8-ba32-6d54e092c1ff",
+  "account": "9134515e-6087-4b26-bfef-c7f041f38a63",
+  "platform": "facebook",
+  "status": "已读取客户共享内容；任务、制作快照和指标按当前账号分别回读。",
+  "body": "【隔离合成验收】模拟服务器身份与假账号；不是正式登录，不会真实发布。\nVietBridge Publisher V3\n云端内容与任务工作台\n客户\n请选择\n【合成验收】客户 A\n【合成验收】空客户 B\n审核 / 任务账号\n请选择\n【假账号】Facebook A1\n【假账号】Facebook A2\n【假账号】小红书 A3\n刷新\n内容与预览\n发布任务\n制作审核\n发布检查\nFacebook 群组\nFacebook Inbox\n主动搜索与回复\n指标与迭代\n账号与授权\n\n当前客户：【合成验收】客户 A · 当前账号：【假账号】Facebook A1 · Facebook\n\nPUBLISHER / V3\n\n制作审核\n草稿工作区 · 真实发布未启用\n\n已读取客户共享内容；任务、制作快照和指标按当前账号分别回读。\n\n制作快照与审核接入\n\n显示前 20 条持久快照；可回读已入账素材。明确人工决定绑定当前版本与媒体；真实来源和管理员提供方尚未接入。\n\nREVIEW_REQUIRED\nSYNTHETIC-UI-QA-20261023\n\n请求版本 1 · 审批与发布权限分别核验\n\n查看素材快照\n\n云端重媒体服务尚未接入。当前手工录入内容不具备可信制作方、媒体解码和审批证据，批准入口保持关闭。\n\n已有流程要求：ZIP 提取 → 媒体解码 → 精确来源核验 → 人工审批回执。内容批准与各账号发布许可分别核验。\n\n制作素材快照\n关闭\n\n审核目标：【假账号】Facebook A1 · Facebook\n\nSYNTHETIC-UI-QA-20261023\n\nPENDING · 仅限合成素材内容审核 · 不授予发布许可\n\nSYNTHETIC-20261022-074 / body · READY\n\n读取完整文本\nSHA256 66e6a796f6e2381108ab2a10f719abb2eaaad0188c4669acb94620e47ad12927\n\nSYNTHETIC-20261022-074 / cover · READY\n\n点按放大图片\nSHA256 98482235145709d10625241e693682f30a02330de8d4cee75a112c9a1647aed3\n\nSYNTHETIC-20261022-074 / platform · READY\n\n读取完整文本\nSHA256 511a325c62948381e763418100c8d531fd849edf0b838869aa2cda1e254f5ac9\n制作检查回执\n内容审批回执\n\nPENDING · 等待明确人工决定\n\n批准仅针对当前版本、媒体、账号和平台，不授予上传或发布权限。\n\n正文事实已检查\n图像与手机可读性已检查\n视频播放与字幕对齐已检查\n原始来源已人工查看\n审批或撤销理由\n批准当前内容拒绝 / 撤销内容批准\n持久审批审计\nSYNTHETIC-20261022-074 / cover\n关闭图片，返回审核\n\n仅查看当前账号已入账的图片；批准状态不变。\n\n查看原图尺寸",
+  "overflow": {
+    "width": 1440,
+    "document": 1440,
+    "dialog": {
+      "scroll": 798,
+      "client": 798
+    }
+  },
+  "outside": [],
+  "errors": []
+}

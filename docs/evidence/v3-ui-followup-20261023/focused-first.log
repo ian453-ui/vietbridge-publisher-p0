@@ -1,0 +1,74 @@
+✔ desktop cloud console persists customer/account/content/platform/task with full preview and reload (2549.585891ms)
+✔ mobile cloud console persists customer/account/content/platform/task with full preview and reload (1786.398129ms)
+✖ desktop shared client source previews independent platforms and freezes only the explicitly selected account (9492.956529ms)
+✖ mobile shared client source previews independent platforms and freezes only the explicitly selected account (9505.658264ms)
+✔ desktop unsaved content drafts stay with exact customer and account (1072.761841ms)
+✔ mobile unsaved content drafts stay with exact customer and account (995.586139ms)
+✔ late committed content response cannot reset another account draft or its submit state (1119.496055ms)
+✔ late same-account Review response cannot replace newer metric preview (1359.281169ms)
+✔ refresh closes and clears the current preview (1282.882792ms)
+✔ button closes pending approval readback without reopening the review (1682.291065ms)
+✔ Escape closes pending approval readback without reopening the review (1727.052725ms)
+✔ lost content save acknowledgement keeps original scoped command and explicit retry is idempotent (1284.243924ms)
+✔ definite invalid content input can be corrected without stranding the scoped draft (909.357367ms)
+✔ desktop cloud Review plays decoded snapshot and reads durable null metric without publication (1573.411854ms)
+✔ mobile cloud Review plays decoded snapshot and reads durable null metric without publication (1558.768468ms)
+✔ delayed old account and old customer responses cannot replace current cloud console data (1060.73356ms)
+✔ desktop Review human approval -> media preparation -> original content/task preview -> revoke -> reload (3055.132106ms)
+✔ mobile Review human approval -> media preparation -> original content/task preview -> revoke -> reload (2891.010317ms)
+✔ desktop canonical imported source shows exact identity and latest QA withdraws old approval on reload (1258.833895ms)
+✔ mobile canonical imported source shows exact identity and latest QA withdraws old approval on reload (1327.397305ms)
+✔ desktop shared media -> independent target Review -> explicit approval -> frozen target media survives reload (1933.671454ms)
+✔ mobile shared media -> independent target Review -> explicit approval -> frozen target media survives reload (1989.212097ms)
+✔ late target review creation response cannot switch back from another account or reopen preview (1550.322957ms)
+✔ desktop independent platform editor preserves drafts, explicitly rebases conflict and keeps other copy (1427.81836ms)
+✔ mobile independent platform editor preserves drafts, explicitly rebases conflict and keeps other copy (1516.429117ms)
+✔ late platform save cannot clear another platform draft or change its original base (888.112467ms)
+✔ late source editor read cannot reopen under another customer (827.105805ms)
+✔ returning to the original pending platform unlocks its own completed save without losing other drafts (995.119173ms)
+✔ lost variant save acknowledgement retains exact command and explicit retry reads historical commit (856.871378ms)
+✔ pending rebase excludes concurrent save and later lost acknowledgement recovers the original receipt (1232.946034ms)
+✔ mobile reviewed media edit shows original image/video binding and blocks ordinary freeze after reload (1802.309153ms)
+✔ desktop edited media -> fresh decode -> independent Review -> explicit approval -> exact frozen new copy survives reload (2316.023505ms)
+✔ mobile edited media -> fresh decode -> independent Review -> explicit approval -> exact frozen new copy survives reload (2183.538304ms)
+✔ late new edited Review response cannot reopen under another account (1755.565734ms)
+✔ lost new edited Review acknowledgement retains exact request and explicit retry does not inspect/create twice (1579.730487ms)
+✔ mobile derived frozen copy supports three edit-inspect-approve-freeze cycles and persistent exact history (4953.738457ms)
+✔ desktop batch select mixed copies -> preflight -> per-item frozen receipts and clear (1160.443707ms)
+✔ mobile batch select mixed copies -> preflight -> per-item frozen receipts and clear (1134.77886ms)
+✔ late batch preflight cannot restore selection after platform (856.888464ms)
+✔ late batch preflight cannot restore selection after account (854.376682ms)
+✔ late batch preflight cannot restore selection after workspace (831.81581ms)
+✔ late batch preflight cannot restore selection after clear (846.735356ms)
+✔ batch in-flight committed reply cannot dispatch remaining items after account switch (1024.093717ms)
+✔ batch lost acknowledgment and per-item failure preserve committed receipts without retrying the batch (898.685154ms)
+✔ batch reviewed media returns original task and another target requires independent review (1287.146749ms)
+✔ batch edited reviewed media cannot bypass new inspection or independent approval (1416.822121ms)
+✔ desktop Worker document, assets and persistent API use one scoped application (1759.337876ms)
+✔ mobile Worker document, assets and persistent API use one scoped application (1645.593562ms)
+ℹ tests 48
+ℹ suites 0
+ℹ pass 46
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 86034.693016
+
+✖ failing tests:
+
+test at test/sites-cloud-console-ui.test.js:67:103
+✖ desktop shared client source previews independent platforms and freezes only the explicitly selected account (9492.956529ms)
+  page.waitForFunction: Timeout 8000ms exceeded.
+      at TestContext.<anonymous> (/workspace/vietbridge-publisher-p0/test/sites-cloud-console-ui.test.js:78:197) {
+    name: 'TimeoutError',
+    log: []
+  }
+
+test at test/sites-cloud-console-ui.test.js:67:103
+✖ mobile shared client source previews independent platforms and freezes only the explicitly selected account (9505.658264ms)
+  page.waitForFunction: Timeout 8000ms exceeded.
+      at TestContext.<anonymous> (/workspace/vietbridge-publisher-p0/test/sites-cloud-console-ui.test.js:78:197) {
+    name: 'TimeoutError',
+    log: []
+  }
