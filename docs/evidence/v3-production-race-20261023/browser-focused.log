@@ -1,0 +1,15 @@
+✔ known invalid production URL can be corrected without losing the workspace draft (909.977478ms)
+✔ lost production HTTP acknowledgement is read back after a new page and refresh (1208.078685ms)
+✔ no receipt after an unsent request never auto-creates and only replays matching input (1039.199078ms)
+✔ slow fingerprint and rapid double submit create only one scoped lead (971.292909ms)
+✔ two tabs serialize same-workspace creates and keep an unknown command for receipt readback (2345.844396ms)
+✔ older tab response cannot clear a newer scoped pending marker (869.885906ms)
+✔ switching customer during a slow fingerprint cannot submit the old customer or lock the new one (851.91124ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8621.492476
