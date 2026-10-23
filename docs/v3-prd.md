@@ -1,5 +1,9 @@
 # Publisher V3 — PRD / architecture / acceptance plan
 
+The proposed end-to-end editorial workflow is specified separately in the
+[content-production PRD](v3-content-production-prd.md); it is not an implemented
+producer, model integration, or publication authorization.
+
 Current update: [derived Review edits](v3-derived-review-edits.md) supports repeated
 edit → fresh inspection → independent approval → frozen task cycles, including a
 new target account's independently reviewed source. Ancestor scope, exact events
