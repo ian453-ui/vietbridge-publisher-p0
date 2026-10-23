@@ -90,9 +90,14 @@ export function ingestDocxContentBundle(
 
   const imported: DocxIngestResult["imported"] = [];
   for (const article of articles) {
-    const frontload=article.paragraphs.map(value=>value.match(/^FRONTLOAD_HIGH_DENSITY\s*[|｜]\s*([\w-]+)/iu)?.[1]).find(Boolean);
-    const finalEnd=article.paragraphs.findIndex(value=>/^【PUBLIC_FINAL END】$/iu.test(value.trim()));
-    const authoredBody=article.media.filter(media=>media.role==="body"&&(finalEnd<0||article.paragraphs.indexOf(media.marker)<finalEnd));
+    const begins=article.paragraphs.flatMap((value,index)=>/^【PUBLIC_FINAL BEGIN(?:[｜|][^】]*)?】$/iu.test(value.trim())?[index]:[]);
+    const ends=article.paragraphs.flatMap((value,index)=>/^【PUBLIC_FINAL END】$/iu.test(value.trim())?[index]:[]);
+    const hasFinal=begins.length>0||ends.length>0;
+    if(hasFinal&&(begins.length!==1||ends.length!==1||ends[0]<=begins[0]))throw new Error(`${article.id} PUBLIC_FINAL_BOUNDARY_INVALID`);
+    const publicMedia=hasFinal?article.media.filter(media=>{const index=article.paragraphs.indexOf(media.marker);return index>begins[0]&&index<ends[0];}):article.media;
+    const finalLines=hasFinal?article.paragraphs.slice(begins[0]+1,ends[0]):article.paragraphs;
+    const frontload=finalLines.map(value=>value.match(/^FRONTLOAD_HIGH_DENSITY\s*[|｜]\s*([\w-]+)/iu)?.[1]).find(Boolean);
+    const authoredBody=publicMedia.filter(media=>media.role==="body");
     if(frontload&&authoredBody.length===1){authoredBody[0].semanticLabel="FRONTLOAD_HIGH_DENSITY";authoredBody[0].driveFileId=frontload;}
     const target = join(resolve(targetRoot), article.id);
     mkdirSync(target, { recursive: true });
@@ -114,9 +119,9 @@ export function ingestDocxContentBundle(
     let coverIndex = 0, bodyIndex = 0;
     const overrides=source.activeAssetOverrides?.[article.id];
     if(overrides&&overrides.length!==article.media.length)throw new Error(`${article.id} active asset mapping count does not match inline images`);
-    article.media.forEach((media,mediaIndex) => {
+    publicMedia.forEach((media,mediaIndex) => {
       const suffix = normalizedImageExtension(media.path);
-      const override=overrides?.[mediaIndex];
+      const override=overrides?.[article.media.indexOf(media)];
       const role=override?.role??media.role;
       const filename = override?.filename ?? (role === "cover"
         ? `${coverIndex++ ? `cover_${coverIndex}` : "cover"}_INGESTED${suffix}`
@@ -138,8 +143,8 @@ export function ingestDocxContentBundle(
         sha256: createHash("sha256").update(bytes).digest("hex")
       };
     });
-    const markerToAsset=new Map(article.media.map((media,index)=>[media.marker,assetNames[index]]));
-    const enrichedWechat=attachSourceBodyImages(sections.wechat,article);
+    const markerToAsset=new Map(publicMedia.map((media,index)=>[media.marker,assetNames[index]]));
+    const enrichedWechat=attachSourceBodyImages(sections.wechat,{...article,media:publicMedia});
     const wechat=enrichedWechat.replace(/\[\[VB_INLINE_MEDIA:([^\]]+)\]\]/gu,(marker)=>{
       const filename=markerToAsset.get(marker);
       if(!filename)throw new Error(`${article.id} unresolved inline image marker in public copy`);
@@ -162,9 +167,8 @@ export function ingestDocxContentBundle(
     // A DOCX refresh owns only the assets that a previous DOCX refresh wrote.
     // Preserve independently verified Drive/history assets instead of silently
     // replacing the whole canonical media set on every import.
-    const explicitFinalMedia=article.media.length>0&&article.paragraphs.some(value=>/^【PUBLIC_FINAL BEGIN(?:[｜|][^】]*)?】$/iu.test(value.trim()));
     const preservedAssets = previousActiveAssets.filter(name => {
-      if(explicitFinalMedia)return false;
+      if(hasFinal)return false;
       const metadata = objectRecord(previousAssetSources[name]);
       return !["DOCX_INLINE", "DRIVE_ACTIVE_ASSET_DOCX_READBACK"].includes(String(metadata.source_kind ?? "").toUpperCase());
     });
@@ -194,7 +198,7 @@ export function ingestDocxContentBundle(
       publication_authorized: previous.publication_authorized === true,
       active_assets: mergedAssets,
       asset_sources: mergedAssetSources,
-      blocking_issue: assetNames.length ? "FACT_AND_VISUAL_QA_PENDING_AFTER_INLINE_ASSET_INGEST" : ""
+      blocking_issue: hasFinal&&!publicMedia.some(media=>media.role==='body') ? "PUBLIC_FINAL_MEDIA_MISSING" : assetNames.length ? "FACT_AND_VISUAL_QA_PENDING_AFTER_INLINE_ASSET_INGEST" : ""
     }, null, 2) + "\n");
     imported.push({ articleId: article.id, title: article.title, assetCount: assetNames.length, target });
   }
@@ -229,12 +233,16 @@ function parseArticles(xml: string, relationships: Map<string, string>): Article
     }
     for (const match of paragraph.matchAll(/r:embed="([^"]+)"/g)) {
       const target = relationships.get(match[1]);
-      if (target && !current.media.some(media => media.path === target)) {
+      const lastBegin=current.paragraphs.findLastIndex(value=>/^【PUBLIC_FINAL BEGIN(?:[｜|][^】]*)?】$/iu.test(value.trim()));
+      const lastEnd=current.paragraphs.findLastIndex(value=>/^【PUBLIC_FINAL END】$/iu.test(value.trim()));
+      const inFinal=lastBegin>lastEnd;
+      const occurrence=current.media.filter(media=>media.path===target).length;
+      if (target && (!occurrence||inFinal)) {
       const context = current.paragraphs.at(-1) ?? "";
       const explicitCover = /头图|COVER|插入文章首部/i.test(context) && !/正文|BODY/i.test(context);
       const sourceAsset = context.match(/^(WECHAT_COVER|SOCIAL_COVER|FRONTLOAD_HIGH_DENSITY)\s*[|｜]\s*([\w-]+)/iu);
-      const marker=`[[VB_INLINE_MEDIA:${target}]]`;
-      if(!current.media.some(media => media.path === target))current.media.push({ path: target, role: explicitCover ? "cover" : "body", marker,semanticLabel:sourceAsset?.[1],driveFileId:sourceAsset?.[2] });
+      const marker=`[[VB_INLINE_MEDIA:${target}${occurrence?'#'+occurrence:''}]]`;
+      current.media.push({ path: target, role: explicitCover ? "cover" : "body", marker,semanticLabel:sourceAsset?.[1],driveFileId:sourceAsset?.[2] });
       current.paragraphs.push(marker);
       }
     }

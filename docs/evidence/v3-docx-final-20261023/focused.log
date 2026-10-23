@@ -1,0 +1,18 @@
+✔ complete PUBLIC_FINAL ingests only its ordered inline images, preserving bytes, dimensions and pending QA (34.080947ms)
+✔ malformed PUBLIC_FINAL missing end fails before materializing a package (8.6257ms)
+✔ malformed PUBLIC_FINAL missing begin fails before materializing a package (7.115297ms)
+✔ malformed PUBLIC_FINAL duplicate begin fails before materializing a package (6.997815ms)
+✔ malformed PUBLIC_FINAL duplicate end fails before materializing a package (6.206864ms)
+✔ legacy unmarked DOCX retains its inline image behavior (10.698364ms)
+✔ an image relationship reused in backup and PUBLIC_FINAL remains present in final (9.64696ms)
+✔ full-source overrides retain their original image indexes after PUBLIC_FINAL selection (14.166134ms)
+✔ a later PUBLIC_FINAL with no image removes formerly active inline images (18.078728ms)
+✔ complete PUBLIC_FINAL without an inline image stays pending and declares the gap (8.742547ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 229.131552
