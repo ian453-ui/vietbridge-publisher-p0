@@ -41,6 +41,11 @@ export class AsyncProductionIntake {
   catch(error){if(error.status)throw error;if(authorizationChanged(error))fail('SCOPE_DENIED',403);fail('STORAGE_WRITE_REJECTED',409);}
  }
  async job(id){await this.scope();if(!uuid(id))fail('INVALID_PRODUCTION_JOB',400);const row=await this.one('SELECT j.*,l.source_kind,l.original_url,l.canonical_url,l.title,l.brief,l.connector_id,l.event_id,l.source_hash,l.parent_lead_id,l.rights_status FROM sites_production_jobs j JOIN sites_production_leads l ON l.workspace=j.workspace AND l.id=j.lead_id WHERE j.workspace=? AND j.id=?',[this.workspace,id]);if(!row)fail('PRODUCTION_JOB_NOT_FOUND',404);return row;}
+ async commandReceipt(id){
+  await this.scope();if(!uuid(id))fail('INVALID_PRODUCTION_COMMAND',400);
+  const row=await this.one("SELECT c.command_id,c.applied,c.lead_id,c.job_id,c.result_revision,c.result_state FROM sites_production_commands c JOIN sites_production_leads l ON l.id=c.lead_id JOIN sites_production_jobs j ON j.id=c.job_id AND j.lead_id=l.id JOIN sites_workspaces w ON w.id=l.workspace AND w.owner_user_id=c.owner_user_id WHERE c.owner_user_id=? AND c.command_id=? AND c.kind='CREATE' AND l.workspace=? AND j.workspace=?",[this.userId,id,this.workspace,this.workspace]);
+  return row?.applied===1?{outcome:'COMMITTED',job_id:row.job_id,lead_id:row.lead_id,created_revision:row.result_revision,created_state:row.result_state,publish_allowed:false}:row?{outcome:'UNKNOWN',publish_allowed:false}:{outcome:'NO_RECEIPT',publish_allowed:false};
+ }
  async list({cursor=''}={}){
   await this.scope();const [at,id]=cursor?cursor.split('|'):['',''];if(cursor&&(!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(at)||!uuid(id)||cursor.split('|').length!==2))fail('PRODUCTION_CURSOR_INVALID',400);
   const rows=await this.rows("SELECT j.*,l.source_kind,l.canonical_url,l.title,l.brief,l.rights_status FROM sites_production_jobs j JOIN sites_production_leads l ON l.workspace=j.workspace AND l.id=j.lead_id WHERE j.workspace=? AND (?='' OR j.created_at<? OR (j.created_at=? AND j.id<?)) ORDER BY j.created_at DESC,j.id DESC LIMIT 51",[this.workspace,cursor,at,at,id]);

@@ -152,11 +152,12 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
      const result=await command(userId,'WORKSPACE',input,(c,at)=>[statement('INSERT INTO sites_workspaces(id,owner_user_id,name,created_at) SELECT c.entity_id,c.owner_user_id,?,?'+winning+' ON CONFLICT(id) DO NOTHING',[input.name,at,...bound(c)])]);return response(200,{workspace_id:result.id,...result,...flags});
     }
    }
-   const production=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/production\/(leads|jobs)(?:\/([a-f0-9-]{36})(?:\/(actions|handoff-check|handoff))?)?$/);
+   const production=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/production\/(leads|jobs|commands)(?:\/([a-f0-9-]{36})(?:\/(actions|handoff-check|handoff))?)?$/);
    if(production){
     const [,workspace,resource,id,action]=production,store=new AsyncProductionIntake(db,{userId,workspace,now});await store.scope();
     if(request.method==='POST'&&(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site'))fail('ORIGIN_DENIED',403);
     if(resource==='leads'&&!id&&request.method==='POST')return response(200,await store.create(await readInput(request)));
+    if(resource==='commands'&&id&&request.method==='GET'&&!action)return response(200,await store.commandReceipt(id));
     if(resource==='jobs'&&!id&&request.method==='GET')return response(200,await store.list({cursor:url.searchParams.get('cursor')||''}));
     if(resource==='jobs'&&id&&request.method==='GET'&&!action)return response(200,{job:await store.job(id),publish_allowed:false});
     if(resource==='jobs'&&id&&action==='actions'&&request.method==='POST')return response(200,await store.action(id,await readInput(request)));

@@ -43,6 +43,13 @@ test('a duplicate event binds its new command to the exact normalized request an
  assert.equal(f.sql.prepare('SELECT count(*) n FROM sites_production_leads').get().n,1);
 });
 
+test('production command receipt is an owner-scoped read, never a new create',async t=>{
+ const f=setup(t),w=await workspace(f,'Receipt owner'),other=await workspace(f,'Other workspace'),input=lead(),missing=await f.call(base(w)+'/commands/'+input.command_id);assert.deepEqual(missing.body,{outcome:'NO_RECEIPT',publish_allowed:false});
+ const created=await f.call(base(w)+'/leads',input),receipt=await f.call(base(w)+'/commands/'+input.command_id);assert.equal(created.status,200);assert.equal(receipt.status,200);assert.equal(receipt.body.outcome,'COMMITTED');assert.equal(receipt.body.job_id,created.body.job.id);assert.equal(receipt.body.created_state,'WAITING_PROVIDER');
+ assert.equal((await f.call(base(other)+'/commands/'+input.command_id)).body.outcome,'NO_RECEIPT');f.user='different-owner';assert.equal((await f.call(base(w)+'/commands/'+input.command_id)).status,403);f.user='synthetic-owner';
+ assert.equal(f.sql.prepare('SELECT count(*) n FROM sites_production_leads').get().n,1);
+});
+
 test('manual lead and pause/resume/cancel use durable exact commands and forbid handoff',async t=>{
  const f=setup(t),w=await workspace(f,'Synthetic A'),input=lead({source_kind:'MANUAL',url:null,title:'Manual synthetic tip',brief:'No verified source.\nSecond line remains a tip, not an instruction.',event_id:'manual-1'}),created=await f.call(base(w)+'/leads',input);assert.equal(created.status,200,JSON.stringify(created.body));const id=created.body.job.id;assert.equal(created.body.job.brief,input.brief);
  const check=await f.call(base(w)+'/jobs/'+id+'/handoff-check');assert.equal(check.status,200);assert.equal(check.body.eligible,false);assert.ok(check.body.blockers.includes('IMAGE_MISSING'));

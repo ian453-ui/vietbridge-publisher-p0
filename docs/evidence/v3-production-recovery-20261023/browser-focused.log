@@ -1,0 +1,15 @@
+✔ mobile production lead persists, stays in workspace, and never presents a generated article (1496.831543ms)
+✔ known invalid production URL can be corrected without losing the workspace draft (904.184864ms)
+✔ lost production HTTP acknowledgement is read back after a new page and refresh (1343.273644ms)
+✔ no receipt after an unsent request never auto-creates and only replays matching input (1059.967059ms)
+✔ unavailable browser pending storage blocks a new lead before network write (730.304908ms)
+✔ pending lead identity stays in its workspace and clears on logout (824.802178ms)
+✔ late production list response cannot restore another customer’s lead (922.775552ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7702.852627
