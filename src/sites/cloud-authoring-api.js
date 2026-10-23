@@ -157,6 +157,9 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
     if(resource==='task-preflight')fail('METHOD_NOT_ALLOWED',405);
     if(resource==='catalogue'){
      const viewer=url.searchParams.get('accountId');if(viewer!==null)await account(userId,workspace,viewer);
+     const cursor=url.searchParams.get('cursor')||'';
+     const [beforeAt,beforeId]=cursor?cursor.split('|'):['',''];
+     if(cursor&&(!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(beforeAt)||!uuid(beforeId)))fail('CATALOGUE_CURSOR_INVALID',400);
      // Shared source visibility is derived in the same SELECT as owner and active
      // source membership. An approval/plan remains bound to its original account.
      const contents=await rows(`SELECT c.*,p.id AS plan_id,p.account_id AS plan_account_id,e.source_plan_id AS edited_plan_id,(SELECT max(v.revision) FROM sites_contents v WHERE v.workspace=c.workspace AND v.account_id=c.account_id AND v.content_id=c.content_id AND v.slug=c.slug) AS latest_revision FROM sites_contents c
@@ -165,8 +168,10 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
       LEFT JOIN sites_upload_plans p ON p.content_id=c.id AND p.workspace=c.workspace
       LEFT JOIN sites_content_edits e ON e.content_id=c.id
       WHERE c.workspace=? AND (? IS NULL OR EXISTS(SELECT 1 FROM sites_project_memberships v WHERE v.workspace=c.workspace AND v.account_id=? AND v.user_id=? AND v.role='READER' AND v.revoked_at IS NULL))
-      ORDER BY c.created_at DESC,c.id DESC LIMIT 200`,[userId,userId,workspace,viewer,viewer,userId]);
-     return response(200,{contents:contents.map(({variants_json,plan_id,plan_account_id,edited_plan_id,...c})=>({...c,variants:JSON.parse(variants_json),review_edit:edited_plan_id?{source_plan_id:edited_plan_id,requires_new_inspection:true}:null,review_binding:plan_id?{plan_id,account_id:plan_account_id}:null})),...flags});
+      AND (?='' OR c.created_at<? OR (c.created_at=? AND c.id<?))
+      ORDER BY c.created_at DESC,c.id DESC LIMIT 201`,[userId,userId,workspace,viewer,viewer,userId,cursor,beforeAt,beforeAt,beforeId]);
+     const page=contents.slice(0,200),last=page.at(-1);
+     return response(200,{contents:page.map(({variants_json,plan_id,plan_account_id,edited_plan_id,...c})=>({...c,variants:JSON.parse(variants_json),review_edit:edited_plan_id?{source_plan_id:edited_plan_id,requires_new_inspection:true}:null,review_binding:plan_id?{plan_id,account_id:plan_account_id}:null})),next_cursor:contents.length>200?last.created_at+'|'+last.id:null,...flags});
     }
     if(resource==='accounts')return response(200,{accounts:await rows("SELECT a.* FROM sites_account_details a JOIN sites_project_memberships m ON m.workspace=a.workspace AND m.account_id=a.account_id WHERE a.workspace=? AND m.user_id=? AND m.role='READER' AND m.revoked_at IS NULL ORDER BY a.created_at,a.account_id LIMIT 200",[workspace,userId]),...flags});
     const accountId=url.searchParams.get('accountId');await account(userId,workspace,accountId);

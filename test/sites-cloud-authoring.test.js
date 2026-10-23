@@ -9,6 +9,16 @@ import {createCloudAuthoringApi,cloudDigest} from '../src/sites/cloud-authoring-
 function setup(t){const root=mkdtempSync(join(tmpdir(),'v3-sites-authoring-')),path=join(root,'cloud.sqlite'),f=cloudD1Fixture(path);t.after(()=>{f.close();rmSync(root,{recursive:true,force:true});});return {...f,path,fixture:f};}
 async function seed(f){const w=(await f.call('/api/sites/workspaces',{command_id:crypto.randomUUID(),name:'Synthetic Cloud Customer'})).body.id,base='/api/sites/workspaces/'+w,a=(await f.call(base+'/accounts',{command_id:crypto.randomUUID(),display_name:'Synthetic Facebook',platform:'facebook',external_identity:null})).body.id;assert.ok(w);assert.ok(a);return {w,a,base};}
 const content=(a,overrides={})=>({command_id:crypto.randomUUID(),account_id:a,content_id:'STUDY-20261022-074',slug:'study-options',revision:1,title:'Synthetic complete title',body:'Complete original body\nSecond paragraph retained.',variants:{facebook:{title:'Facebook variant',body:'Explicit Facebook body\nComplete ending.'}},...overrides});
+test('shared catalogue keyset reaches older versions beyond 200 without duplicate or cross-workspace rows',async t=>{
+ const f=setup(t),{w,a,base}=await seed(f),original=(await f.call(base+'/contents',content(a))).body;
+ const insert=f.sql.prepare("INSERT INTO sites_contents(id,workspace,account_id,content_id,slug,revision,title,body,variants_json,payload_hash,source_status,created_at) SELECT ?,workspace,account_id,?,slug,revision,?,body,variants_json,payload_hash,source_status,? FROM sites_contents WHERE id=?");
+ for(let n=1;n<=205;n++)insert.run('00000000-0000-4000-8000-'+String(n).padStart(12,'0'),'SYNTHETIC-'+String(n).padStart(3,'0'),'Synthetic older '+n,'2020-01-01T00:00:00.000Z',original.id);
+ const first=await f.call(base+'/catalogue?accountId='+a);assert.equal(first.status,200);assert.equal(first.body.contents.length,200);assert.ok(first.body.next_cursor);
+ const second=await f.call(base+'/catalogue?accountId='+a+'&cursor='+encodeURIComponent(first.body.next_cursor));assert.equal(second.status,200);assert.equal(second.body.contents.length,6);assert.equal(second.body.next_cursor,null);
+ assert.equal(new Set([...first.body.contents,...second.body.contents].map(c=>c.id)).size,206);
+ assert.equal((await f.call(base+'/catalogue?cursor=invalid')).body.error,'CATALOGUE_CURSOR_INVALID');
+ const other=await seed(f);assert.deepEqual((await f.call(other.base+'/catalogue')).body.contents,[]);
+});
 test('shared catalogue lists the same full source for both accounts while legacy scoped reads remain isolated',async t=>{
  const f=setup(t),{w,a,base}=await seed(f),b=(await f.call(base+'/accounts',{command_id:crypto.randomUUID(),display_name:'Second Facebook',platform:'facebook',external_identity:null})).body.id,c=(await f.call(base+'/contents',content(a))).body;
  for(const id of [a,b]){const r=await f.call(base+'/catalogue?accountId='+id);assert.equal(r.status,200);assert.equal(r.body.contents[0].id,c.id);assert.equal(r.body.contents[0].account_id,a);assert.equal(r.body.contents[0].body,content(a).body);assert.equal(r.body.publish_allowed,false);}
