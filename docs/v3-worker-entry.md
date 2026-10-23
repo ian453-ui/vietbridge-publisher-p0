@@ -6,12 +6,30 @@
 This package adds application integration code, not a replacement Sites starter,
 authentication provider, build helper or deployment artifact.
 
+2026-10-23 update: the registered Site is now public and has a live URL, but its
+then-deployed source returned `IDENTITY_REQUIRED` JSON at `/` for an anonymous
+visitor. The Worker now serves only its exact, non-sensitive HTML/JS/CSS shell
+without a visitor identity; business APIs still require the official server-side
+identity and original workspace checks. The public shell links to the Sites
+dispatch-owned `/signin-with-chatgpt` route using a top-level navigation. This
+source fix has **not** been deployed or live-verified by this repository turn.
+Local evidence is in `docs/evidence/v3-public-shell-20261023/`: a failing
+anonymous-root test before the fix (`anonymous-root-red.log.gz`), focused Worker
+and browser runs (`focused.log`, `console-ui.log`), and actual anonymous desktop
+and 390px Chromium screenshots. The first full run's sole failure was a stale
+assertion for the previous login text (`full-first-failure.log.gz`); the final
+full-suite result is recorded in `full-test.log`. The live Site request from this
+environment received an edge CONNECT 403, so the deployed route and actual
+ChatGPT sign-in redirect still require verification by the deployment owner.
+The final local runs passed 13/13 focused Worker/browser cases, 58/58 existing
+console browser cases, and 1371/1371 full-suite cases.
+
 ## Implemented entry
 
 `src/sites/worker-entry.js` exports `createPublisherSite(options)`, returning a
 Worker-shaped object with `fetch(request, env, ctx)`. It also exports a default
-Worker which deliberately refuses service until official identity integration
-is supplied through the factory. There is no header parser, default user,
+Worker whose business APIs deliberately refuse service until official identity
+integration is supplied through the factory. There is no header parser, default user,
 first-visitor enrollment, credential loader, in-memory business store or network
 fallback.
 
@@ -19,14 +37,14 @@ fallback.
 | --- | --- |
 | `options.origin` or `env.PUBLISHER_CANONICAL_ORIGIN` | Required exact canonical HTTPS origin; never inferred from Host, forwarding headers or the request URL. Explicit factory configuration takes precedence. HTTP loopback requires the code-only `allowLoopback:true` test option. |
 | `options.getTrustedIdentity(request, env, ctx)` | Required server-only function supplied by the verified official identity integration. Null/invalid user returns 401; missing integration or provider failure returns distinct 503 errors. No bearer token, email, cookie or browser header becomes identity here. |
-| `env.DB` | Required D1 `prepare`/`batch` binding, passed directly into the existing API per request. No global database or identity caching. Missing DB returns 503 even for the document. |
+| `env.DB` | Required D1 `prepare`/`batch` binding for business APIs, passed into the existing API per request. No global database or identity caching. Missing DB returns 503 for APIs while the public static shell can still load. |
 | `env.BUCKET` | Optional R2 `get`/`put` binding passed directly to existing scoped object/review stores. Manual text authoring can operate without it; media reads remain unavailable. A configured malformed binding fails 503. |
 | `options.readAsset(path, {request,env,ctx})` | Server-only official-framework asset adapter, when available. Otherwise the handler requires `env.ASSETS.fetch`. |
 | Approval/target/variant providers | Explicit server-code options passed to existing stores; absent providers remain absent. This entry adds no admin authority, real producer or publication transport. |
 
 `/` serves the existing `cloud-console.html`; `/cloud-console.js` and
-`/cloud-console.css` serve the existing source assets. All three require resolved
-identity and valid database binding. GET/HEAD, exact content types, no-store,
+`/cloud-console.css` serve the existing source assets to anonymous visitors.
+They contain no business records or identity claims. GET/HEAD, exact content types, no-store,
 nosniff and a same-origin CSP are enforced. Only those paths reach the asset
 provider, through new internal GET requests without browser cookies or credentials.
 Redirects, missing assets and HTML fallbacks for JS/CSS fail closed. Source files,
@@ -40,8 +58,10 @@ bindings are captured. Other methods and routes remain unavailable. No execution
 upload, publication, permission, migration or enrollment endpoint is introduced.
 
 Cloudflare documents the [`ASSETS.fetch` binding](https://developers.cloudflare.com/workers/static-assets/binding/).
-If using that binding, the eventual hosting setup **must route these paths through
-the Worker first** so asset-first serving cannot bypass this handler's checks.
+If using that binding, the hosting setup **must route these paths through
+the Worker first** so asset-first serving cannot bypass the exact static allowlist,
+MIME checks and security headers. Business API paths must always reach the
+identity and workspace gates.
 This repository does not invent the missing Sites-generated configuration.
 An official Vinext integration may instead supply `readAsset` from its supported
 server asset path. Dispatch-owned sign-in/callback routes must remain upstream;
@@ -53,7 +73,7 @@ The new entry has direct API tests using actual file-backed SQLite behind the
 existing D1 method-shape fixture, file-backed R2 method-shape fixtures and the
 unchanged production UI assets. Desktop and mobile Chromium journeys serve the
 document, JS, CSS and APIs through this single entry, reload durable task data,
-read original task previews and reject anonymous document requests. Outside
+read original task previews and reject anonymous business API requests. Outside
 browser requests are blocked. Fixed synthetic identity exists only in tests.
 
 Tests exercise missing/malformed bindings, forged identity headers, provider
@@ -92,12 +112,12 @@ The current Sites skill and Worker starter README were readable. Exact official
 Vinext auth/Worker source reads returned `failed to read skill resource`.
 This is an unavailable resource, not an automatic approval denial.
 
-Fresh native readback of the existing Site: active, current role owner, access
-mode custom with only owner, zero external visitors, version 0, saved versions
-empty, live/preview/expected URLs null. Runtime variable keys and visible D1
-bindings are empty. The original local hosting manifest/staging directory is
-absent in this instance. No new manifest with guessed bindings was fabricated.
-See `evidence/v3-worker-entry-20261022-platform.json` for redacted observations.
+The following is the historical 2026-10-22 native readback: active, current role
+owner, access mode custom with only owner, version 0 and live URL null. The
+2026-10-23 readback shows access mode public, revision 2, and a live URL; it does
+not prove this new source has been deployed. The original local hosting manifest
+and official starter remain separate deployment concerns. See
+`evidence/v3-worker-entry-20261022-platform.json` for the older redacted observation.
 
 To continue deployment:
 
@@ -109,14 +129,16 @@ To continue deployment:
    three assets through its supported routing. Do not deploy the intentionally
    unconfigured default export as a working service.
 3. Declare and verify dedicated D1/R2 bindings through the official manifest
-   contract. Convert the ten candidate SQL files into reviewed generated schema
+   contract. Review all eleven candidate SQL files against generated schema
    migrations/metadata and validate them through the official local runtime.
-   No real database, membership, object store or migration has been created here.
+   The current hosted database and migrations require separate review and readback;
+   this source-only fix does not modify them.
 4. Validate real dispatch identity, owner/workspace/account isolation, asset-first
    bypass prevention, persistence, revocation and rollback on actual Worker/D1/R2.
    Synthetic SQLite/R2 tests cannot establish those hosted properties.
 5. Only with the complete official workflow and already authorized source access,
-   build/package the exact pushed source and deploy privately to the same Site.
+   build/package the exact pushed source and deploy to the same Site while preserving
+   its current public audience.
    Any required credential creation/configuration remains a specific stop point
    under the user's instruction. Read back the actual deployment/URL before
    claiming delivery; an expected address or static shell is not acceptance.

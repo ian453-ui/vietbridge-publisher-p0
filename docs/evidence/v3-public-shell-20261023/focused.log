@@ -1,0 +1,21 @@
+✔ default Worker exports fetch but refuses missing official identity and canonical origin (41.975164ms)
+✔ anonymous public shell is HTML while business API ignores forged identity claims (12.451069ms)
+✔ public shell stays available without DB while API and untrusted origins fail closed (20.192094ms)
+✔ null, invalid and throwing identity resolvers cannot be replaced with browser claims (11.333535ms)
+✔ public static routes serve exact existing bytes, HEAD and security headers without forwarding credentials (11.767384ms)
+✔ routing rejects private files, SPA fallbacks, redirects and unsupported methods (9.689027ms)
+✔ Worker authoring persists exact scoped tasks and retains UNKNOWN receipts after restart (50.058919ms)
+✔ one Worker instance never caches an identity or database between concurrent requests (27.986088ms)
+✔ Worker forwards transaction rollback and rejects foreign-origin writes without side effects (16.610136ms)
+✔ Worker injects the exact R2 method binding and preserves scoped media integrity checks (136.481843ms)
+✔ missing schema is a storage failure and never triggers request-time DDL or enrollment (18.438505ms)
+✔ desktop Worker document, assets and persistent API use one scoped application (1979.173261ms)
+✔ mobile Worker document, assets and persistent API use one scoped application (1857.016649ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4343.243255

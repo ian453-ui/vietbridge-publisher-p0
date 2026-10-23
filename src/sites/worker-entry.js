@@ -27,7 +27,7 @@ function canonicalOrigin(value,allowLoopback){
  * Official server code must supply getTrustedIdentity. Never source that function
  * from request headers/body, service tokens or a browser-selectable environment.
  * DB/BUCKET/ASSETS are request-local runtime bindings, never global data stores.
- * Hosting must route protected assets through this handler (Worker-first), or
+ * Hosting must route these exact public shell assets through this handler (Worker-first), or
  * provide readAsset from the official framework's server-side asset integration.
  */
 export function createPublisherSite({origin=null,getTrustedIdentity=null,readAsset=null,resolveApprovalAuthority=null,targetReviewProvider=null,variantInspectionProvider=null,allowLoopback=false}={}){
@@ -40,7 +40,16 @@ export function createPublisherSite({origin=null,getTrustedIdentity=null,readAss
    const asset=assets.get(url.pathname),api=url.pathname.startsWith('/api/sites/')||url.pathname.startsWith('/api/unified/');
    if(!asset&&!api)return error(404,'OPERATION_UNAVAILABLE');
    if(asset&&!['GET','HEAD'].includes(request.method)||api&&!['GET','POST'].includes(request.method))return error(405,'METHOD_NOT_ALLOWED',{'Allow':asset?'GET, HEAD':'GET, POST'});
-   // Even the document fails closed: a static shell is not a working backend.
+   // The public shell contains no business records. Read only the three allowlisted
+   // assets before identity/DB checks; every business API stays behind those checks.
+   if(asset){
+    const loader=typeof readAsset==='function'?()=>readAsset(asset.path,{request,env,ctx}):typeof env.ASSETS?.fetch==='function'?()=>env.ASSETS.fetch(new Request(new URL(asset.path,expected),{method:'GET'})):null;
+    if(!loader)return error(503,'SITES_ASSET_BINDING_REQUIRED');
+    let response;
+    try{response=await loader();}catch{return error(503,'SITES_ASSET_UNAVAILABLE');}
+    if(!(response instanceof Response)||response.status!==200||!asset.mime.includes((response.headers.get('Content-Type')||'').split(';')[0].trim().toLowerCase()))return error(503,'SITES_ASSET_INVALID');
+    return new Response(request.method==='HEAD'?null:response.body,{headers:{...security,'Content-Type':asset.type}});
+   }
    if(typeof env.DB?.prepare!=='function'||typeof env.DB?.batch!=='function')return error(503,'SITES_RUNTIME_BINDING_REQUIRED');
    if(env.BUCKET!=null&&(typeof env.BUCKET.get!=='function'||typeof env.BUCKET.put!=='function'))return error(503,'R2_BINDING_REQUIRED');
    if(typeof getTrustedIdentity!=='function')return error(503,'SITES_IDENTITY_INTEGRATION_UNAVAILABLE');
@@ -49,20 +58,10 @@ export function createPublisherSite({origin=null,getTrustedIdentity=null,readAss
    if(!identity||typeof identity.userId!=='string'||!identity.userId.length||identity.userId.length>300||identity.userId.trim()!==identity.userId)return error(401,'IDENTITY_REQUIRED');
    // Capture only this resolved identity for this request; do not parse headers.
    const trustedIdentity=Object.freeze({userId:identity.userId});
-   if(api){
-    const handler=createCloudAuthoringApi({db:env.DB,bucket:env.BUCKET??null,origin:expected,getTrustedIdentity:async()=>trustedIdentity,
-     resolveApprovalAuthority:typeof resolveApprovalAuthority==='function'?(req,user,scope)=>resolveApprovalAuthority(req,user,scope,env,ctx):null,
-     targetReviewProvider,variantInspectionProvider});
-    return await handler(request);
-   }
-   const loader=typeof readAsset==='function'?()=>readAsset(asset.path,{request,env,ctx}):typeof env.ASSETS?.fetch==='function'?()=>env.ASSETS.fetch(new Request(new URL(asset.path,expected),{method:'GET'})):null;
-   if(!loader)return error(503,'SITES_ASSET_BINDING_REQUIRED');
-   let response;
-   try{response=await loader();}catch{return error(503,'SITES_ASSET_UNAVAILABLE');}
-   // Reject SPA fallbacks, redirects and the wrong content type; never expose an
-   // arbitrary asset directory or forward cookies/headers to an asset provider.
-   if(!(response instanceof Response)||response.status!==200||!asset.mime.includes((response.headers.get('Content-Type')||'').split(';')[0].trim().toLowerCase()))return error(503,'SITES_ASSET_INVALID');
-   return new Response(request.method==='HEAD'?null:response.body,{headers:{...security,'Content-Type':asset.type}});
+   const handler=createCloudAuthoringApi({db:env.DB,bucket:env.BUCKET??null,origin:expected,getTrustedIdentity:async()=>trustedIdentity,
+    resolveApprovalAuthority:typeof resolveApprovalAuthority==='function'?(req,user,scope)=>resolveApprovalAuthority(req,user,scope,env,ctx):null,
+    targetReviewProvider,variantInspectionProvider});
+   return await handler(request);
   }catch{return error(503,'SITES_APPLICATION_UNAVAILABLE');}
  }};
 }

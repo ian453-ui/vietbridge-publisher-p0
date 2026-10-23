@@ -34,24 +34,32 @@ test('default Worker exports fetch but refuses missing official identity and can
  const denied=await worker.fetch(r,{...f.env,getTrustedIdentity:async()=>({userId:'synthetic-owner'})});
  assert.equal((await denied.json()).error,'SITES_IDENTITY_INTEGRATION_UNAVAILABLE');assert.equal(f.f.reads,0);assert.equal(f.f.writes,0);
 });
-test('missing database, malformed bucket and untrusted origins fail closed for document and API',async t=>{
+test('anonymous public shell is HTML while business API ignores forged identity claims',async t=>{
+ const f=fixture(t);f.user=null;
+ const root=await f.app.fetch(f.request('/',null,{headers:{'oai-authenticated-user-id':'forged-owner'}}),f.env);assert.equal(root.status,200);assert.match(root.headers.get('Content-Type'),/text\/html/);assert.match(await root.text(),/VietBridge Publisher V3/);
+ for(const path of ['/cloud-console.js','/cloud-console.css'])assert.equal((await f.app.fetch(f.request(path),f.env)).status,200);
+ const api=await f.app.fetch(f.request('/api/sites/workspaces',null,{headers:{'oai-authenticated-user-id':'forged-owner'}}),f.env);assert.equal(api.status,401);assert.equal((await api.json()).error,'IDENTITY_REQUIRED');
+ const before=f.f.sql.prepare('SELECT count(*) n FROM sites_workspaces').get().n,write=await f.app.fetch(f.request('/api/sites/workspaces',{command_id:crypto.randomUUID(),name:'Forged owner'}, {headers:{'oai-authenticated-user-id':'forged-owner'}}),f.env);assert.equal(write.status,401);assert.equal(f.f.sql.prepare('SELECT count(*) n FROM sites_workspaces').get().n,before);
+});
+test('public shell stays available without DB while API and untrusted origins fail closed',async t=>{
  const f=fixture(t);
- for(const path of ['/','/cloud-console.js','/api/sites/workspaces']){
-  for(const DB of [null,{}, {prepare(){}}])assert.equal((await(await f.app.fetch(f.request(path),{...f.env,DB})).json()).error,'SITES_RUNTIME_BINDING_REQUIRED');
+ for(const DB of [null,{}, {prepare(){}}]){
+  for(const path of ['/','/cloud-console.js'])assert.equal((await f.app.fetch(f.request(path),{...f.env,DB})).status,200);
+  assert.equal((await(await f.app.fetch(f.request('/api/sites/workspaces'),{...f.env,DB})).json()).error,'SITES_RUNTIME_BINDING_REQUIRED');
  }
  for(const value of ['',origin+'/',origin+'/path','http://public.invalid','http://127.0.0.1:6000','https://user:pass@synthetic-worker.invalid'])assert.equal((await(await f.app.fetch(f.request('/'),{...f.env,PUBLISHER_CANONICAL_ORIGIN:value})).json()).error,'SITES_ORIGIN_REQUIRED');
  assert.equal((await f.app.fetch(new Request('https://foreign.invalid/',{headers:{Host:new URL(origin).host}}),f.env)).status,409);
- assert.equal((await(await f.app.fetch(f.request('/'),{...f.env,BUCKET:{get(){}}})).json()).error,'R2_BINDING_REQUIRED');assert.equal(f.f.writes,0);
+ assert.equal((await f.app.fetch(f.request('/'),{...f.env,BUCKET:{get(){}}})).status,200);assert.equal((await(await f.app.fetch(f.request('/api/sites/workspaces'),{...f.env,BUCKET:{get(){}}})).json()).error,'R2_BINDING_REQUIRED');assert.equal(f.f.writes,0);
 });
 test('null, invalid and throwing identity resolvers cannot be replaced with browser claims',async t=>{
- const f=fixture(t),req=f.request('/',null,{headers:{'oai-authenticated-user-id':'synthetic-owner',Cookie:'user=synthetic-owner',Authorization:'Bearer synthetic-not-authority'}});
+ const f=fixture(t),req=f.request('/api/sites/workspaces',null,{headers:{'oai-authenticated-user-id':'synthetic-owner',Cookie:'user=synthetic-owner',Authorization:'Bearer synthetic-not-authority'}});
  for(const identity of [null,{}, {userId:' '},{userId:5},{userId:' owner'},{userId:'x'.repeat(301)}]){
   const app=createPublisherSite({getTrustedIdentity:async()=>identity});assert.equal((await app.fetch(req,f.env)).status,401);
  }
  const app=createPublisherSite({getTrustedIdentity:async()=>{throw Error('private-provider-details');}}),r=await app.fetch(req,f.env);
  assert.equal(r.status,503);assert.doesNotMatch(await r.text(),/private-provider-details/);assert.equal(f.f.reads,0);assert.equal(f.f.writes,0);
 });
-test('protected static routes serve exact existing bytes, HEAD and security headers without forwarding credentials',async t=>{
+test('public static routes serve exact existing bytes, HEAD and security headers without forwarding credentials',async t=>{
  const f=fixture(t);
  for(const [route,file] of [['/','/cloud-console.html'],['/cloud-console.js','/cloud-console.js'],['/cloud-console.css','/cloud-console.css']]){
   const r=await f.app.fetch(f.request(route+'?ignored=1',null,{headers:{Cookie:'synthetic-secret=1'}}),f.env);
@@ -59,7 +67,7 @@ test('protected static routes serve exact existing bytes, HEAD and security head
   assert.equal(r.headers.get('Set-Cookie'),null);assert.equal(r.headers.get('X-Content-Type-Options'),'nosniff');assert.equal(r.headers.get('Cache-Control'),'private, no-store');assert.match(r.headers.get('Content-Security-Policy'),/frame-ancestors 'none'/);
   const head=await f.app.fetch(f.request(route,null,{method:'HEAD'}),f.env);assert.equal(head.status,200);assert.equal(await head.text(),'');
  }
- assert.equal(f.calls,6);assert.equal(f.f.reads,0);assert.equal(f.f.writes,0);
+ assert.equal(f.calls,0);assert.equal(f.f.reads,0);assert.equal(f.f.writes,0);
 });
 test('routing rejects private files, SPA fallbacks, redirects and unsupported methods',async t=>{
  const f=fixture(t);
