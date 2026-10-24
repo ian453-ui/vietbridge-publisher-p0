@@ -144,7 +144,7 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
    const name=url.pathname==='/'?'index.html':url.pathname.slice(1);res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'text/html');return res.end(await readFile(join(root,name)));
   }
   if(req.method==='GET'&&url.pathname==='/api/state')return send(res,200,{...store.view(url.searchParams.get('workspace')),token,unified:Boolean(unified),executionEnabled,pageExecutionEnabled:Boolean(options.pageExecution),integrationAcceptance:Boolean(unified&&!executionEnabled||publisher&&publisherOptions.workerEnabled!==true)});
-  const bridgeJob=url.pathname.match(/^\/api\/v3-bridge\/jobs\/([a-f0-9-]{36})\/(status|capability|dispatch|reconcile)$/);
+  const bridgeJob=url.pathname.match(/^\/api\/v3-bridge\/jobs\/([a-f0-9-]{36})\/(status|capability|prepare|dispatch|reconcile)$/);
   if(bridgeJob&&req.method==='GET'){
    if(!v3Bridge)return send(res,409,{error:'V3_BRIDGE_DISABLED'});
    const siteJobId=bridgeJob[1],link=v3Bridge.binding(siteJobId);
@@ -188,12 +188,7 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
    if((principal?.type!=='app'&&(req.headers.origin!==origin||req.headers['x-local-token']!==token)||principal?.type==='app'&&req.headers.origin&&req.headers.origin!==origin)||!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(req.headers['content-type']||''))throw Error('本地请求验证失败，请刷新页面');
    const input=await readRequestJson(req);
    options.requestGuard?.({method:req.method,url,input,principal});
-   if(url.pathname==='/api/v3-bridge/bind'){
-    if(!v3Bridge)return send(res,409,{error:'V3_BRIDGE_DISABLED'});
-    if(principal?.type!=='admin')return send(res,403,{error:'APPROVAL_ADMIN_REQUIRED'});
-    const authority={kind:'EXISTING_ADMIN',actor_id:'admin:'+createHash('sha256').update(access.data.user).digest('hex')};
-    return send(res,200,v3Bridge.bind(input,{authority}));
-   }
+   if(url.pathname==='/api/v3-bridge/bind')return send(res,410,{error:'V3_LEGACY_BIND_DISABLED'});
    if(url.pathname==='/api/v3-bridge/account-bind'){
     if(!v3Bridge)return send(res,409,{error:'V3_BRIDGE_DISABLED'});
     if(principal?.type!=='admin')return send(res,403,{error:'APPROVAL_ADMIN_REQUIRED'});
