@@ -20,6 +20,7 @@ function fixture(t){
  let calls=0,reconciles=0,allowed=true;
  const executor={executionCapability(){return {canExecute:allowed,mode:'TEST_LOCAL_POLICY'};},async execute(workspace,id,input){calls++;assert.equal(workspace,'ws-enterprise');assert.equal(id,localJobId);assert.deepEqual(input,{confirm:true,snapshot_hash:localHash});db.prepare("UPDATE publisher_jobs SET state='UNKNOWN',attempt_id='attempt-1' WHERE id=?").run(id);throw Error('SUBMISSION_RESULT_UNKNOWN');},async reconcile(workspace,id,input){reconciles++;assert.equal(workspace,'ws-enterprise');assert.equal(id,localJobId);assert.deepEqual(input,{platform_id:'post123'});db.prepare("UPDATE publisher_jobs SET state='PUBLISHED',evidence_json=? WHERE id=?").run(JSON.stringify({id:'post123',url:'https://example.test/post123',verified:true}),id);}};
  const bridge=new V3MacExecutionBridge(publisher,executor,{siteProjectId});
+ db.prepare('INSERT INTO publisher_v3_task_approvals VALUES(?,?,?,?,?,?,?,?,NULL)').run(siteJobId,siteWorkspaceId,siteAccountId,siteHash,'c'.repeat(64),'d'.repeat(64),admin.actor_id,'2026-10-24T00:00:00Z');
  const link={site_project_id:siteProjectId,site_job_id:siteJobId,site_workspace_id:siteWorkspaceId,site_account_id:siteAccountId,site_snapshot_hash:siteHash,local_workspace_id:'ws-enterprise',local_account_id:'account-enterprise',local_job_id:localJobId,local_snapshot_hash:localHash};
  return {db,bridge,link,calls:()=>calls,reconciles:()=>reconciles,setAllowed(value){allowed=value;}};
 }
@@ -46,8 +47,15 @@ test('V3 dispatch delegates to the original executor once; UNKNOWN can only reco
  f.setAllowed(false);await assert.rejects(f.bridge.dispatch(siteJobId,confirmation),/V3_LOCAL_EXECUTION_UNAVAILABLE/);assert.equal(f.calls(),0);
  f.setAllowed(true);await assert.rejects(f.bridge.dispatch(siteJobId,confirmation),/SUBMISSION_RESULT_UNKNOWN/);
  assert.equal(f.bridge.status(siteJobId).state,'UNKNOWN');
+ f.db.prepare('INSERT INTO publisher_submit_receipts VALUES(?,?,?,?)').run(localJobId,'post123','https://example.test/post123','2026-10-24T00:01:00Z');
+ assert.equal(f.bridge.status(siteJobId).verified,false);assert.equal(f.bridge.status(siteJobId).platform_url,null);assert.equal(f.bridge.status(siteJobId).pending_receipt,true);
  assert.equal((await f.bridge.dispatch(siteJobId,confirmation)).already_claimed,true);assert.equal(f.calls(),1);
  await f.bridge.reconcile(siteJobId,{site_snapshot_hash:siteHash,local_snapshot_hash:localHash,platform_id:'post123'});
  assert.equal(f.bridge.status(siteJobId).state,'PUBLISHED');assert.equal(f.bridge.status(siteJobId).verified,true);
  assert.equal((await f.bridge.dispatch(siteJobId,confirmation)).already_claimed,true);assert.equal(f.calls(),1);assert.equal(f.reconciles(),1);
+});
+test('local approval revocation blocks a previously READY V3 binding before driver dispatch',async t=>{
+ const f=fixture(t);f.bridge.bind(f.link,{authority:admin});f.bridge.revokeSiteTask(siteJobId,{authority:admin});
+ await assert.rejects(f.bridge.dispatch(siteJobId,{confirm:true,local_snapshot_hash:localHash,site_snapshot_hash:siteHash}),/V3_TASK_APPROVAL_REQUIRED/);
+ assert.equal(f.calls(),0);
 });
