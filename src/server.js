@@ -146,6 +146,7 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
   if(req.method==='GET'&&url.pathname==='/api/state')return send(res,200,{...store.view(url.searchParams.get('workspace')),token,unified:Boolean(unified),executionEnabled,pageExecutionEnabled:Boolean(options.pageExecution),integrationAcceptance:Boolean(unified&&!executionEnabled||publisher&&publisherOptions.workerEnabled!==true)});
   const bridgeJob=url.pathname.match(/^\/api\/v3-bridge\/jobs\/([a-f0-9-]{36})\/(status|capability|prepare|dispatch|reconcile)$/);
   if(bridgeJob&&req.method==='GET'){
+   if(!['status','capability'].includes(bridgeJob[2]))return send(res,405,{error:'METHOD_NOT_ALLOWED'});
    if(!v3Bridge)return send(res,409,{error:'V3_BRIDGE_DISABLED'});
    const siteJobId=bridgeJob[1],link=v3Bridge.binding(siteJobId);
    if(principal?.type==='app'&&!principal.token.workspaces.includes(link.local_workspace_id))return send(res,403,{error:'V3_BRIDGE_SCOPE_DENIED'});
