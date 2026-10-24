@@ -72,8 +72,8 @@ export class V3MacExecutionBridge {
   this.#bind({site_project_id:this.siteProjectId,site_job_id:input.site_job_id,site_workspace_id:input.site_workspace_id,site_account_id:input.site_account_id,site_snapshot_hash:input.site_snapshot_hash,local_workspace_id:mapping.local_workspace_id,local_account_id:mapping.local_account_id,local_job_id:job.id,local_snapshot_hash:job.snapshot_hash});
   return this.capability(input.site_job_id);
  }
- /** Only an existing local admin may bind a previously reviewed local job to
-  * one exact Sites draft. No HTTP body may supply the admin authority object.
+ /** Legacy direct binding is disabled. Only prepare may bind a Site job after
+  * exact account, QA receipt, manifest and staged media validation.
   */
  bind(input,{authority}={}){
   requireProductionAdmin(authority);
