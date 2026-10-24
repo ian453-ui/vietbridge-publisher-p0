@@ -24,6 +24,7 @@ import {unifiedRoute} from './unified-http.js';
 import {publisherAutomationCapabilities} from './publisher-automation.js';
 import {UnifiedExecutor} from './unified-executor.js';
 import {V3MacExecutionBridge} from './v3-mac-execution-bridge.js';
+import {stageV3Media} from './v3-media-staging.js';
 import {ScopedOperations} from './scoped-operations.js';
 import {InteractiveScopedOperations} from './interactive-scoped-operations.js';
 import {BrowserProfileReopen} from './browser-profile-reopen.js';
@@ -174,6 +175,13 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
    if(!mime)throw Error('媒体格式不支持');res.setHeader('Content-Type',mime);return res.end(await readFile(asset.path));
   }
   if(req.method==='GET'&&url.pathname==='/api/health')return send(res,200,{ok:true,version:'2.1.0-alpha.1',mode:'local-real-integration',persistent:true,v1Url:'http://127.0.0.1:17880/'});
+  const bridgeMedia=url.pathname.match(/^\/api\/v3-bridge\/jobs\/([a-f0-9-]{36})\/media\/(\d{1,2})$/);
+  if(bridgeMedia&&req.method==='POST'){
+   if(!v3Bridge)return send(res,409,{error:'V3_BRIDGE_DISABLED'});
+   if(principal?.type!=='app'||req.headers.origin&&req.headers.origin!==origin||req.headers['content-type']!=='application/octet-stream')return send(res,403,{error:'V3_MEDIA_AUTH_OR_TYPE_DENIED'});
+   const staged=await stageV3Media({root:join(dirname(dbPath),'v3-site-media'),siteJobId:bridgeMedia[1],ordinal:Number(bridgeMedia[2]),mime:req.headers['x-v3-mime'],sha256:req.headers['x-v3-sha256'],size:Number(req.headers['x-v3-size']),stream:req});
+   const {path:_privatePath,...receipt}=staged;return send(res,200,receipt);
+  }
   if(req.method==='POST'){
    if((principal?.type!=='app'&&(req.headers.origin!==origin||req.headers['x-local-token']!==token)||principal?.type==='app'&&req.headers.origin&&req.headers.origin!==origin)||!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(req.headers['content-type']||''))throw Error('本地请求验证失败，请刷新页面');
    const input=await readRequestJson(req);
