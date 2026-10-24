@@ -128,7 +128,9 @@ export class SiteRealPublication extends AsyncStorage {
   let remote;try{remote=await this.relay.status(id);}catch(error){if(error.message==='V3_BINDING_NOT_FOUND'&&row.state==='PREPARE_INTENT')return this.status(id);throw error;}
   if(remote.site_workspace_id!==row.workspace||remote.site_account_id!==row.account_id||remote.site_snapshot_hash!==row.site_snapshot_hash||row.local_snapshot_hash&&remote.local_snapshot_hash!==row.local_snapshot_hash)fail('REAL_RELAY_SCOPE_MISMATCH');
   const next=remote.state==='PUBLISHED'||remote.state==='PUBLISHED_ID_PENDING'?(remote.verified===true&&remote.evidence_origin==='MAC_UNIFIED_EXECUTOR_READBACK'?remote.state:'UNKNOWN'):remote.state==='DRAFT_WRITTEN'?'DRAFT_WRITTEN':remote.state==='UNKNOWN'?'UNKNOWN':row.state;
-  await this.batch([this.guard('EXISTS(SELECT 1 FROM sites_real_jobs WHERE job_id=? AND workspace=? AND account_id=? AND site_snapshot_hash=?)',[id,row.workspace,row.account_id,row.site_snapshot_hash]),this.statement('UPDATE sites_real_jobs SET state=?,local_job_id=?,local_snapshot_hash=?,readback_json=?,updated_at=? WHERE job_id=?',[next,remote.local_job_id,remote.local_snapshot_hash,JSON.stringify(remote),this.now(),id])]);
+  // The relay call can outlive a concurrent submit. A stale READY readback must
+  // never move SUBMIT_INTENT (or its later outcome) back to PREPARED.
+  await this.batch([this.statement('UPDATE sites_real_jobs SET state=?,local_job_id=?,local_snapshot_hash=?,readback_json=?,updated_at=? WHERE job_id=? AND workspace=? AND account_id=? AND site_snapshot_hash=? AND state=?',[next,remote.local_job_id,remote.local_snapshot_hash,JSON.stringify(remote),this.now(),id,row.workspace,row.account_id,row.site_snapshot_hash,row.state])]);
   return this.status(id);
  }
  async dispatch(id,input){

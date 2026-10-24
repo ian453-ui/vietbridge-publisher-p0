@@ -93,3 +93,29 @@ test('uncertain or unapproved preparation keeps one intent and resumes only its 
  assert.equal(prepares,2);assert.equal(uploads,2);
  assert.equal((await call(preparePath,{method:'POST',body:{command_id:command}})).body.error,'REAL_PREPARE_UNAVAILABLE');
 });
+
+test('late READY refresh cannot roll a concurrent submit intent back to PREPARED',async t=>{
+ const {f,bucket}=setup(t),s=await seed(f),job=crypto.randomUUID(),localHash='a'.repeat(64);
+ let unblock,entered;const blocked=new Promise(resolve=>unblock=resolve),started=new Promise(resolve=>entered=resolve);
+ let statusCalls=0,siteHash;
+ const relay={
+  async upload(){return {};},
+  async prepare(_id,input){siteHash=input.site_snapshot_hash;return {site_workspace_id:s.workspace,site_account_id:s.account,site_snapshot_hash:siteHash,local_job_id:crypto.randomUUID(),local_snapshot_hash:localHash,state:'READY'};},
+  async capability(){return {site_snapshot_hash:siteHash,local_snapshot_hash:localHash,capability:{canExecute:true}};},
+  async dispatch(){return {state:'UNKNOWN'};},
+  async status(){statusCalls++;if(statusCalls===1){entered();await blocked;return {site_workspace_id:s.workspace,site_account_id:s.account,site_snapshot_hash:siteHash,local_job_id:crypto.randomUUID(),local_snapshot_hash:localHash,state:'READY'};}return {site_workspace_id:s.workspace,site_account_id:s.account,site_snapshot_hash:siteHash,local_job_id:crypto.randomUUID(),local_snapshot_hash:localHash,state:'UNKNOWN'};}
+ };
+ const call=api(f,bucket,relay),suffix='?accountId='+s.account;
+ await call(s.base+'/real-contents/'+s.content+'/media/0'+suffix,{method:'POST',body:png});
+ const preview=(await call(s.base+'/real-contents/'+s.content+suffix)).body;
+ await call(s.base+'/real-contents/'+s.content+'/review'+suffix,{method:'POST',body:{expected_snapshot_hash:preview.snapshot_hash,source_refs:['https://example.test/source'],checks}});
+ const frozen=await call(s.base+'/real-contents/'+s.content+'/freeze'+suffix,{method:'POST',body:{site_job_id:job,expected_snapshot_hash:preview.snapshot_hash,confirm:true}});
+ assert.equal(frozen.body.state,'FROZEN');
+ assert.equal((await call(s.base+'/real-jobs/'+job+'/prepare'+suffix,{method:'POST',body:{command_id:crypto.randomUUID()}})).body.state,'PREPARED');
+ const stale=call(s.base+'/real-jobs/'+job+'/refresh'+suffix,{method:'POST',body:{}});await started;
+ const submitted=await call(s.base+'/real-jobs/'+job+'/dispatch'+suffix,{method:'POST',body:{confirm:true,site_snapshot_hash:siteHash,local_snapshot_hash:localHash,command_id:crypto.randomUUID()}});
+ assert.equal(submitted.body.state,'UNKNOWN');unblock();
+ assert.equal((await stale).body.state,'UNKNOWN');
+ assert.equal(f.sql.prepare('SELECT state FROM sites_real_jobs WHERE job_id=?').get(job).state,'UNKNOWN');
+ assert.equal((await call(s.base+'/real-jobs/'+job+'/dispatch'+suffix,{method:'POST',body:{confirm:true,site_snapshot_hash:siteHash,local_snapshot_hash:localHash,command_id:crypto.randomUUID()}})).body.error,'REAL_SUBMIT_UNAVAILABLE');
+});
