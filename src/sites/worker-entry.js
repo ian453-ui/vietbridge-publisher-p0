@@ -1,4 +1,5 @@
 import {createCloudAuthoringApi} from './cloud-authoring-api.js';
+import {MacExecutionRelayClient} from './mac-execution-relay-client.js';
 
 export const PUBLISHER_SITE_PROJECT_ID='appgprj_6ad97a034fd08191a8399eeda10f048c';
 const assets=new Map([
@@ -58,7 +59,8 @@ export function createPublisherSite({origin=null,getTrustedIdentity=null,readAss
    if(!identity||typeof identity.userId!=='string'||!identity.userId.length||identity.userId.length>300||identity.userId.trim()!==identity.userId)return error(401,'IDENTITY_REQUIRED');
    // Capture only this resolved identity for this request; do not parse headers.
    const trustedIdentity=Object.freeze({userId:identity.userId});
-   const handler=createCloudAuthoringApi({db:env.DB,bucket:env.BUCKET??null,origin:expected,getTrustedIdentity:async()=>trustedIdentity,
+   const relayClient=env.PUBLISHER_ENABLE_REAL_RELAY==='1'?new MacExecutionRelayClient({origin:'https://publisher.vietbridge.one',token:env.PUBLISHER_MAC_RELAY_TOKEN}):null;
+   const handler=createCloudAuthoringApi({db:env.DB,bucket:env.BUCKET??null,relayClient,origin:expected,getTrustedIdentity:async()=>trustedIdentity,
     resolveApprovalAuthority:typeof resolveApprovalAuthority==='function'?(req,user,scope)=>resolveApprovalAuthority(req,user,scope,env,ctx):null,
     targetReviewProvider,variantInspectionProvider});
    return await handler(request);
