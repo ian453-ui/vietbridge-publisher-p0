@@ -25,23 +25,20 @@ function fixture(t){
  return {db,bridge,link,calls:()=>calls,reconciles:()=>reconciles,setAllowed(value){allowed=value;}};
 }
 
-test('V3 binding is exact, admin only, idempotent and rejects another customer or changed snapshot',t=>{
+test('legacy standalone binding cannot bypass prepared manifest',t=>{
  const f=fixture(t);
  assert.throws(()=>f.bridge.bind(f.link),/APPROVAL_ADMIN_REQUIRED/);
- assert.throws(()=>f.bridge.bind({...f.link,local_workspace_id:'ws-other'},{authority:admin}),/NO_LOCAL_JOB/);
- assert.throws(()=>f.bridge.bind({...f.link,local_snapshot_hash:'c'.repeat(64)},{authority:admin}),/V3_LOCAL_JOB_CHANGED/);
- f.db.prepare('DELETE FROM publisher_content_sources').run();
- assert.throws(()=>f.bridge.bind(f.link,{authority:admin}),/V3_SITE_SOURCE_NOT_IMPORTED/);
- f.db.prepare('INSERT INTO publisher_content_sources VALUES(?,?,?,?)').run('ws-enterprise','sites:'+siteProjectId+':'+siteJobId,siteHash,'content-1');
- assert.equal(f.bridge.bind(f.link,{authority:admin}).duplicate,false);
- assert.equal(f.bridge.bind(f.link,{authority:admin}).duplicate,true);
- assert.throws(()=>f.bridge.bind({...f.link,site_account_id:'39786221-4438-4b94-8651-ff31f6049113'},{authority:admin}),/V3_BINDING_CONFLICT/);
- assert.throws(()=>f.bridge.bind({...f.link,site_job_id:'39786221-4438-4b94-8651-ff31f6049113'},{authority:admin}),/V3_SITE_SOURCE_NOT_IMPORTED/);
- assert.equal(f.db.prepare('SELECT count(*) n FROM publisher_v3_job_bindings').get().n,1);
+ assert.throws(()=>f.bridge.bind(f.link,{authority:admin}),/V3_LEGACY_BIND_DISABLED/);
+ assert.equal(f.db.prepare('SELECT count(*) n FROM publisher_v3_job_bindings').get().n,0);
 });
 
+function seedPreparedBinding(f){
+ const l=f.link;
+ f.db.prepare('INSERT INTO publisher_v3_job_bindings VALUES(?,?,?,?,?,?,?,?,?,?)').run(l.site_project_id,l.site_job_id,l.site_workspace_id,l.site_account_id,l.site_snapshot_hash,l.local_workspace_id,l.local_account_id,l.local_job_id,l.local_snapshot_hash,'2026-10-24T00:00:00Z');
+}
+
 test('V3 dispatch delegates to the original executor once; UNKNOWN can only reconcile, never replay',async t=>{
- const f=fixture(t);f.bridge.bind(f.link,{authority:admin});
+ const f=fixture(t);seedPreparedBinding(f);
  const confirmation={confirm:true,local_snapshot_hash:localHash,site_snapshot_hash:siteHash};
  await assert.rejects(f.bridge.dispatch(siteJobId,{...confirmation,local_snapshot_hash:'c'.repeat(64)}),/V3_EXACT_CONFIRMATION_REQUIRED/);
  f.setAllowed(false);await assert.rejects(f.bridge.dispatch(siteJobId,confirmation),/V3_LOCAL_EXECUTION_UNAVAILABLE/);assert.equal(f.calls(),0);
@@ -54,8 +51,14 @@ test('V3 dispatch delegates to the original executor once; UNKNOWN can only reco
  assert.equal(f.bridge.status(siteJobId).state,'PUBLISHED');assert.equal(f.bridge.status(siteJobId).verified,true);
  assert.equal((await f.bridge.dispatch(siteJobId,confirmation)).already_claimed,true);assert.equal(f.calls(),1);assert.equal(f.reconciles(),1);
 });
+test('synthetic publication evidence never becomes real V3 readback',t=>{
+ const f=fixture(t);seedPreparedBinding(f);
+ f.db.prepare("UPDATE publisher_jobs SET state='PUBLISHED',evidence_json=? WHERE id=?").run(JSON.stringify({verified:true,syntheticOnly:true,id:'fake-post',url:'https://example.test/fake'}),localJobId);
+ const result=f.bridge.status(siteJobId);
+ assert.equal(result.verified,false);assert.equal(result.evidence_origin,null);assert.equal(result.platform_url,null);
+});
 test('local approval revocation blocks a previously READY V3 binding before driver dispatch',async t=>{
- const f=fixture(t);f.bridge.bind(f.link,{authority:admin});f.bridge.revokeSiteTask(siteJobId,{authority:admin});
+ const f=fixture(t);seedPreparedBinding(f);f.bridge.revokeSiteTask(siteJobId,{authority:admin});
  await assert.rejects(f.bridge.dispatch(siteJobId,{confirm:true,local_snapshot_hash:localHash,site_snapshot_hash:siteHash}),/V3_TASK_APPROVAL_REQUIRED/);
  assert.equal(f.calls(),0);
 });
