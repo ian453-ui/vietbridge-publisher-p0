@@ -38,6 +38,7 @@ function visibleContents(){const query=$('#content-search').value.trim().toLocal
 function render(){
  $('#empty').hidden=state.workspaces.length>0;$('#new-content').disabled=!state.account;$('#account-form button').disabled=!state.workspace;
  const account=state.accounts.find(a=>a.account_id===state.account),workspace=state.workspaces.find(w=>w.id===state.workspace);$('#scope-status').textContent=workspace?'当前客户：'+workspace.name+' · 当前账号：'+(account?account.display_name+' · '+platformNames[account.platform]:'请选择账号'):'请选择客户与账号';$('#account-status').textContent=account?'当前账号：'+account.display_name+' · '+platformNames[account.platform]+' · '+account.authorization_state+'。身份及平台授权尚未验证。':'';
+ $('#identity-form').hidden=!account||account.platform!=='xiaohongshu'||!!account.external_identity;$('#identity-current').textContent=account?'所选账号：'+account.display_name+' · '+account.account_id:'';
  const platform=state.previewPlatform,target=state.accounts.find(a=>a.account_id===state.targetAccount&&a.platform===platform);if(!target)state.targetAccount='';
  $('#content-platform').value=platform;options($('#target-account'),state.accounts.filter(a=>a.platform===platform),'account_id','display_name',state.targetAccount);
  $('#target-status').textContent=target?'冻结目标：'+target.display_name+' · '+platformNames[platform]+' · '+(target.external_identity||'外部身份未核验')+'。仅创建草稿，不授予发布权限。':'未选目标账号；冻结前须选同平台账号，缺稿不借用。';
@@ -86,6 +87,7 @@ function form(id,submit){$(id).onsubmit=async event=>{event.preventDefault();con
 form('#workspace-form',async(data,command)=>{const result=await api('/api/sites/workspaces',{command_id:command,name:data.name.trim()});state.workspace=result.id;
 await refresh();});
 form('#account-form',async(data,command)=>{if(!state.workspace)throw Error('请先选择客户');const workspace=state.workspace,result=await api('/api/sites/workspaces/'+workspace+'/accounts',{command_id:command,display_name:data.display_name.trim(),platform:data.platform,external_identity:data.external_identity.trim()||null});if(state.workspace===workspace){localStorage.setItem('publisher-v3-account:'+workspace,result.id);await loadAccounts();}});
+form('#identity-form',async(data,command)=>{const workspace=state.workspace,account=state.account;if(!workspace||!account)throw Error('请先选择账号');await api('/api/sites/workspaces/'+workspace+'/accounts/'+account+'/identity',{command_id:command,external_identity:data.external_identity.trim(),evidence_note:data.evidence_note.trim()});if(state.workspace===workspace&&state.account===account)await loadAccounts();});
 $('#content-form').addEventListener('input',stashDraft);
 $('#content-form').onsubmit=async event=>{
  event.preventDefault();stashDraft();const key=scopeKey(),draft=contentDrafts.get(key),workspace=state.workspace,accountId=state.account,account=state.accounts.find(a=>a.account_id===accountId);

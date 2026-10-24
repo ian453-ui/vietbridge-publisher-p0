@@ -184,6 +184,28 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
      const result=await command(userId,'WORKSPACE',input,(c,at)=>[statement('INSERT INTO sites_workspaces(id,owner_user_id,name,created_at) SELECT c.entity_id,c.owner_user_id,?,?'+winning+' ON CONFLICT(id) DO NOTHING',[input.name,at,...bound(c)])]);return response(200,{workspace_id:result.id,...result,...flags});
     }
    }
+   const identityRoute=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/accounts\/([a-f0-9-]{36})\/identity$/);
+   if(identityRoute){
+    if(request.method!=='POST')fail('METHOD_NOT_ALLOWED',405);
+    if(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site')fail('ORIGIN_DENIED',403);
+    const [,workspace,accountId]=identityRoute,input=await readInput(request);
+    exact(input,['command_id','external_identity','evidence_note']);
+    if(!uuid(input.command_id)||!text(input.external_identity,200)||!text(input.evidence_note,240))fail('INVALID_ACCOUNT_IDENTITY',400);
+    const a=await account(userId,workspace,accountId);
+    if(a.platform!=='xiaohongshu'||a.authorization_state!=='UNCONFIGURED')fail('ACCOUNT_IDENTITY_UNSUPPORTED');
+    const commandInput={...input,workspace,account_id:accountId,operation:'FILL_EXTERNAL_IDENTITY'};
+    const prior=await one('SELECT command_id FROM sites_authoring_commands WHERE owner_user_id=? AND command_id=?',[userId,input.command_id]);
+    if(!prior){
+     if(a.external_identity!==null||await one('SELECT id FROM publisher_jobs WHERE workspace=? AND account_id=? LIMIT 1',[workspace,accountId])||await one('SELECT job_id FROM sites_real_jobs WHERE workspace=? AND account_id=? LIMIT 1',[workspace,accountId])||await one('SELECT content_id FROM sites_real_reviews WHERE workspace=? AND account_id=? LIMIT 1',[workspace,accountId]))fail('ACCOUNT_IDENTITY_LOCKED');
+    }
+    const result=await command(userId,'ACCOUNT',commandInput,(c,at)=>[
+     statement("INSERT INTO sites_write_assertions(ok) SELECT CASE WHEN EXISTS(SELECT 1 FROM sites_account_details a WHERE a.workspace=? AND a.account_id=? AND a.platform='xiaohongshu' AND a.external_identity IS NULL AND a.authorization_state='UNCONFIGURED' AND NOT EXISTS(SELECT 1 FROM publisher_jobs j WHERE j.workspace=a.workspace AND j.account_id=a.account_id) AND NOT EXISTS(SELECT 1 FROM sites_real_jobs r WHERE r.workspace=a.workspace AND r.account_id=a.account_id) AND NOT EXISTS(SELECT 1 FROM sites_real_reviews v WHERE v.workspace=a.workspace AND v.account_id=a.account_id)) THEN 1 ELSE 0 END"+winning,[workspace,accountId,...bound(c)]),
+     statement('UPDATE sites_account_details SET external_identity=? WHERE workspace=? AND account_id=? AND external_identity IS NULL AND EXISTS(SELECT 1 FROM sites_authoring_commands c WHERE c.owner_user_id=? AND c.command_id=? AND c.command_hash=? AND c.committed=0)',[input.external_identity,workspace,accountId,...bound(c)]),
+     statement('INSERT INTO sites_account_identity_events(id,workspace,account_id,actor_user_id,old_identity,new_identity,evidence_note,created_at) SELECT c.entity_id,?,?,c.owner_user_id,NULL,?,?,?'+winning,[workspace,accountId,input.external_identity,input.evidence_note,at,...bound(c)]),
+     authorizationGuard(db,{userId,workspace,accountId})
+    ]);
+    return response(200,{account_id:accountId,event_id:result.id,duplicate:result.duplicate,...flags});
+   }
    const production=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/production\/(leads|jobs|commands)(?:\/([a-f0-9-]{36})(?:\/(actions|handoff-check|handoff))?)?$/);
    if(production){
     const [,workspace,resource,id,action]=production,store=new AsyncProductionIntake(db,{userId,workspace,now});await store.scope();
