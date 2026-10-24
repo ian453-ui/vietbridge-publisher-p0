@@ -51,13 +51,15 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
  if(unified)unified.browserSkill=facebook.browserSkill;
  if(unified&&options.recoverStartup)unified.recoverAfterShutdown();
  const executionEnabled=options.executionEnabled===true;
+ const v3MediaRoot=join(dirname(dbPath),'v3-site-media');
  const executor=unified?new UnifiedExecutor(unified,{resources:options.resources||new BrowserResources(join(dirname(dbPath),'browser-resource-locks')),drivers:options.drivers||unifiedDrivers(facebook),enabled:executionEnabled,pageExecution:options.pageExecution,snapshotRoot:join(dirname(dbPath),'publisher-media-snapshots'),mediaRoots:job=>{
   const workspace=store.list('workspaces').find(w=>w.id===job.workspace),roots=job.workspace==='ws-vietbridge'?(library?.roots||[]):workspace?.content_root?[workspace.content_root]:[];
   const imported=library&&store.db.prepare('SELECT 1 FROM group_library_imports WHERE workspace=? AND content_id=?').get(job.workspace,job.content_id);
-  return imported?roots.concat(job.snapshot.media.map(path=>dirname(path))):roots;
+  const siteImport=options.v3BridgeEnabled&&store.db.prepare("SELECT 1 FROM publisher_content_sources WHERE workspace=? AND content_id=? AND source_id LIKE 'sites:appgprj_6ad97a034fd08191a8399eeda10f048c:%'").get(job.workspace,job.content_id);
+  return imported?roots.concat(job.snapshot.media.map(path=>dirname(path))):siteImport?roots.concat(v3MediaRoot):roots;
  }}):null;
  if(options.v3BridgeEnabled&&(cloud?.mode!=='mac-tunnel'||!unified||!access))throw Error('V3_BRIDGE_REQUIRES_AUTHENTICATED_MAC_UNIFIED');
- const v3Bridge=options.v3BridgeEnabled?new V3MacExecutionBridge(unified,executor,{siteProjectId:'appgprj_6ad97a034fd08191a8399eeda10f048c'}):null;
+ const v3Bridge=options.v3BridgeEnabled?new V3MacExecutionBridge(unified,executor,{siteProjectId:'appgprj_6ad97a034fd08191a8399eeda10f048c',mediaRoot:v3MediaRoot}):null;
  if(unified)facebook.resources=executor.resources;
  const productionUploads=unified?new ProductionUploadPlans(unified,executor,{root:join(dirname(dbPath),'production-upload-media')}):null;
  if(options.scopeAuthorization){if(!unified||cloud?.mode!=='mac-tunnel'||executionEnabled||options.scanScheduler||options.contentSync?.automatic)throw Error('SCOPED_AUTH_REQUIRES_AUTHENTICATED_IDLE_UNIFIED');executor.scopedOperations=new ScopedOperations(executor,facebook,{policy:options.scopeAuthorization,mediaRoots:()=>{const w=store.list('workspaces').find(w=>w.id===options.scopeAuthorization.workspace);return w?.content_root?[w.content_root]:[];},snapshotRoot:join(dirname(dbPath),'publisher-media-snapshots')});if(options.recoverStartup||options.recoverScopedStartup)executor.scopedOperations.recoverStartup();options.onScopedOperations?.(executor.scopedOperations);}
@@ -179,7 +181,7 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
   if(bridgeMedia&&req.method==='POST'){
    if(!v3Bridge)return send(res,409,{error:'V3_BRIDGE_DISABLED'});
    if(principal?.type!=='app'||req.headers.origin&&req.headers.origin!==origin||req.headers['content-type']!=='application/octet-stream')return send(res,403,{error:'V3_MEDIA_AUTH_OR_TYPE_DENIED'});
-   const staged=await stageV3Media({root:join(dirname(dbPath),'v3-site-media'),siteJobId:bridgeMedia[1],ordinal:Number(bridgeMedia[2]),mime:req.headers['x-v3-mime'],sha256:req.headers['x-v3-sha256'],size:Number(req.headers['x-v3-size']),stream:req});
+   const staged=await stageV3Media({root:v3MediaRoot,siteJobId:bridgeMedia[1],ordinal:Number(bridgeMedia[2]),mime:req.headers['x-v3-mime'],sha256:req.headers['x-v3-sha256'],size:Number(req.headers['x-v3-size']),stream:req});
    const {path:_privatePath,...receipt}=staged;return send(res,200,receipt);
   }
   if(req.method==='POST'){
@@ -192,9 +194,29 @@ export function createApp(dbPath=join(runtime?.dataDir||join(homedir(),'Library/
     const authority={kind:'EXISTING_ADMIN',actor_id:'admin:'+createHash('sha256').update(access.data.user).digest('hex')};
     return send(res,200,v3Bridge.bind(input,{authority}));
    }
+   if(url.pathname==='/api/v3-bridge/account-bind'){
+    if(!v3Bridge)return send(res,409,{error:'V3_BRIDGE_DISABLED'});
+    if(principal?.type!=='admin')return send(res,403,{error:'APPROVAL_ADMIN_REQUIRED'});
+    const authority={kind:'EXISTING_ADMIN',actor_id:'admin:'+createHash('sha256').update(access.data.user).digest('hex')};
+    return send(res,200,v3Bridge.bindAccount(input,{authority}));
+   }
+   if(url.pathname==='/api/v3-bridge/task-approve'){
+    if(!v3Bridge)return send(res,409,{error:'V3_BRIDGE_DISABLED'});
+    if(principal?.type!=='admin')return send(res,403,{error:'APPROVAL_ADMIN_REQUIRED'});
+    const authority={kind:'EXISTING_ADMIN',actor_id:'admin:'+createHash('sha256').update(access.data.user).digest('hex')};
+    return send(res,200,v3Bridge.approveSiteTask(input,{authority}));
+   }
+   if(url.pathname==='/api/v3-bridge/task-revoke'){
+    if(!v3Bridge)return send(res,409,{error:'V3_BRIDGE_DISABLED'});
+    if(principal?.type!=='admin')return send(res,403,{error:'APPROVAL_ADMIN_REQUIRED'});
+    const authority={kind:'EXISTING_ADMIN',actor_id:'admin:'+createHash('sha256').update(access.data.user).digest('hex')};
+    return send(res,200,v3Bridge.revokeSiteTask(input.site_job_id,{authority}));
+   }
    if(bridgeJob){
     if(!v3Bridge)return send(res,409,{error:'V3_BRIDGE_DISABLED'});
-    const siteJobId=bridgeJob[1],link=v3Bridge.binding(siteJobId);
+    const siteJobId=bridgeJob[1];
+    if(bridgeJob[2]==='prepare')return send(res,200,await v3Bridge.prepare({...input,site_job_id:siteJobId},{allowedWorkspace:principal?.type==='app'?principal.token.workspaces[0]:null}));
+    const link=v3Bridge.binding(siteJobId);
     if(principal?.type==='app'&&!principal.token.workspaces.includes(link.local_workspace_id))return send(res,403,{error:'V3_BRIDGE_SCOPE_DENIED'});
     if(bridgeJob[2]==='dispatch')return send(res,200,await v3Bridge.dispatch(siteJobId,input));
     if(bridgeJob[2]==='reconcile')return send(res,200,await v3Bridge.reconcile(siteJobId,input));
