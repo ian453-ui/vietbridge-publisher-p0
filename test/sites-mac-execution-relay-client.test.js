@@ -20,3 +20,10 @@ test('Site relay rejects unsafe origin, uncertain network outcome and mismatched
  const mismatched=new MacExecutionRelayClient({origin,token,fetchImpl:async()=>result('dispatch',{site_snapshot_hash:'c'.repeat(64)})});
  await assert.rejects(mismatched.dispatch(siteJob,{confirm:true,local_snapshot_hash:localHash,site_snapshot_hash:siteHash}),/V3_RELAY_READBACK_MISMATCH/);
 });
+test('Site server uploads only bounded, hashed media to its exact job and checks the staging receipt',async()=>{
+ const sha256='c'.repeat(64),bytes=new Uint8Array([137,80,78,71,13,10,26,10,1]),calls=[];
+ const client=new MacExecutionRelayClient({origin,token,fetchImpl:async(url,options)=>{calls.push({url,options});const response=new Response(JSON.stringify({site_job_id:siteJob,ordinal:0,mime:'image/png',sha256,size:bytes.length,duplicate:false}),{headers:{'Content-Type':'application/json'}});Object.defineProperty(response,'url',{value:url});return response;}});
+ const receipt=await client.upload(siteJob,0,{mime:'image/png',sha256,size:bytes.length,body:bytes});assert.equal(receipt.duplicate,false);
+ assert.equal(calls.length,1);assert.equal(calls[0].options.headers['X-V3-Sha256'],sha256);assert.equal(calls[0].options.redirect,'error');
+ await assert.rejects(client.upload(siteJob,20,{mime:'image/png',sha256,size:bytes.length,body:bytes}),/V3_RELAY_MEDIA_INVALID/);
+});
