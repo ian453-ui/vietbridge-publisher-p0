@@ -59,3 +59,20 @@ test('real request handler offers form login without Basic challenge and accepts
  const malformed=await call('/api/access/password',{method:'POST',headers:admin,body:'{\"current_password\":\"test-secret-that-must-not-echo'});assert.equal(malformed.code,409);assert.ok(!malformed.text.includes('test-secret-that-must-not-echo'));
  const ws=(await call('/api/workspaces',{method:'POST',headers:admin,body:JSON.stringify({name:'Customer'})})).json();const created=await call('/api/access/tokens',{method:'POST',headers:admin,body:JSON.stringify({name:'API client',password,days:30,workspaces:[ws.id],scopes:['jobs:read']})});assert.equal(created.code,201);const bearer={authorization:'Bearer '+created.json().token};assert.equal((await call('/api/unified/workspaces/'+ws.id+'/jobs',{headers:bearer})).code,200);assert.equal((await call('/api/unified/workspaces/another/jobs',{headers:bearer})).code,403);assert.equal((await call('/api/access/tokens',{headers:bearer})).code,403);assert.equal((await call('/api/access/tokens',{method:'POST',headers:{cookie,'content-type':'application/json'},body:'{}'})).code,409);
 });
+
+test('V3 prepare HTTP route authenticates and reaches exact binding check',async t=>{
+ const f=fixture(t),job='e11a0a0b-36d1-4b96-a547-650324836d48';
+ const server=createApp(join(f.root,'publisher-unified.sqlite'),{unified:true,cloud:f.config,v3BridgeEnabled:true});t.after(()=>server.emit('close'));
+ const access=new PublisherAccess(f.config);
+ const scoped=access.createToken({name:'prepare one',password,days:1,workspaces:['ws-a'],scopes:['v3:prepare'],site_project_id:'appgprj_6ad97a034fd08191a8399eeda10f048c',site_job_ids:[job]}).token;
+ async function call(method,token,input={}){
+  const req=Readable.from(method==='POST'?[Buffer.from(JSON.stringify(input))]:[]);Object.assign(req,{url:'/api/v3-bridge/jobs/'+job+'/prepare',method,headers:{host:f.config.host,'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})}});
+  let code=200,raw='';const res={setHeader(){},writeHead(status){code=status;},end(value=''){raw+=value;}};
+  await server.listeners('request')[0](req,res);return {code,body:JSON.parse(raw)};
+ }
+ assert.equal((await call('POST',null)).code,401);
+ assert.equal((await call('GET',scoped)).code,403);
+ const input={site_job_id:job,site_workspace_id:'197d8d12-ae97-455a-a484-941db62adbd0',site_account_id:'106fb398-78db-4485-93ce-e88207f0a066',site_snapshot_hash:'a'.repeat(64),platform:'facebook',external_identity:'61594159443807',qa_receipt_hash:'b'.repeat(64),title:'Test',body:'Test body',payload:{title:'Test',body:'Test body'},media:[]};
+ const result=await call('POST',scoped,input);
+ assert.equal(result.body.error,'V3_ACCOUNT_MAPPING_REQUIRED');
+});
