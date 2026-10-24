@@ -30,6 +30,8 @@ export class V3MacExecutionBridge {
   return this.publisher.store.tx(()=>{
    const job=this.publisher.job(input.local_workspace_id,input.local_job_id);
    if(job.account_id!==input.local_account_id||job.snapshot_hash!==input.local_snapshot_hash||!['DRAFT','READY'].includes(job.state))fail('V3_LOCAL_JOB_CHANGED');
+   const source=this.db.prepare('SELECT content_id FROM publisher_content_sources WHERE workspace=? AND source_id=? AND revision=?').get(input.local_workspace_id,'sites:'+this.siteProjectId+':'+input.site_job_id,input.site_snapshot_hash);
+   if(!source||source.content_id!==job.content_id)fail('V3_SITE_SOURCE_NOT_IMPORTED');
    this.publisher.assertCurrent(job);
    const prior=this.db.prepare('SELECT * FROM publisher_v3_job_bindings WHERE site_job_id=? OR local_job_id=?').all(input.site_job_id,input.local_job_id);
    if(prior.length){if(prior.length!==1||keys.some(key=>prior[0][key]!==input[key]))fail('V3_BINDING_CONFLICT');return {site_job_id:input.site_job_id,local_job_id:input.local_job_id,duplicate:true};}
