@@ -62,14 +62,14 @@ export class V3MacExecutionBridge {
   if(!approval||approval.revoked_at||approval.site_workspace_id!==input.site_workspace_id||approval.site_account_id!==input.site_account_id||approval.site_snapshot_hash!==input.site_snapshot_hash||approval.qa_receipt_hash!==input.qa_receipt_hash||approval.manifest_hash!==preparedManifestHash(input))fail('V3_TASK_APPROVAL_REQUIRED');
   const account=this.publisher.account(mapping.local_workspace_id,mapping.local_account_id);
   if(!account.enabled||account.platform!==input.platform||account.external_id!==input.external_identity||input.platform==='facebook'&&account.target_page_id!==mapping.target_page_id)fail('V3_ACCOUNT_IDENTITY_MISMATCH');
-  if(input.media.some((m,i)=>!m||m.ordinal!==i))fail('V3_MEDIA_ORDER_INVALID');
-  const media=[];for(const m of input.media)media.push(await verifyV3StagedMedia({root:this.mediaRoot,siteJobId:input.site_job_id,...m}));
+  if(input.media.some((m,i)=>!m||typeof m!=='object'||Array.isArray(m)||Object.keys(m).sort().join()!=='mime,ordinal,sha256,size'||m.ordinal!==i))fail('V3_MEDIA_ORDER_INVALID');
+  const media=[];for(const m of input.media)media.push(await verifyV3StagedMedia({ordinal:m.ordinal,mime:m.mime,sha256:m.sha256,size:m.size,root:this.mediaRoot,siteJobId:input.site_job_id}));
   const requestHash=createHash('sha256').update(JSON.stringify(input)).digest('hex');
   this.publisher.store.tx(()=>{const old=this.db.prepare('SELECT request_hash FROM publisher_v3_prepare_requests WHERE site_job_id=?').get(input.site_job_id);if(old&&old.request_hash!==requestHash)fail('V3_PREPARE_CONFLICT');if(!old)this.db.prepare('INSERT INTO publisher_v3_prepare_requests VALUES(?,?,?)').run(input.site_job_id,requestHash,new Date().toISOString());});
   const content=this.publisher.importContent(mapping.local_workspace_id,{source_id:'sites:'+this.siteProjectId+':'+input.site_job_id,revision:input.site_snapshot_hash,title:input.title,body:input.body,media,platform_payloads:{[input.platform]:{...input.payload,media}}});
   const job=this.publisher.createPageJob(mapping.local_workspace_id,{account_id:mapping.local_account_id,content_id:content.id});
   if(job.state==='DRAFT')this.executor.approve(mapping.local_workspace_id,job.id,job.snapshot_hash);
-  this._bind({site_project_id:this.siteProjectId,site_job_id:input.site_job_id,site_workspace_id:input.site_workspace_id,site_account_id:input.site_account_id,site_snapshot_hash:input.site_snapshot_hash,local_workspace_id:mapping.local_workspace_id,local_account_id:mapping.local_account_id,local_job_id:job.id,local_snapshot_hash:job.snapshot_hash});
+  this.#bind({site_project_id:this.siteProjectId,site_job_id:input.site_job_id,site_workspace_id:input.site_workspace_id,site_account_id:input.site_account_id,site_snapshot_hash:input.site_snapshot_hash,local_workspace_id:mapping.local_workspace_id,local_account_id:mapping.local_account_id,local_job_id:job.id,local_snapshot_hash:job.snapshot_hash});
   return this.capability(input.site_job_id);
  }
  /** Only an existing local admin may bind a previously reviewed local job to
@@ -77,9 +77,9 @@ export class V3MacExecutionBridge {
   */
  bind(input,{authority}={}){
   requireProductionAdmin(authority);
-  return this._bind(input);
+  fail('V3_LEGACY_BIND_DISABLED');
  }
- _bind(input){
+ #bind(input){
   const keys=['site_project_id','site_job_id','site_workspace_id','site_account_id','site_snapshot_hash','local_workspace_id','local_account_id','local_job_id','local_snapshot_hash'];
   if(!input||Object.keys(input).sort().join()!==keys.sort().join()||input.site_project_id!==this.siteProjectId||!uuid(input.site_job_id)||!uuid(input.site_workspace_id)||!uuid(input.site_account_id)||!sha(input.site_snapshot_hash)||!sha(input.local_snapshot_hash)||!input.local_workspace_id||!input.local_account_id||!uuid(input.local_job_id))fail('V3_BINDING_INVALID');
   return this.publisher.store.tx(()=>{
@@ -102,7 +102,7 @@ export class V3MacExecutionBridge {
  }
  status(siteJobId){
   const {link,job}=this.current(siteJobId),receipt=this.db.prepare('SELECT platform_id,platform_url,created_at FROM publisher_submit_receipts WHERE job_id=?').get(job.id);
-  const publicationVerified=['PUBLISHED','PUBLISHED_ID_PENDING'].includes(job.state)&&job.evidence?.verified===true;
+  const publicationVerified=['PUBLISHED','PUBLISHED_ID_PENDING'].includes(job.state)&&job.evidence?.verified===true&&job.evidence?.syntheticOnly!==true&&!job.snapshot?.productionReview;
   return {site_job_id:siteJobId,site_workspace_id:link.site_workspace_id,site_account_id:link.site_account_id,site_snapshot_hash:link.site_snapshot_hash,local_job_id:job.id,local_snapshot_hash:job.snapshot_hash,state:job.state,attempt_id:job.attempt_id,platform_id:publicationVerified?(job.evidence?.id||receipt?.platform_id||null):null,platform_url:publicationVerified?(job.evidence?.url||receipt?.platform_url||null):null,platform_time:publicationVerified?(job.evidence?.publishedAt||job.evidence?.published_at||null):null,verified:publicationVerified,draft_verified:job.state==='DRAFT_WRITTEN'&&job.evidence?.verified===true,pending_receipt:!!receipt&&!publicationVerified,evidence_origin:publicationVerified?'MAC_UNIFIED_EXECUTOR_READBACK':null,readback:publicationVerified?{content_hash:job.evidence.contentHash||null,payload_hash:job.evidence.payloadHash||null,media_verified:job.evidence.mediaVerified===true,observed_times:job.evidence.observedTimes||null}:null,updated_at:job.updated_at};
  }
  capability(siteJobId){const {link,job}=this.current(siteJobId);return {...this.status(siteJobId),capability:this.executor.executionCapability(link.local_workspace_id,job.id)};}
