@@ -10,6 +10,7 @@ import {requireProductionAdmin} from '../production-approval-policy.js';
 import {AsyncMetricStore} from './async-metric-store.js';
 import {authorizationGuard,authorizationChanged} from './async-storage.js';
 import {AsyncProductionIntake} from './async-production-intake.js';
+import {SiteRealPublication} from './real-publication.js';
 
 export const cloudPlatforms=Object.freeze(['facebook','xiaohongshu','wechat_official_account','wechat_channels']);
 const flags=Object.freeze({executionEnabled:false,publish_allowed:false,source_gate_satisfied:false,media_processing:'CLOUD_SERVICE_NOT_CONNECTED',producer_authenticated:false});
@@ -35,7 +36,7 @@ async function readInput(request){
  * Only server-resolved existing admins can decide/prepare synthetic review snapshots.
  * Publication, upload, credential and interaction routes stay shut.
  */
-export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=null,resolveApprovalAuthority=null,targetReviewProvider=null,variantInspectionProvider=null,now=()=>new Date().toISOString()}={}){
+export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=null,relayClient=null,resolveApprovalAuthority=null,targetReviewProvider=null,variantInspectionProvider=null,now=()=>new Date().toISOString()}={}){
  const statement=(sql,args=[])=>db.prepare(sql).bind(...args);
  async function rows(sql,args=[]){const result=await statement(sql,args).all();if(result.success===false||!Array.isArray(result.results))fail('STORAGE_UNAVAILABLE',503);return result.results;}
  async function one(sql,args=[]){return (await rows(sql,args))[0]||null;}
@@ -96,6 +97,37 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
    const identity=await getTrustedIdentity(request);if(!identity||!text(identity.userId,300))fail('IDENTITY_REQUIRED',401);const userId=identity.userId;
    if(url.pathname.startsWith('/api/unified/'))return createSitesReadonlyApi({db,origin,resolveScope:createSitesScopeResolver({db,getTrustedIdentity:async()=>identity})})(request);
    if(!['GET','POST'].includes(request.method))fail('METHOD_NOT_ALLOWED',405);
+   const realJobsList=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/real-jobs$/);
+   if(realJobsList){if(request.method!=='GET')fail('METHOD_NOT_ALLOWED',405);const workspace=realJobsList[1],accountId=url.searchParams.get('accountId');await account(userId,workspace,accountId);return response(200,{jobs:await new SiteRealPublication(db,{bucket,relay:relayClient,authorization:{userId,workspace,accountId},now}).list()});}
+   const realContent=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/real-contents\/([a-f0-9-]{36})(?:\/(review|freeze|media\/(\d{1,2})))?$/);
+   const realJob=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/real-jobs\/([a-f0-9-]{36})(?:\/(prepare|dispatch|refresh))?$/);
+   if(realContent||realJob){
+    const [,workspace,id,action,ordinal]=realContent||realJob,accountId=url.searchParams.get('accountId');
+    await account(userId,workspace,accountId);
+    const flow=new SiteRealPublication(db,{bucket,relay:relayClient,authorization:{userId,workspace,accountId},now});
+    if(realContent&&request.method==='GET'&&!action)return response(200,await flow.preview(id));
+    if(realContent&&request.method==='GET'&&action?.startsWith('media/')){
+     const object=await flow.media(id,Number(ordinal));
+     return new Response(object.data,{status:200,headers:{'Content-Type':object.mime,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+    }
+    if(realJob&&request.method==='GET'&&!action)return response(200,await flow.status(id));
+    if(request.method!=='POST')fail('METHOD_NOT_ALLOWED',405);
+    if(request.headers.get('origin')!==origin||request.headers.get('sec-fetch-site')==='cross-site')fail('ORIGIN_DENIED',403);
+    if(realContent&&action?.startsWith('media/')){
+     if(!bucket)fail('R2_BINDING_REQUIRED',503);
+     const reader=request.body?.getReader();if(!reader)fail('REAL_MEDIA_INVALID',400);
+     const parts=[];let size=0;try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>16*1024*1024){await reader.cancel();fail('REAL_MEDIA_TOO_LARGE',413);}parts.push(value);}}finally{reader.releaseLock();}
+     const bytes=new Uint8Array(size);let at=0;for(const part of parts){bytes.set(part,at);at+=part.length;}
+     return response(200,await flow.upload(id,Number(ordinal),bytes,request.headers.get('content-type'),request.headers.get('x-content-sha256')));
+    }
+    const input=await readInput(request);
+    if(realContent&&action==='review')return response(200,await flow.review(id,input));
+    if(realContent&&action==='freeze')return response(200,await flow.freeze(id,input));
+    if(realJob&&action==='prepare'){exact(input,['command_id']);return response(200,await flow.prepare(id,input.command_id));}
+    if(realJob&&action==='dispatch')return response(200,await flow.dispatch(id,input));
+    if(realJob&&action==='refresh'){exact(input,[]);return response(200,await flow.refresh(id));}
+    fail('METHOD_NOT_ALLOWED',405);
+   }
    const revisedReview=url.pathname.match(/^\/api\/sites\/workspaces\/([a-f0-9-]{36})\/contents\/([a-f0-9-]{36})\/review$/);
    if(revisedReview){
     const [,workspace,id]=revisedReview,accountId=url.searchParams.get('accountId'),scope={workspace,accountId};await account(userId,workspace,accountId);
@@ -251,6 +283,6 @@ export function createCloudAuthoringApi({db,origin,getTrustedIdentity,bucket=nul
     statement('INSERT INTO sites_job_snapshots SELECT c.entity_id,?,?,?'+winning+' ON CONFLICT(job_id) DO NOTHING',[workspace,content.id,JSON.stringify(snapshot),...bound(c)]),
     statement('DELETE FROM sites_write_assertions')
    ]);return response(200,{...await taskReceipt(userId,workspace,a.account_id,input),duplicate:result.duplicate});
-  }catch(error){const known={'STORAGE_SCOPE_DENIED':403,'METRIC_NOT_FOUND':404,'REVIEW_NOT_FOUND':404,'REVIEW_ASSET_NOT_FOUND':404,'OBJECT_NOT_FOUND':404,'METRIC_CURSOR_INVALID':400,'METRIC_AS_OF_INVALID':400,'REVIEW_CURSOR_INVALID':400,'OBJECT_MISSING':503,'OBJECT_IO_TIMEOUT':503,'OBJECT_CORRUPT':503,'OBJECT_INTEGRITY_MISMATCH':503,'R2_BINDING_REQUIRED':503,'REVIEW_STORAGE_CORRUPT':503,'METRIC_STORAGE_CORRUPT':503},handoffError=/^(VARIANT_|APPROVAL_|PRODUCTION_|PRODUCER_AUTH_UNAVAILABLE|ACCOUNT_TARGET_CHANGED|STALE_REVIEW_VERSION|SOURCE_PROVIDER_UNAVAILABLE|SYNTHETIC_PROVENANCE_INVALID|TARGET_IDENTITY_UNKNOWN|ENTERPRISE_SOURCE_APPROVAL_FORBIDDEN)/.test(error.message),status=error.status||known[error.message]||(handoffError?409:503);return response(status,{error:error.status||known[error.message]||handoffError?error.message:'SITES_STORAGE_UNAVAILABLE',...flags});}
+  }catch(error){const known={'STORAGE_SCOPE_DENIED':403,'METRIC_NOT_FOUND':404,'REVIEW_NOT_FOUND':404,'REVIEW_ASSET_NOT_FOUND':404,'OBJECT_NOT_FOUND':404,'REAL_CONTENT_NOT_FOUND':404,'REAL_JOB_NOT_FOUND':404,'REAL_MEDIA_NOT_FOUND':404,'METRIC_CURSOR_INVALID':400,'METRIC_AS_OF_INVALID':400,'REVIEW_CURSOR_INVALID':400,'OBJECT_MISSING':503,'OBJECT_IO_TIMEOUT':503,'OBJECT_CORRUPT':503,'OBJECT_INTEGRITY_MISMATCH':503,'R2_BINDING_REQUIRED':503,'REVIEW_STORAGE_CORRUPT':503,'METRIC_STORAGE_CORRUPT':503},handoffError=/^(VARIANT_|APPROVAL_|PRODUCTION_|PRODUCER_AUTH_UNAVAILABLE|ACCOUNT_TARGET_CHANGED|STALE_REVIEW_VERSION|SOURCE_PROVIDER_UNAVAILABLE|SYNTHETIC_PROVENANCE_INVALID|TARGET_IDENTITY_UNKNOWN|ENTERPRISE_SOURCE_APPROVAL_FORBIDDEN|REAL_|V3_)/.test(error.message),status=error.status||known[error.message]||(handoffError?409:503);return response(status,{error:error.status||known[error.message]||handoffError?error.message:'SITES_STORAGE_UNAVAILABLE',...flags});}
  };
 }
