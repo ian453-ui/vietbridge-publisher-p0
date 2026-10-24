@@ -6,6 +6,10 @@ import {join} from 'node:path';
 import {Readable} from 'node:stream';
 import {PublisherAccess,passwordRecord} from '../src/publisher-access.js';
 import {createApp} from '../src/server.js';
+import {Store} from '../src/store.js';
+import {UnifiedPublisher} from '../src/unified-publisher.js';
+import {DatabaseSync} from 'node:sqlite';
+import {createHash} from 'node:crypto';
 const password='disposable-test-password-at-least-24';
 test('six-character passwords are accepted and shorter passwords are rejected',()=>{assert.doesNotThrow(()=>passwordRecord('123456'));assert.throws(()=>passwordRecord('12345'),/6至512/);});
 test('login and application settings are reachable before selecting a customer',()=>{const client=readFileSync(new URL('../src/client.js',import.meta.url),'utf8');assert.match(client,/\['access','v1','customers','verification'\]\.includes\(route\)/);assert.match(client,/route==='access'\?'登录与应用'/);});
@@ -50,16 +54,6 @@ test('job-scoped app token stages one hashed image through the authenticated Mac
  const first=await call(token);assert.equal(first.code,200);assert.equal(first.body.sha256,sha);assert.equal(Object.hasOwn(first.body,'path'),false);
  const again=await call(token);assert.equal(again.code,200);assert.equal(again.body.duplicate,true);
 });
-test('real request handler offers form login without Basic challenge and accepts narrowly scoped public Bearer APIs without browser CSRF token',async t=>{const f=fixture(t),server=createApp(join(f.root,'publisher-unified.sqlite'),{unified:true,cloud:f.config});t.after(()=>{server.emit('close');});async function call(path,{method='GET',headers={},body}={}){const req=Readable.from(body===undefined?[]:Array.isArray(body)?body:[Buffer.from(body)]);Object.assign(req,{url:path,method,headers:{host:f.config.host,...headers}});const responseHeaders={};let code=200,text='';const res={setHeader(k,v){responseHeaders[k]=v;},writeHead(c,h={}){code=c;Object.assign(responseHeaders,h);},end(v=''){text+=v;}};await server.listeners('request')[0](req,res);return {code,text,headers:responseHeaders,json:()=>JSON.parse(text)};}
- const landing=await call('/');assert.equal(landing.code,303);assert.equal(landing.headers.Location,'/login');assert.equal((await call('/login')).code,200);assert.equal((await call('/api/state')).headers['WWW-Authenticate'],undefined);
- assert.equal((await call('/auth/login',{method:'POST',headers:{origin:'https://evil.example'},body:new URLSearchParams({username:'admin',password}).toString()})).code,403);
- const login=await call('/auth/login',{method:'POST',headers:{origin:f.config.origin},body:new URLSearchParams({username:'admin',password}).toString()});assert.equal(login.code,303);assert.match(login.headers['Set-Cookie'],/HttpOnly; SameSite=Strict/);assert.match(login.headers['Set-Cookie'],/Secure/);const cookie=login.headers['Set-Cookie'].split(';')[0];const state=(await call('/api/state',{headers:{cookie}})).json(),admin={cookie,origin:f.config.origin,'x-local-token':state.token,'content-type':'application/json'};
- assert.equal((await call('/api-response.js')).code,401);const helper=await call('/api-response.js',{headers:{cookie}});assert.equal(helper.code,200);assert.equal(helper.headers['Content-Type'],'text/javascript');assert.match(helper.text,/readApiJson/);
- const unicodePayload=Buffer.from(JSON.stringify({name:'中文客户'})),mid=unicodePayload.indexOf(Buffer.from('中'))+1;const unicodeResult=await call('/api/workspaces',{method:'POST',headers:admin,body:[unicodePayload.subarray(0,mid),unicodePayload.subarray(mid)]});assert.equal(unicodeResult.json().name,'中文客户');
- const malformed=await call('/api/access/password',{method:'POST',headers:admin,body:'{\"current_password\":\"test-secret-that-must-not-echo'});assert.equal(malformed.code,409);assert.ok(!malformed.text.includes('test-secret-that-must-not-echo'));
- const ws=(await call('/api/workspaces',{method:'POST',headers:admin,body:JSON.stringify({name:'Customer'})})).json();const created=await call('/api/access/tokens',{method:'POST',headers:admin,body:JSON.stringify({name:'API client',password,days:30,workspaces:[ws.id],scopes:['jobs:read']})});assert.equal(created.code,201);const bearer={authorization:'Bearer '+created.json().token};assert.equal((await call('/api/unified/workspaces/'+ws.id+'/jobs',{headers:bearer})).code,200);assert.equal((await call('/api/unified/workspaces/another/jobs',{headers:bearer})).code,403);assert.equal((await call('/api/access/tokens',{headers:bearer})).code,403);assert.equal((await call('/api/access/tokens',{method:'POST',headers:{cookie,'content-type':'application/json'},body:'{}'})).code,409);
-});
-
 test('V3 prepare HTTP route authenticates and reaches exact binding check',async t=>{
  const f=fixture(t),job='e11a0a0b-36d1-4b96-a547-650324836d48';
  const server=createApp(join(f.root,'publisher-unified.sqlite'),{unified:true,cloud:f.config,v3BridgeEnabled:true});t.after(()=>server.emit('close'));
@@ -72,7 +66,36 @@ test('V3 prepare HTTP route authenticates and reaches exact binding check',async
  }
  assert.equal((await call('POST',null)).code,401);
  assert.equal((await call('GET',scoped)).code,403);
+ const adminSession=access.login('admin',password),adminReq=Readable.from([]);Object.assign(adminReq,{url:'/api/v3-bridge/jobs/'+job+'/prepare',method:'GET',headers:{host:f.config.host,cookie:'publisher_session='+adminSession}});
+ let methodCode=200;await server.listeners('request')[0](adminReq,{setHeader(){},writeHead(status){methodCode=status;},end(){}});assert.equal(methodCode,405);
  const input={site_job_id:job,site_workspace_id:'197d8d12-ae97-455a-a484-941db62adbd0',site_account_id:'106fb398-78db-4485-93ce-e88207f0a066',site_snapshot_hash:'a'.repeat(64),platform:'facebook',external_identity:'61594159443807',qa_receipt_hash:'b'.repeat(64),title:'Test',body:'Test body',payload:{title:'Test',body:'Test body'},media:[]};
  const result=await call('POST',scoped,input);
  assert.equal(result.body.error,'V3_ACCOUNT_MAPPING_REQUIRED');
+});
+test('approved exact V3 prepare crosses HTTP into native imported READY job without submitting',async t=>{
+ const f=fixture(t),path=join(f.root,'publisher-unified.sqlite'),store=new Store(path,{seedDemo:false}),publisher=new UnifiedPublisher(store);
+ const workspace=store.saveWorkspace({name:'Synthetic LP',content_root:f.root}),profile=store.saveProfile(workspace.id,{name:'Synthetic Chrome',cdp_port:19857,user_data_dir:join(f.root,'chrome')});
+ const localAccount=publisher.saveAccount(workspace.id,{display_name:'Synthetic LP Page',expected_identity:'Synthetic LP Page',identity_type:'PAGE',external_id:'61594159443807',operator_actor_id:'61594159443807',target_page_id:'1459220443931651',profile_id:profile.id});store.close();
+ const server=createApp(path,{unified:true,cloud:f.config,v3BridgeEnabled:true});t.after(()=>server.emit('close'));
+ const siteJob='e11a0a0b-36d1-4b96-a547-650324836d48',siteWorkspace='197d8d12-ae97-455a-a484-941db62adbd0',siteAccount='106fb398-78db-4485-93ce-e88207f0a066',snapshot='a'.repeat(64),qa='b'.repeat(64);
+ const input={site_job_id:siteJob,site_workspace_id:siteWorkspace,site_account_id:siteAccount,site_snapshot_hash:snapshot,platform:'facebook',external_identity:'61594159443807',qa_receipt_hash:qa,title:'Synthetic source',body:'Synthetic source body',payload:{title:'Synthetic platform',body:'Synthetic platform body'},media:[]};
+ const manifest=createHash('sha256').update(JSON.stringify({platform:input.platform,external_identity:input.external_identity,title:input.title,body:input.body,payload:input.payload,media:input.media})).digest('hex');
+ const db=new DatabaseSync(path);t.after(()=>db.close());
+ db.prepare('INSERT INTO publisher_v3_account_mappings VALUES(?,?,?,?,?,?,?,?)').run(siteWorkspace,siteAccount,workspace.id,localAccount.id,'facebook','61594159443807','1459220443931651',new Date().toISOString());
+ db.prepare('INSERT INTO publisher_v3_task_approvals VALUES(?,?,?,?,?,?,?,?,NULL)').run(siteJob,siteWorkspace,siteAccount,snapshot,qa,manifest,'synthetic-admin',new Date().toISOString());
+ const appToken=new PublisherAccess(f.config).createToken({name:'one prepare',password,days:1,workspaces:[workspace.id],scopes:['v3:prepare'],site_project_id:'appgprj_6ad97a034fd08191a8399eeda10f048c',site_job_ids:[siteJob]}).token;
+ async function call(){const req=Readable.from([Buffer.from(JSON.stringify(input))]);Object.assign(req,{url:'/api/v3-bridge/jobs/'+siteJob+'/prepare',method:'POST',headers:{host:f.config.host,'content-type':'application/json',authorization:'Bearer '+appToken}});let code=200,raw='';await server.listeners('request')[0](req,{setHeader(){},writeHead(status){code=status;},end(value=''){raw+=value;}});return {code,body:JSON.parse(raw)};}
+ const first=await call();assert.equal(first.code,200,JSON.stringify(first.body));assert.equal(first.body.state,'READY');assert.equal(first.body.verified,false);
+ const again=await call();assert.equal(again.code,200,JSON.stringify(again.body));assert.equal(again.body.local_job_id,first.body.local_job_id);
+ assert.equal(db.prepare('SELECT count(*) n FROM publisher_jobs').get().n,1);
+ assert.equal(db.prepare('SELECT count(*) n FROM publisher_submit_intents').get().n,0);
+});
+test('real request handler offers form login without Basic challenge and accepts narrowly scoped public Bearer APIs without browser CSRF token',async t=>{const f=fixture(t),server=createApp(join(f.root,'publisher-unified.sqlite'),{unified:true,cloud:f.config});t.after(()=>{server.emit('close');});async function call(path,{method='GET',headers={},body}={}){const req=Readable.from(body===undefined?[]:Array.isArray(body)?body:[Buffer.from(body)]);Object.assign(req,{url:path,method,headers:{host:f.config.host,...headers}});const responseHeaders={};let code=200,text='';const res={setHeader(k,v){responseHeaders[k]=v;},writeHead(c,h={}){code=c;Object.assign(responseHeaders,h);},end(v=''){text+=v;}};await server.listeners('request')[0](req,res);return {code,text,headers:responseHeaders,json:()=>JSON.parse(text)};}
+ const landing=await call('/');assert.equal(landing.code,303);assert.equal(landing.headers.Location,'/login');assert.equal((await call('/login')).code,200);assert.equal((await call('/api/state')).headers['WWW-Authenticate'],undefined);
+ assert.equal((await call('/auth/login',{method:'POST',headers:{origin:'https://evil.example'},body:new URLSearchParams({username:'admin',password}).toString()})).code,403);
+ const login=await call('/auth/login',{method:'POST',headers:{origin:f.config.origin},body:new URLSearchParams({username:'admin',password}).toString()});assert.equal(login.code,303);assert.match(login.headers['Set-Cookie'],/HttpOnly; SameSite=Strict/);assert.match(login.headers['Set-Cookie'],/Secure/);const cookie=login.headers['Set-Cookie'].split(';')[0];const state=(await call('/api/state',{headers:{cookie}})).json(),admin={cookie,origin:f.config.origin,'x-local-token':state.token,'content-type':'application/json'};
+ assert.equal((await call('/api-response.js')).code,401);const helper=await call('/api-response.js',{headers:{cookie}});assert.equal(helper.code,200);assert.equal(helper.headers['Content-Type'],'text/javascript');assert.match(helper.text,/readApiJson/);
+ const unicodePayload=Buffer.from(JSON.stringify({name:'中文客户'})),mid=unicodePayload.indexOf(Buffer.from('中'))+1;const unicodeResult=await call('/api/workspaces',{method:'POST',headers:admin,body:[unicodePayload.subarray(0,mid),unicodePayload.subarray(mid)]});assert.equal(unicodeResult.json().name,'中文客户');
+ const malformed=await call('/api/access/password',{method:'POST',headers:admin,body:'{\"current_password\":\"test-secret-that-must-not-echo'});assert.equal(malformed.code,409);assert.ok(!malformed.text.includes('test-secret-that-must-not-echo'));
+ const ws=(await call('/api/workspaces',{method:'POST',headers:admin,body:JSON.stringify({name:'Customer'})})).json();const created=await call('/api/access/tokens',{method:'POST',headers:admin,body:JSON.stringify({name:'API client',password,days:30,workspaces:[ws.id],scopes:['jobs:read']})});assert.equal(created.code,201);const bearer={authorization:'Bearer '+created.json().token};assert.equal((await call('/api/unified/workspaces/'+ws.id+'/jobs',{headers:bearer})).code,200);assert.equal((await call('/api/unified/workspaces/another/jobs',{headers:bearer})).code,403);assert.equal((await call('/api/access/tokens',{headers:bearer})).code,403);assert.equal((await call('/api/access/tokens',{method:'POST',headers:{cookie,'content-type':'application/json'},body:'{}'})).code,409);
 });
