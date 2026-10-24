@@ -12,8 +12,9 @@ const siteHash='a'.repeat(64),localHash='b'.repeat(64);
 const admin={kind:'EXISTING_ADMIN',actor_id:'admin:'+'f'.repeat(64)};
 function fixture(t){
  const db=new DatabaseSync(':memory:');t.after(()=>db.close());
- db.exec("CREATE TABLE publisher_jobs(id TEXT PRIMARY KEY,workspace TEXT,account_id TEXT,snapshot_hash TEXT,state TEXT,attempt_id TEXT,evidence_json TEXT,updated_at TEXT); CREATE TABLE publisher_submit_receipts(job_id TEXT PRIMARY KEY,platform_id TEXT,platform_url TEXT,created_at TEXT)");
- db.prepare('INSERT INTO publisher_jobs VALUES(?,?,?,?,?,?,?,?)').run(localJobId,'ws-enterprise','account-enterprise',localHash,'READY',null,'{}','2026-10-24T00:00:00Z');
+ db.exec("CREATE TABLE publisher_jobs(id TEXT PRIMARY KEY,workspace TEXT,account_id TEXT,content_id TEXT,snapshot_hash TEXT,state TEXT,attempt_id TEXT,evidence_json TEXT,updated_at TEXT); CREATE TABLE publisher_submit_receipts(job_id TEXT PRIMARY KEY,platform_id TEXT,platform_url TEXT,created_at TEXT); CREATE TABLE publisher_content_sources(workspace TEXT,source_id TEXT,revision TEXT,content_id TEXT)");
+ db.prepare('INSERT INTO publisher_jobs VALUES(?,?,?,?,?,?,?,?,?)').run(localJobId,'ws-enterprise','account-enterprise','content-1',localHash,'READY',null,'{}','2026-10-24T00:00:00Z');
+ db.prepare('INSERT INTO publisher_content_sources VALUES(?,?,?,?)').run('ws-enterprise','sites:'+siteProjectId+':'+siteJobId,siteHash,'content-1');
  const store={tx(fn){db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(error){db.exec('ROLLBACK');throw error;}}};
  const publisher={db,store,job(workspace,id){const row=db.prepare('SELECT * FROM publisher_jobs WHERE workspace=? AND id=?').get(workspace,id);if(!row)throw Error('NO_LOCAL_JOB');return {...row,evidence:JSON.parse(row.evidence_json)};},assertCurrent(job){if(job.state==='CANCELLED')throw Error('STALE_LOCAL_JOB');}};
  let calls=0,reconciles=0,allowed=true;
@@ -28,10 +29,13 @@ test('V3 binding is exact, admin only, idempotent and rejects another customer o
  assert.throws(()=>f.bridge.bind(f.link),/APPROVAL_ADMIN_REQUIRED/);
  assert.throws(()=>f.bridge.bind({...f.link,local_workspace_id:'ws-other'},{authority:admin}),/NO_LOCAL_JOB/);
  assert.throws(()=>f.bridge.bind({...f.link,local_snapshot_hash:'c'.repeat(64)},{authority:admin}),/V3_LOCAL_JOB_CHANGED/);
+ f.db.prepare('DELETE FROM publisher_content_sources').run();
+ assert.throws(()=>f.bridge.bind(f.link,{authority:admin}),/V3_SITE_SOURCE_NOT_IMPORTED/);
+ f.db.prepare('INSERT INTO publisher_content_sources VALUES(?,?,?,?)').run('ws-enterprise','sites:'+siteProjectId+':'+siteJobId,siteHash,'content-1');
  assert.equal(f.bridge.bind(f.link,{authority:admin}).duplicate,false);
  assert.equal(f.bridge.bind(f.link,{authority:admin}).duplicate,true);
- assert.throws(()=>f.bridge.bind({...f.link,site_snapshot_hash:'d'.repeat(64)},{authority:admin}),/V3_BINDING_CONFLICT/);
- assert.throws(()=>f.bridge.bind({...f.link,site_job_id:'39786221-4438-4b94-8651-ff31f6049113'},{authority:admin}),/V3_BINDING_CONFLICT/);
+ assert.throws(()=>f.bridge.bind({...f.link,site_account_id:'39786221-4438-4b94-8651-ff31f6049113'},{authority:admin}),/V3_BINDING_CONFLICT/);
+ assert.throws(()=>f.bridge.bind({...f.link,site_job_id:'39786221-4438-4b94-8651-ff31f6049113'},{authority:admin}),/V3_SITE_SOURCE_NOT_IMPORTED/);
  assert.equal(f.db.prepare('SELECT count(*) n FROM publisher_v3_job_bindings').get().n,1);
 });
 
