@@ -35,4 +35,9 @@ test('approved-site preparation consumes staged bytes and maps only an admin-bou
  await assert.rejects(bridge.prepare(input,{allowedWorkspace:'ws-other'}),/V3_ACCOUNT_MAPPING_REQUIRED/);
  const answer=await bridge.prepare(input,{allowedWorkspace:'ws-enterprise'});assert.equal(answer.state,'READY');assert.equal(imports,1);assert.equal(approvals,1);
  assert.equal(bridge.binding(siteJobId).local_workspace_id,'ws-enterprise');
+ const malicious={...input,media:[{...input.media[0],root:join(root,'other'),siteJobId:'39786221-4438-4b94-8651-ff31f6049113',path:'../../other.png'}]};
+ const maliciousHash=createHash('sha256').update(JSON.stringify({platform:malicious.platform,external_identity:malicious.external_identity,title:malicious.title,body:malicious.body,payload:malicious.payload,media:malicious.media})).digest('hex');
+ db.prepare('UPDATE publisher_v3_task_approvals SET manifest_hash=? WHERE site_job_id=?').run(maliciousHash,siteJobId);
+ await assert.rejects(bridge.prepare(malicious,{allowedWorkspace:'ws-enterprise'}),/V3_MEDIA_ORDER_INVALID/);
+ assert.equal(imports,1);
 });
