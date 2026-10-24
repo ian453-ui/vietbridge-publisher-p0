@@ -1,0 +1,38 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {createHash} from 'node:crypto';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {Readable} from 'node:stream';
+import {V3MacExecutionBridge} from '../src/v3-mac-execution-bridge.js';
+import {stageV3Media} from '../src/v3-media-staging.js';
+
+const siteProjectId='appgprj_6ad97a034fd08191a8399eeda10f048c',siteJobId='e11a0a0b-36d1-4b96-a547-650324836d48',siteWorkspaceId='197d8d12-ae97-455a-a484-941db62adbd0',siteAccountId='106fb398-78db-4485-93ce-e88207f0a066',siteHash='a'.repeat(64),localHash='b'.repeat(64);
+const admin={kind:'EXISTING_ADMIN',actor_id:'admin:'+'f'.repeat(64)};
+test('approved-site preparation consumes staged bytes and maps only an admin-bound matching local account',async t=>{
+ const root=mkdtempSync(join(tmpdir(),'vb-site-prep-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const db=new DatabaseSync(':memory:');t.after(()=>db.close());
+ db.exec("CREATE TABLE publisher_jobs(id TEXT PRIMARY KEY,workspace TEXT,account_id TEXT,content_id TEXT,snapshot_hash TEXT,state TEXT,attempt_id TEXT,evidence_json TEXT,updated_at TEXT); CREATE TABLE publisher_content_sources(workspace TEXT,source_id TEXT,revision TEXT,content_id TEXT); CREATE TABLE publisher_submit_receipts(job_id TEXT,platform_id TEXT,platform_url TEXT,created_at TEXT)");
+ const store={tx(fn){db.exec('BEGIN IMMEDIATE');try{const answer=fn();db.exec('COMMIT');return answer;}catch(error){db.exec('ROLLBACK');throw error;}}};let imports=0,approvals=0;
+ const publisher={db,store,account(workspace,id){if(workspace!=='ws-enterprise'||id!=='acc-enterprise')throw Error('ACCOUNT_MISSING');return {platform:'facebook',external_id:'1140806582458978',target_page_id:'61592080580015',enabled:1};},job(workspace,id){const row=db.prepare('SELECT * FROM publisher_jobs WHERE workspace=? AND id=?').get(workspace,id);if(!row)throw Error('JOB_MISSING');return {...row,evidence:JSON.parse(row.evidence_json)};},assertCurrent(){},importContent(workspace,input){imports++;assert.equal(workspace,'ws-enterprise');assert.equal(input.source_id,'sites:'+siteProjectId+':'+siteJobId);assert.equal(input.revision,siteHash);assert.equal(input.media.length,1);db.prepare('INSERT INTO publisher_content_sources VALUES(?,?,?,?)').run(workspace,input.source_id,input.revision,'content-1');return {id:'content-1'};},createPageJob(workspace,input){assert.equal(workspace,'ws-enterprise');assert.equal(input.account_id,'acc-enterprise');const prior=db.prepare('SELECT id FROM publisher_jobs').get();if(!prior)db.prepare('INSERT INTO publisher_jobs VALUES(?,?,?,?,?,?,?,?,?)').run('5ee5f131-338e-4d65-bc34-1e34dc4c9a80',workspace,input.account_id,input.content_id,localHash,'DRAFT',null,'{}','2026-10-24T00:00:00Z');return this.job(workspace,'5ee5f131-338e-4d65-bc34-1e34dc4c9a80');}};
+ const executor={approve(workspace,id,hash){approvals++;assert.equal(hash,localHash);db.prepare("UPDATE publisher_jobs SET state='READY' WHERE id=? AND workspace=?").run(id,workspace);},executionCapability(){return {canExecute:false,mode:'DISABLED'};}};
+ const bridge=new V3MacExecutionBridge(publisher,executor,{siteProjectId,mediaRoot:root});
+ const mapping={site_workspace_id:siteWorkspaceId,site_account_id:siteAccountId,local_workspace_id:'ws-enterprise',local_account_id:'acc-enterprise',platform:'facebook',external_identity:'1140806582458978',target_page_id:'61592080580015'};
+ assert.throws(()=>bridge.bindAccount(mapping),/APPROVAL_ADMIN_REQUIRED/);
+ assert.throws(()=>bridge.bindAccount({...mapping,external_identity:'61592080580015'},{authority:admin}),/V3_ACCOUNT_IDENTITY_MISMATCH/);
+ assert.throws(()=>bridge.bindAccount({...mapping,target_page_id:'1140806582458978'},{authority:admin}),/V3_ACCOUNT_IDENTITY_MISMATCH/);
+ bridge.bindAccount(mapping,{authority:admin});
+ const bytes=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.from('synthetic')]),sha256=createHash('sha256').update(bytes).digest('hex');
+ const input={site_job_id:siteJobId,site_workspace_id:siteWorkspaceId,site_account_id:siteAccountId,site_snapshot_hash:siteHash,platform:'facebook',external_identity:mapping.external_identity,qa_receipt_hash:'c'.repeat(64),title:'Source title',body:'Source body',payload:{title:'Platform title',body:'Platform body',tags:[],author:'Owner'},media:[{ordinal:0,mime:'image/png',sha256,size:bytes.length}]};
+ await assert.rejects(bridge.prepare(input,{allowedWorkspace:'ws-enterprise'}),/V3_TASK_APPROVAL_REQUIRED/);
+ const manifest_hash=createHash('sha256').update(JSON.stringify({platform:input.platform,external_identity:input.external_identity,title:input.title,body:input.body,payload:input.payload,media:input.media})).digest('hex');
+ bridge.approveSiteTask({site_job_id:siteJobId,site_workspace_id:siteWorkspaceId,site_account_id:siteAccountId,site_snapshot_hash:siteHash,qa_receipt_hash:input.qa_receipt_hash,manifest_hash},{authority:admin});
+ await assert.rejects(bridge.prepare({...input,body:'changed after approval'},{allowedWorkspace:'ws-enterprise'}),/V3_TASK_APPROVAL_REQUIRED/);
+ await assert.rejects(bridge.prepare(input,{allowedWorkspace:'ws-enterprise'}),/V3_MEDIA_NOT_STAGED/);
+ await stageV3Media({root,siteJobId,ordinal:0,mime:'image/png',sha256,size:bytes.length,stream:Readable.from([bytes])});
+ await assert.rejects(bridge.prepare(input,{allowedWorkspace:'ws-other'}),/V3_ACCOUNT_MAPPING_REQUIRED/);
+ const answer=await bridge.prepare(input,{allowedWorkspace:'ws-enterprise'});assert.equal(answer.state,'READY');assert.equal(imports,1);assert.equal(approvals,1);
+ assert.equal(bridge.binding(siteJobId).local_workspace_id,'ws-enterprise');
+});
