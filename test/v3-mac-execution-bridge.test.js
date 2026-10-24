@@ -16,7 +16,7 @@ function fixture(t){
  db.prepare('INSERT INTO publisher_jobs VALUES(?,?,?,?,?,?,?,?,?)').run(localJobId,'ws-enterprise','account-enterprise','content-1',localHash,'READY',null,'{}','2026-10-24T00:00:00Z');
  db.prepare('INSERT INTO publisher_content_sources VALUES(?,?,?,?)').run('ws-enterprise','sites:'+siteProjectId+':'+siteJobId,siteHash,'content-1');
  const store={tx(fn){db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(error){db.exec('ROLLBACK');throw error;}}};
- const publisher={db,store,job(workspace,id){const row=db.prepare('SELECT * FROM publisher_jobs WHERE workspace=? AND id=?').get(workspace,id);if(!row)throw Error('NO_LOCAL_JOB');return {...row,evidence:JSON.parse(row.evidence_json)};},assertCurrent(job){if(job.state==='CANCELLED')throw Error('STALE_LOCAL_JOB');}};
+ const publisher={db,store,job(workspace,id){const row=db.prepare('SELECT * FROM publisher_jobs WHERE workspace=? AND id=?').get(workspace,id);if(!row)throw Error('NO_LOCAL_JOB');return {...row,snapshot:{},evidence:JSON.parse(row.evidence_json)};},assertCurrent(job){if(job.state==='CANCELLED')throw Error('STALE_LOCAL_JOB');}};
  let calls=0,reconciles=0,allowed=true;
  const executor={executionCapability(){return {canExecute:allowed,mode:'TEST_LOCAL_POLICY'};},async execute(workspace,id,input){calls++;assert.equal(workspace,'ws-enterprise');assert.equal(id,localJobId);assert.deepEqual(input,{confirm:true,snapshot_hash:localHash});db.prepare("UPDATE publisher_jobs SET state='UNKNOWN',attempt_id='attempt-1' WHERE id=?").run(id);throw Error('SUBMISSION_RESULT_UNKNOWN');},async reconcile(workspace,id,input){reconciles++;assert.equal(workspace,'ws-enterprise');assert.equal(id,localJobId);assert.deepEqual(input,{platform_id:'post123'});db.prepare("UPDATE publisher_jobs SET state='PUBLISHED',evidence_json=? WHERE id=?").run(JSON.stringify({id:'post123',url:'https://example.test/post123',verified:true}),id);}};
  const bridge=new V3MacExecutionBridge(publisher,executor,{siteProjectId});
@@ -56,6 +56,13 @@ test('synthetic publication evidence never becomes real V3 readback',t=>{
  f.db.prepare("UPDATE publisher_jobs SET state='PUBLISHED',evidence_json=? WHERE id=?").run(JSON.stringify({verified:true,syntheticOnly:true,id:'fake-post',url:'https://example.test/fake'}),localJobId);
  const result=f.bridge.status(siteJobId);
  assert.equal(result.verified,false);assert.equal(result.evidence_origin,null);assert.equal(result.platform_url,null);
+});
+test('missing native frozen snapshot is not verified publication evidence',t=>{
+ const f=fixture(t);seedPreparedBinding(f);
+ f.db.prepare("UPDATE publisher_jobs SET state='PUBLISHED',evidence_json=? WHERE id=?").run(JSON.stringify({verified:true,id:'fake-post'}),localJobId);
+ const original=f.bridge.publisher.job.bind(f.bridge.publisher);
+ f.bridge.publisher.job=(...args)=>({...original(...args),snapshot:null});
+ assert.equal(f.bridge.status(siteJobId).verified,false);
 });
 test('local approval revocation blocks a previously READY V3 binding before driver dispatch',async t=>{
  const f=fixture(t);seedPreparedBinding(f);f.bridge.revokeSiteTask(siteJobId,{authority:admin});
