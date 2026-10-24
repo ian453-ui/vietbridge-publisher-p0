@@ -13,19 +13,20 @@ export class MacExecutionRelayClient {
   this.origin=origin;this.token=token;this.fetchImpl=fetchImpl;this.timeoutMs=timeoutMs;
  }
  async call(siteJobId,operation,input){
-  if(!uuid(siteJobId)||!['status','capability','dispatch','reconcile'].includes(operation))fail('V3_RELAY_COMMAND_INVALID');
+  if(!uuid(siteJobId)||!['status','capability','prepare','dispatch','reconcile'].includes(operation))fail('V3_RELAY_COMMAND_INVALID');
   const method=['status','capability'].includes(operation)?'GET':'POST';
-  if(method==='POST'&&(!input||!sha(input.local_snapshot_hash)||!sha(input.site_snapshot_hash)))fail('V3_RELAY_HASH_REQUIRED');
+  if(method==='POST'&&(!input||!sha(input.site_snapshot_hash)||(operation==='prepare'?input.site_job_id!==siteJobId:!sha(input.local_snapshot_hash))))fail('V3_RELAY_HASH_REQUIRED');
   const url=this.origin+'/api/v3-bridge/jobs/'+siteJobId+'/'+operation;
   let response;try{response=await this.fetchImpl(url,{method,headers:{Authorization:'Bearer '+this.token,...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:JSON.stringify(input)}:{}),redirect:'error',cache:'no-store',signal:AbortSignal.timeout(this.timeoutMs)});}catch{fail('V3_RELAY_OUTCOME_UNKNOWN');}
   if(!(response instanceof Response)||response.redirected||response.url!==url||!/^application\/json(?:\s*;.*)?$/i.test(response.headers.get('content-type')||''))fail('V3_RELAY_RESPONSE_INVALID');
   let body;try{const text=await response.text();if(text.length>32768)fail('V3_RELAY_RESPONSE_TOO_LARGE');body=JSON.parse(text);}catch(error){if(error.message==='V3_RELAY_RESPONSE_TOO_LARGE')throw error;fail('V3_RELAY_OUTCOME_UNKNOWN');}
   if(!response.ok)fail(typeof body?.error==='string'&&/^[A-Z0-9_]{3,80}$/.test(body.error)?body.error:'V3_RELAY_REJECTED');
-  if(body?.site_job_id!==siteJobId||!sha(body.local_snapshot_hash)||!sha(body.site_snapshot_hash)||method==='POST'&&(body.local_snapshot_hash!==input.local_snapshot_hash||body.site_snapshot_hash!==input.site_snapshot_hash))fail('V3_RELAY_READBACK_MISMATCH');
+  if(body?.site_job_id!==siteJobId||!sha(body.local_snapshot_hash)||!sha(body.site_snapshot_hash)||method==='POST'&&(body.site_snapshot_hash!==input.site_snapshot_hash||operation!=='prepare'&&body.local_snapshot_hash!==input.local_snapshot_hash))fail('V3_RELAY_READBACK_MISMATCH');
   return body;
  }
  status(id){return this.call(id,'status');}
  capability(id){return this.call(id,'capability');}
+ prepare(id,input){return this.call(id,'prepare',input);}
  dispatch(id,input){return this.call(id,'dispatch',input);}
  reconcile(id,input){return this.call(id,'reconcile',input);}
  async upload(siteJobId,ordinal,{mime,sha256,size,body}={}){
