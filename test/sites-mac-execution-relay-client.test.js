@@ -27,3 +27,10 @@ test('Site server uploads only bounded, hashed media to its exact job and checks
  assert.equal(calls.length,1);assert.equal(calls[0].options.headers['X-V3-Sha256'],sha256);assert.equal(calls[0].options.redirect,'error');
  await assert.rejects(client.upload(siteJob,20,{mime:'image/png',sha256,size:bytes.length,body:bytes}),/V3_RELAY_MEDIA_INVALID/);
 });
+test('Site server prepare call keeps the frozen Site job and snapshot binding',async()=>{
+ const calls=[],client=new MacExecutionRelayClient({origin,token,fetchImpl:async(url,options)=>{calls.push({url,options});return result('prepare');}});
+ const input={site_job_id:siteJob,site_snapshot_hash:siteHash};const receipt=await client.prepare(siteJob,input);
+ assert.equal(receipt.site_job_id,siteJob);assert.equal(calls.length,1);assert.equal(calls[0].options.method,'POST');
+ assert.equal(JSON.parse(calls[0].options.body).site_snapshot_hash,siteHash);
+ await assert.rejects(client.prepare(siteJob,{...input,site_job_id:'39786221-4438-4b94-8651-ff31f6049113'}),/V3_RELAY_HASH_REQUIRED/);
+});
