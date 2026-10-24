@@ -22,7 +22,29 @@ import {metricPacket,metricSelector,metricNow} from './fixtures/synthetic-metric
 
 async function boundedGate(gate){let timer;try{await Promise.race([gate,new Promise(r=>{timer=setTimeout(r,10000);})]);}finally{clearTimeout(timer);}}
 
-async function setup(t,{evidence=false,approval=false,canonical=false,targetReview=false,variantReview=false}={}){
+test('real content UI requires viewed media and explicit owner QA before a durable frozen task',{timeout:40000},async t=>{
+ const f=await setup(t,{real:true}),records=await seedSitesRecords(f.db);
+ f.db.sql.prepare('UPDATE sites_account_details SET external_identity=? WHERE workspace=? AND account_id=?').run('61594159443807',records.workspace,records.accountId);
+ const browser=await chromium.launch({executablePath:process.env.PUBLISHER_TEST_BROWSER_PATH||'/usr/bin/chromium',headless:true});t.after(()=>browser.close());
+ const page=await browser.newPage({viewport:{width:390,height:844}});page.setDefaultTimeout(8000);
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(f.origin);
+ await page.locator('[data-real-content]:not([disabled])').first().click();
+ await page.locator('#real-review').waitFor();assert.equal(await page.locator('#real-review').isDisabled(),true);
+ await page.locator('#real-file').setInputFiles({name:'cover.png',mimeType:'image/png',buffer:readFileSync(new URL('./fixtures/gpt-primary.png',import.meta.url))});
+ await page.locator('#real-upload').click();await page.locator('#preview-body .review-asset img').waitFor();
+ assert.equal(await page.locator('#preview-body .review-asset img').evaluate(img=>img.complete&&img.naturalWidth>0),true);
+ await page.locator('#real-sources').fill('https://example.test/source');
+ for(const box of await page.locator('[data-real-check]').all())await box.check();
+ await page.locator('#real-review').click();await page.getByText('OWNER_REVIEWED').waitFor();
+ await page.locator('#real-freeze').click();await page.getByText('FROZEN',{exact:false}).last().waitFor();
+ assert.equal(f.db.sql.prepare('SELECT count(*) n FROM sites_real_jobs').get().n,1);
+ await page.reload();await page.locator('[data-tab=tasks]').click();await page.locator('[data-real-job]').click();await page.locator('#real-dispatch').waitFor();
+ assert.match(await page.locator('#preview-body').innerText(),/FROZEN/);
+ assert.equal(await page.locator('#real-dispatch').isDisabled(),true);
+ assert.deepEqual(errors,[]);
+});
+
+async function setup(t,{evidence=false,approval=false,canonical=false,targetReview=false,variantReview=false,real=false}={}){
  const root=mkdtempSync(join(tmpdir(),'v3-sites-console-')),db=cloudD1Fixture(join(root,'cloud.sqlite'));let api,origin;
  const files={'/':['cloud-console.html','text/html; charset=utf-8'],'/cloud-console.js':['cloud-console.js','text/javascript'],'/cloud-console.css':['cloud-console.css','text/css']};
  const server=createServer(async(req,res)=>{try{
@@ -32,7 +54,7 @@ async function setup(t,{evidence=false,approval=false,canonical=false,targetRevi
  }catch(error){res.writeHead(500);res.end(JSON.stringify({error:error.message}));}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));origin='http://127.0.0.1:'+server.address().port;
  // Test-only fixed identity. No request header, body or cookie can choose it.
- let source=null,bucket=evidence?fileBucket(join(root,'objects')):null;if(canonical){const scope=await seedSitesRecords(db);source=await canonicalFixture(t,{existing:{root,path:join(root,'cloud.sqlite'),f:db,...scope},slug:'贸易与许可-074'});bucket=source.bucket;await source.imports.import(source.reference());await seedCloudApproval(db,source.state.packet,source.scope);}
+ let source=null,bucket=evidence||real?fileBucket(join(root,'objects')):null;if(canonical){const scope=await seedSitesRecords(db);source=await canonicalFixture(t,{existing:{root,path:join(root,'cloud.sqlite'),f:db,...scope},slug:'贸易与许可-074'});bucket=source.bucket;await source.imports.import(source.reference());await seedCloudApproval(db,source.state.packet,source.scope);}
  let trustedUser='synthetic-owner';const variantInspector=variantReview?syntheticVariantInspector(root):null;api=createCloudAuthoringApi({db:db.db,origin,bucket,variantInspectionProvider:variantInspector,resolveApprovalAuthority:approval?async()=>syntheticAdmin:null,targetReviewProvider:targetReview?syntheticTargetProvider(db.db):null,getTrustedIdentity:async()=>trustedUser?{userId:trustedUser}:null});
  if(evidence){const f=await seedSitesRecords(db),p=inspectedPacket(root,f.scope,{video:true,platformPayload:approval}),reviews=new AsyncReviewStore(db.db,{bucket,inspectionProvider:{readInspection:async()=>p}});await reviews.intake({...f.scope,task_id:p.request.task_id,request_revision:1});if(approval)await seedCloudApproval(db,p,f.scope);const metrics=new AsyncMetricStore(db.db),id=(await metrics.registerTarget(f.target)).id,packet=metricPacket(f.target);await metrics.ingest(id,packet,{...f.scope,now:metricNow});const a=await metrics.beginCollection(id,metricSelector(packet),{...f.scope,now:metricNow+1000});await metrics.failCollection(a.id,{...f.scope,now:metricNow+2000});}
  t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));db.close();rmSync(root,{recursive:true,force:true});});return {root,db,origin,source,bucket,variantInspector,setIdentity:user=>{trustedUser=user;}};
