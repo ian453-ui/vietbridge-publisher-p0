@@ -17,10 +17,12 @@ test('V3 relay scopes require exact Site and task IDs; old tokens cannot gain ex
  const old=f.access.createToken({name:'old',password,days:1,workspaces:['ws-a'],scopes:['jobs:read']}),oldPrincipal=f.access.authenticate({headers:{authorization:'Bearer '+old.token}});
  assert.equal(f.access.authorizeApp(oldPrincipal,'POST',new URL(base+'/dispatch',f.config.origin)),false);
  assert.throws(()=>f.access.createToken({name:'unsafe',password,days:1,workspaces:['ws-a'],scopes:['v3:dispatch']}),/V3 应用令牌/);
- const created=f.access.createToken({name:'specific',password,days:1,workspaces:['ws-a'],scopes:['v3:status','v3:dispatch'],site_project_id:'appgprj_6ad97a034fd08191a8399eeda10f048c',site_job_ids:[siteJob]});
+ const created=f.access.createToken({name:'specific',password,days:1,workspaces:['ws-a'],scopes:['v3:status','v3:upload','v3:dispatch'],site_project_id:'appgprj_6ad97a034fd08191a8399eeda10f048c',site_job_ids:[siteJob]});
  const principal=f.access.authenticate({headers:{authorization:'Bearer '+created.token}});
  assert.equal(f.access.authorizeApp(principal,'GET',new URL(base+'/status',f.config.origin)),true);
  assert.equal(f.access.authorizeApp(principal,'POST',new URL(base+'/dispatch',f.config.origin)),true);
+ assert.equal(f.access.authorizeApp(principal,'POST',new URL(base+'/media/0',f.config.origin)),true);
+ assert.equal(f.access.authorizeApp(principal,'POST',new URL('/api/v3-bridge/jobs/39786221-4438-4b94-8651-ff31f6049113/media/0',f.config.origin)),false);
  assert.equal(f.access.authorizeApp(principal,'POST',new URL(base+'/reconcile',f.config.origin)),false);
  assert.equal(f.access.authorizeApp(principal,'POST',new URL('/api/v3-bridge/jobs/39786221-4438-4b94-8651-ff31f6049113/dispatch',f.config.origin)),false);
  assert.equal(f.access.authorizeApp(principal,'POST',new URL('/api/unified/workspaces/ws-a/jobs/'+siteJob+'/execute',f.config.origin)),false);
@@ -36,6 +38,16 @@ test('authenticated Mac HTTP relay is dormant by default and rejects unbound job
  const scoped=appAccess.createToken({name:'relay',password,days:1,workspaces:['ws-a'],scopes:['v3:status'],site_project_id:'appgprj_6ad97a034fd08191a8399eeda10f048c',site_job_ids:[job]});
  assert.equal((await call({authorization:'Bearer '+scoped.token})).code,409);
  assert.equal((await call({authorization:'Bearer '+scoped.token})).body.error,'V3_BINDING_NOT_FOUND');
+});
+test('job-scoped app token stages one hashed image through the authenticated Mac HTTP route',async t=>{
+ const f=fixture(t),job='e11a0a0b-36d1-4b96-a547-650324836d48',bytes=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),Buffer.from('synthetic')]);
+ const sha=(await import('node:crypto')).createHash('sha256').update(bytes).digest('hex');
+ const server=createApp(join(f.root,'publisher-unified.sqlite'),{unified:true,cloud:f.config,v3BridgeEnabled:true});t.after(()=>server.emit('close'));
+ const token=new PublisherAccess(f.config).createToken({name:'upload one',password,days:1,workspaces:['ws-a'],scopes:['v3:upload'],site_project_id:'appgprj_6ad97a034fd08191a8399eeda10f048c',site_job_ids:[job]}).token;
+ async function call(auth){const req=Readable.from([bytes]);Object.assign(req,{url:'/api/v3-bridge/jobs/'+job+'/media/0',method:'POST',headers:{host:f.config.host,'content-type':'application/octet-stream','x-v3-mime':'image/png','x-v3-sha256':sha,'x-v3-size':String(bytes.length),...(auth?{authorization:'Bearer '+auth}:{})}});let code=200,body='';const res={setHeader(){},writeHead(status){code=status;},end(value=''){body+=value;}};await server.listeners('request')[0](req,res);return {code,body:JSON.parse(body)};}
+ assert.equal((await call(null)).code,401);
+ const first=await call(token);assert.equal(first.code,200);assert.equal(first.body.sha256,sha);assert.equal(Object.hasOwn(first.body,'path'),false);
+ const again=await call(token);assert.equal(again.code,200);assert.equal(again.body.duplicate,true);
 });
 test('real request handler offers form login without Basic challenge and accepts narrowly scoped public Bearer APIs without browser CSRF token',async t=>{const f=fixture(t),server=createApp(join(f.root,'publisher-unified.sqlite'),{unified:true,cloud:f.config});t.after(()=>{server.emit('close');});async function call(path,{method='GET',headers={},body}={}){const req=Readable.from(body===undefined?[]:Array.isArray(body)?body:[Buffer.from(body)]);Object.assign(req,{url:path,method,headers:{host:f.config.host,...headers}});const responseHeaders={};let code=200,text='';const res={setHeader(k,v){responseHeaders[k]=v;},writeHead(c,h={}){code=c;Object.assign(responseHeaders,h);},end(v=''){text+=v;}};await server.listeners('request')[0](req,res);return {code,text,headers:responseHeaders,json:()=>JSON.parse(text)};}
  const landing=await call('/');assert.equal(landing.code,303);assert.equal(landing.headers.Location,'/login');assert.equal((await call('/login')).code,200);assert.equal((await call('/api/state')).headers['WWW-Authenticate'],undefined);
