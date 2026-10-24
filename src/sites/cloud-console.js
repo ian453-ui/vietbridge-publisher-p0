@@ -2,6 +2,7 @@ const $=selector=>document.querySelector(selector),escape=x=>String(x??'').repla
 const state={workspaces:[],accounts:[],contents:[],catalogueCursor:null,catalogueLoading:false,tasks:[],realJobs:[],reviews:[],metrics:[],productionJobs:[],productionCursor:null,productionLoading:false,workspace:'',account:'',previewPlatform:'facebook',targetAccount:'',generation:0};
 // Unsaved content stays in this page's memory, scoped exactly like its save command.
 const contentDrafts=new Map(),targetReviewCommands=new Map(),variantDrafts=new Map();let variantContext=null,variantKey=null,variantEpoch=0;let editorKey=null,previewEpoch=0,imageTrigger=null;
+const identityDrafts=new Map();let identityFormScope=null;
 const productionDrafts=new Map(),productionCreates=new Map();let productionFormWorkspace='',productionRecovery={workspace:'',status:'NONE'};
 const productionPendingPrefix='publisher-v3-production-pending-v1:';
 const productionPendingKey=workspace=>productionPendingPrefix+workspace;
@@ -14,6 +15,18 @@ async function productionFingerprint(command,encoded){const bytes=new TextEncode
 const batchCommands=new Map();let batch={selected:new Set(),results:[],busy:false};
 function resetBatch(){batch={selected:new Set(),results:[],busy:false};}
 const scopeKey=()=>state.workspace&&state.account?JSON.stringify([state.workspace,state.account]):null;
+function identityScope(){const account=state.accounts.find(a=>a.account_id===state.account);return account?.platform==='xiaohongshu'&&account.authorization_state==='UNCONFIGURED'&&!account.external_identity?scopeKey():null;}
+function bindIdentityForm(){
+ const key=identityScope(),form=$('#identity-form');
+ if(key!==identityFormScope){
+  const prior=identityDrafts.get(identityFormScope);if(prior&&!prior.pending)prior.values=Object.fromEntries(new FormData(form));
+  identityFormScope=key;form.reset();const draft=identityDrafts.get(key);
+  for(const [name,value] of Object.entries(draft?.values||{})){const field=form.elements.namedItem(name);if(field)field.value=value;}
+ }
+ const draft=identityDrafts.get(key),locked=Boolean(draft?.pending||draft?.command);
+ for(const field of form.querySelectorAll('input'))field.readOnly=locked;
+ const button=form.querySelector('button[type=submit]');button.disabled=!key||Boolean(draft?.pending||draft?.needsReadback);button.textContent=draft?.command?'使用原命令重试':'保存身份并留审计';
+}
 function dismissImagePreview(restoreFocus=true){const trigger=imageTrigger;imageTrigger=null;const dialog=$('#image-preview');if(dialog.open)dialog.close();$('#image-full').removeAttribute('src');$('#image-viewport').classList.remove('original-size');$('#image-load-state').textContent='';if(restoreFocus&&trigger?.isConnected&&$('#preview').open)trigger.focus();}
 function clearPreview(){dismissImagePreview(false);for(const video of $('#preview-body').querySelectorAll('video'))video.pause();$('#preview-body').replaceChildren();}
 function dismissPreview(){++previewEpoch;clearPreview();$('#preview').close();}
@@ -38,7 +51,7 @@ function visibleContents(){const query=$('#content-search').value.trim().toLocal
 function render(){
  $('#empty').hidden=state.workspaces.length>0;$('#new-content').disabled=!state.account;$('#account-form button').disabled=!state.workspace;
  const account=state.accounts.find(a=>a.account_id===state.account),workspace=state.workspaces.find(w=>w.id===state.workspace);$('#scope-status').textContent=workspace?'当前客户：'+workspace.name+' · 当前账号：'+(account?account.display_name+' · '+platformNames[account.platform]:'请选择账号'):'请选择客户与账号';$('#account-status').textContent=account?'当前账号：'+account.display_name+' · '+platformNames[account.platform]+' · '+account.authorization_state+'。身份及平台授权尚未验证。':'';
- $('#identity-form').hidden=!account||account.platform!=='xiaohongshu'||!!account.external_identity;$('#identity-current').textContent=account?'所选账号：'+account.display_name+' · '+account.account_id:'';
+ bindIdentityForm();$('#identity-form').hidden=!identityScope();$('#identity-current').textContent=account?'所选账号：'+account.display_name+' · '+account.account_id:'';
  const platform=state.previewPlatform,target=state.accounts.find(a=>a.account_id===state.targetAccount&&a.platform===platform);if(!target)state.targetAccount='';
  $('#content-platform').value=platform;options($('#target-account'),state.accounts.filter(a=>a.platform===platform),'account_id','display_name',state.targetAccount);
  $('#target-status').textContent=target?'冻结目标：'+target.display_name+' · '+platformNames[platform]+' · '+(target.external_identity||'外部身份未核验')+'。仅创建草稿，不授予发布权限。':'未选目标账号；冻结前须选同平台账号，缺稿不借用。';
@@ -75,7 +88,7 @@ async function loadScope(){resetBatch();$('#content-search').value='';dismissPre
  try{const suffix='?accountId='+encodeURIComponent(account),[contents,tasks,realJobs,reviews,metrics]=await Promise.all([api('/api/sites/workspaces/'+workspace+'/catalogue'+(account?suffix:'')),account?api('/api/sites/workspaces/'+workspace+'/tasks'+suffix):{tasks:[]},account?api('/api/sites/workspaces/'+workspace+'/real-jobs'+suffix):{jobs:[]},account?api('/api/sites/workspaces/'+workspace+'/reviews'+suffix):{reviews:[]},account?api('/api/sites/workspaces/'+workspace+'/metrics'+suffix):{snapshots:[]}]);if(generation!==state.generation)return;state.contents=contents.contents;state.catalogueCursor=contents.next_cursor;state.tasks=tasks.tasks;state.realJobs=realJobs.jobs;state.reviews=reviews.reviews;state.metrics=metrics.snapshots;render();status('客户内容已读取；任务、审核和指标按当前账号回读。');}catch(error){if(generation===state.generation)status(error.message+'；当前读取不可用。',true);}}
 $('#content-more').onclick=async()=>{if(!state.catalogueCursor||state.catalogueLoading)return;const generation=state.generation,workspace=state.workspace,account=state.account,cursor=state.catalogueCursor;state.catalogueLoading=true;render();try{const query=new URLSearchParams({cursor,...(account?{accountId:account}:{})}),page=await api('/api/sites/workspaces/'+workspace+'/catalogue?'+query);if(generation!==state.generation||workspace!==state.workspace||account!==state.account)return;state.contents.push(...page.contents);state.catalogueCursor=page.next_cursor;status('更早版本已加载；搜索范围已更新。');}catch(error){if(generation===state.generation)status(error.message+'；更早版本读取失败，可重试。',true);}finally{if(generation===state.generation){state.catalogueLoading=false;render();}}};
 async function loadAccounts(){resetBatch();dismissPreview();detachDraft();const generation=++state.generation,workspace=state.workspace;state.accounts=[];state.account='';state.contents=[];state.catalogueCursor=null;state.catalogueLoading=false;state.tasks=[];state.realJobs=[];state.reviews=[];state.metrics=[];state.productionJobs=[];state.productionCursor=null;options($('#account'),[],'account_id','display_name','');render();if(!workspace)return;
- try{const result=await api('/api/sites/workspaces/'+workspace+'/accounts');if(generation!==state.generation)return;state.accounts=result.accounts;const saved=localStorage.getItem('publisher-v3-account:'+workspace);state.account=state.accounts.some(a=>a.account_id===saved)?saved:(state.accounts[0]?.account_id||'');options($('#account'),state.accounts,'account_id','display_name',state.account);await loadScope();}catch(error){if(generation===state.generation)status(error.message,true);}}
+ try{const result=await api('/api/sites/workspaces/'+workspace+'/accounts');if(generation!==state.generation)return;state.accounts=result.accounts;for(const [key,draft] of identityDrafts){const [draftWorkspace,draftAccount]=JSON.parse(key),row=draftWorkspace===workspace?state.accounts.find(a=>a.account_id===draftAccount):null;if(row?.external_identity)identityDrafts.delete(key);else if(row&&!draft.pending)draft.needsReadback=false;}const saved=localStorage.getItem('publisher-v3-account:'+workspace);state.account=state.accounts.some(a=>a.account_id===saved)?saved:(state.accounts[0]?.account_id||'');options($('#account'),state.accounts,'account_id','display_name',state.account);await loadScope();}catch(error){if(generation===state.generation)status(error.message,true);}}
 async function refresh(){resetBatch();paintBatch();state.targetAccount='';dismissPreview();detachDraft();const generation=++state.generation;try{const result=await api('/api/sites/workspaces');if(generation!==state.generation)return;document.body.dataset.auth='authenticated';$('#site-sign-in').hidden=true;state.workspaces=result.workspaces;const selected=state.workspace||localStorage.getItem('publisher-v3-workspace');state.workspace=state.workspaces.some(w=>w.id===selected)?selected:(state.workspaces[0]?.id||'');bindProductionForm();options($('#workspace'),state.workspaces,'id','name',state.workspace);await loadAccounts();if(!state.workspaces.length){tab('settings');status('客户列表为空。请在下方创建已有客户，再添加该客户的账号映射。');}}catch(error){if(error.status===401||error.message==='IDENTITY_REQUIRED')clearAllProductionPending();if(generation===state.generation){document.body.dataset.auth=error.message==='IDENTITY_REQUIRED'?'anonymous':'unavailable';$('#site-sign-in').hidden=false;status(error.message==='IDENTITY_REQUIRED'?'请使用上方 ChatGPT 登录入口进入工作区。':error.message==='SITES_RUNTIME_BINDING_REQUIRED'?'Sites 身份或持久层未接入，数据操作保持关闭。':error.message,true);}}}
 $('#workspace').onchange=()=>{state.targetAccount='';state.previewPlatform='facebook';detachDraft();state.workspace=$('#workspace').value;bindProductionForm();localStorage.setItem('publisher-v3-workspace',state.workspace);loadAccounts();};
 $('#account').onchange=()=>{state.targetAccount='';detachDraft();state.account=$('#account').value;localStorage.setItem('publisher-v3-account:'+state.workspace,state.account);loadScope();};$('#refresh').onclick=refresh;
@@ -87,7 +100,20 @@ function form(id,submit){$(id).onsubmit=async event=>{event.preventDefault();con
 form('#workspace-form',async(data,command)=>{const result=await api('/api/sites/workspaces',{command_id:command,name:data.name.trim()});state.workspace=result.id;
 await refresh();});
 form('#account-form',async(data,command)=>{if(!state.workspace)throw Error('请先选择客户');const workspace=state.workspace,result=await api('/api/sites/workspaces/'+workspace+'/accounts',{command_id:command,display_name:data.display_name.trim(),platform:data.platform,external_identity:data.external_identity.trim()||null});if(state.workspace===workspace){localStorage.setItem('publisher-v3-account:'+workspace,result.id);await loadAccounts();}});
-form('#identity-form',async(data,command)=>{const workspace=state.workspace,account=state.account;if(!workspace||!account)throw Error('请先选择账号');await api('/api/sites/workspaces/'+workspace+'/accounts/'+account+'/identity',{command_id:command,external_identity:data.external_identity.trim(),evidence_note:data.evidence_note.trim()});if(state.workspace===workspace&&state.account===account)await loadAccounts();});
+$('#identity-form').addEventListener('input',()=>{const key=identityFormScope;if(!key||key!==identityScope())return;let draft=identityDrafts.get(key);if(!draft){draft={values:{},command:null,submitted:null,pending:false,needsReadback:false};identityDrafts.set(key,draft);}if(!draft.pending&&!draft.command)draft.values=Object.fromEntries(new FormData($('#identity-form')));});
+$('#identity-form').onsubmit=async event=>{
+ event.preventDefault();const key=identityFormScope;if(!key||key!==identityScope())return;
+ const [workspace,account]=JSON.parse(key),form=$('#identity-form');let draft=identityDrafts.get(key);if(!draft){draft={values:{},command:null,submitted:null,pending:false,needsReadback:false};identityDrafts.set(key,draft);}
+ if(draft.pending||draft.needsReadback)return;
+ const values=Object.fromEntries(new FormData(form)),payload={external_identity:values.external_identity.trim(),evidence_note:values.evidence_note.trim()},encoded=JSON.stringify(payload);
+ if(draft.command&&draft.submitted!==encoded){status('身份输入与未决命令不一致；请先刷新核对原账号。',true);return;}
+ draft.values=values;draft.command ||= crypto.randomUUID();draft.submitted=encoded;draft.pending=true;bindIdentityForm();
+ try{
+  await api('/api/sites/workspaces/'+workspace+'/accounts/'+account+'/identity',{command_id:draft.command,...payload});identityDrafts.delete(key);
+  if(state.workspace===workspace){const row=state.accounts.find(a=>a.account_id===account);if(row)row.external_identity=payload.external_identity;render();if(scopeKey()===key){await loadAccounts();if(scopeKey()===key)status('账号公开身份已保存并回读；平台执行授权仍未配置。');}}
+ }catch(error){if(error.status===400){draft.command=null;draft.submitted=null;}else draft.needsReadback=true;if(scopeKey()===key)status(error.message+(error.status===400?'；请修正后重试。':'；请先刷新核对原账号，未决命令保留。'),true);}
+ finally{draft.pending=false;if(scopeKey()===key)bindIdentityForm();}
+};
 $('#content-form').addEventListener('input',stashDraft);
 $('#content-form').onsubmit=async event=>{
  event.preventDefault();stashDraft();const key=scopeKey(),draft=contentDrafts.get(key),workspace=state.workspace,accountId=state.account,account=state.accounts.find(a=>a.account_id===accountId);

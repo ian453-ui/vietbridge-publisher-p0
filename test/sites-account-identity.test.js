@@ -36,3 +36,26 @@ test('existing frozen or unresolved job blocks identity change and preserves acc
  assert.equal((await f.call(path,input())).body.error,'ACCOUNT_IDENTITY_LOCKED');
  assert.equal(f.sql.prepare('SELECT external_identity FROM sites_account_details WHERE workspace=? AND account_id=?').get(w,a).external_identity,null);
 });
+
+test('existing legacy review also blocks identity change',async t=>{
+ const f=setup(t),{w,a,path}=await seed(f),task=crypto.randomUUID();
+ f.sql.prepare('INSERT INTO sites_task_bindings(task_id,workspace,account_id,identity_hash) VALUES(?,?,?,?)').run(task,w,a,null);
+ f.sql.prepare("INSERT INTO sites_reviews(id,task_id,request_revision,workspace,account_id,request_json,result_json,report_json,envelope_hash,result_fingerprint,state,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,'REVIEW_REQUIRED',?)").run(crypto.randomUUID(),task,1,w,a,'{}','{}','{}','a'.repeat(64),'b'.repeat(64),'2026-10-24T00:00:00.000Z');
+ const result=await f.call(path,input());assert.equal(result.body.error,'ACCOUNT_IDENTITY_LOCKED');
+ assert.equal(f.sql.prepare('SELECT external_identity FROM sites_account_details WHERE workspace=? AND account_id=?').get(w,a).external_identity,null);
+ assert.equal(f.sql.prepare('SELECT count(*) n FROM sites_account_identity_events').get().n,0);
+});
+
+test('legacy review arriving after preflight is rejected by the transaction guard',async t=>{
+ const f=setup(t),{w,a,path}=await seed(f),task=crypto.randomUUID(),original=f.db.batch.bind(f.db);let inserted=false;
+ f.db.batch=async statements=>{
+  if(!inserted&&statements.some(s=>s.query.includes('UPDATE sites_account_details SET external_identity'))){
+   inserted=true;f.sql.prepare('INSERT INTO sites_task_bindings(task_id,workspace,account_id,identity_hash) VALUES(?,?,?,?)').run(task,w,a,null);
+   f.sql.prepare("INSERT INTO sites_reviews(id,task_id,request_revision,workspace,account_id,request_json,result_json,report_json,envelope_hash,result_fingerprint,state,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,'REVIEW_REQUIRED',?)").run(crypto.randomUUID(),task,1,w,a,'{}','{}','{}','a'.repeat(64),'b'.repeat(64),'2026-10-24T00:00:00.000Z');
+  }
+  return original(statements);
+ };
+ const result=await f.call(path,input());assert.equal(inserted,true);assert.notEqual(result.status,200);
+ assert.equal(f.sql.prepare('SELECT external_identity FROM sites_account_details WHERE workspace=? AND account_id=?').get(w,a).external_identity,null);
+ assert.equal(f.sql.prepare('SELECT count(*) n FROM sites_account_identity_events').get().n,0);
+});
