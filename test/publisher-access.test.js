@@ -17,11 +17,12 @@ test('V3 relay scopes require exact Site and task IDs; old tokens cannot gain ex
  const old=f.access.createToken({name:'old',password,days:1,workspaces:['ws-a'],scopes:['jobs:read']}),oldPrincipal=f.access.authenticate({headers:{authorization:'Bearer '+old.token}});
  assert.equal(f.access.authorizeApp(oldPrincipal,'POST',new URL(base+'/dispatch',f.config.origin)),false);
  assert.throws(()=>f.access.createToken({name:'unsafe',password,days:1,workspaces:['ws-a'],scopes:['v3:dispatch']}),/V3 应用令牌/);
- const created=f.access.createToken({name:'specific',password,days:1,workspaces:['ws-a'],scopes:['v3:status','v3:upload','v3:dispatch'],site_project_id:'appgprj_6ad97a034fd08191a8399eeda10f048c',site_job_ids:[siteJob]});
+ const created=f.access.createToken({name:'specific',password,days:1,workspaces:['ws-a'],scopes:['v3:status','v3:upload','v3:prepare','v3:dispatch'],site_project_id:'appgprj_6ad97a034fd08191a8399eeda10f048c',site_job_ids:[siteJob]});
  const principal=f.access.authenticate({headers:{authorization:'Bearer '+created.token}});
  assert.equal(f.access.authorizeApp(principal,'GET',new URL(base+'/status',f.config.origin)),true);
  assert.equal(f.access.authorizeApp(principal,'POST',new URL(base+'/dispatch',f.config.origin)),true);
  assert.equal(f.access.authorizeApp(principal,'POST',new URL(base+'/media/0',f.config.origin)),true);
+ assert.equal(f.access.authorizeApp(principal,'POST',new URL(base+'/prepare',f.config.origin)),true);
  assert.equal(f.access.authorizeApp(principal,'POST',new URL('/api/v3-bridge/jobs/39786221-4438-4b94-8651-ff31f6049113/media/0',f.config.origin)),false);
  assert.equal(f.access.authorizeApp(principal,'POST',new URL(base+'/reconcile',f.config.origin)),false);
  assert.equal(f.access.authorizeApp(principal,'POST',new URL('/api/v3-bridge/jobs/39786221-4438-4b94-8651-ff31f6049113/dispatch',f.config.origin)),false);
